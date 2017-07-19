@@ -49,26 +49,30 @@ export const GenePanelList: React.FunctionComponent<IGenePanelTooltipProps> = ({
 @observer
 export class GenePanelModal extends React.Component<IGeneModalProps, {}> {
     render() {
-        const mobxPromise = this.props.genePanelCache.get({genePanelId: this.props.panelName});
-        return (
-            <Modal show={this.props.show} onHide={this.props.hide} keyboard>
-                <Modal.Header closeButton>
-                    <Modal.Title data-test="gene-panel-modal-title">{this.props.panelName}</Modal.Title>
-                </Modal.Header>
-                <Modal.Body style={{maxHeight: "calc(100vh - 210px)", overflowY: "auto"}}>
-                    {this.props.show && mobxPromise.isPending &&
-                    <LoadingIndicator isLoading={true}/>}
-                    {this.props.show && mobxPromise.isComplete &&
-                    <div data-test="gene-panel-modal-body">
-                        {mobxPromise.result!.genes.map(gene => (
-                            <p key={gene.entrezGeneId}>{gene.hugoGeneSymbol}</p>
-                        ))}
-                    </div>}
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button onClick={this.props.hide}>Close</Button>
-                </Modal.Footer>
-            </Modal>
-        );
+        if (this.props.genePanelCache) {
+            const mobxPromise = this.props.genePanelCache.get({genePanelId: this.props.panelName});
+            return (
+                <Modal show={this.props.show} onHide={this.props.hide} keyboard>
+                    <Modal.Header closeButton>
+                        <Modal.Title data-test="gene-panel-modal-title">{this.props.panelName}</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body style={{maxHeight: "calc(100vh - 210px)", overflowY: "auto"}}>
+                        {this.props.show && mobxPromise.isPending &&
+                        <LoadingIndicator isLoading={true}/>}
+                        {this.props.show && mobxPromise.isComplete &&
+                        <div data-test="gene-panel-modal-body">
+                            {mobxPromise.result!.genes.map(gene => (
+                                <p key={gene.entrezGeneId}>{gene.hugoGeneSymbol}</p>
+                            ))}
+                        </div>}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button onClick={this.props.hide}>Close</Button>
+                    </Modal.Footer>
+                </Modal>
+            );
+        } else {
+            return <span />;
+        }
     }
 };

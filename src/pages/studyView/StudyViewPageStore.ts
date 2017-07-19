@@ -22,6 +22,7 @@ import {
     MolecularProfileSampleCount,
     MutationCountByGene,
     MutationGeneFilter,
+    FusionGeneFilter,
     RectangleBounds,
     Sample,
     SampleIdentifier,
@@ -156,6 +157,7 @@ export const SELECTED_ANALYSIS_GROUP_VALUE = "Selected";
 export const UNSELECTED_ANALYSIS_GROUP_VALUE = "Unselected";
 
 export type MutatedGenesData = MutationCountByGene[];
+export type FusionGenesData = MutationCountByGene[];
 export type CNAGenesData = CopyNumberCountByGene[];
 export type SurvivalType = {
     id: string,
@@ -222,8 +224,7 @@ type OncokbCancerGene = {
     isCancerGene: boolean;
 };
 
-export type MutationCountByGeneWithCancerGene = MutationCountByGene & OncokbCancerGene;
-
+export type AlteredCountByGeneWithCancerGene = MutationCountByGene & OncokbCancerGene;
 export type CopyNumberCountByGeneWithCancerGene = CopyNumberCountByGene & OncokbCancerGene;
 
 export class StudyViewPageStore {
@@ -623,7 +624,7 @@ export class StudyViewPageStore {
     @observable private _clinicalDataBinFilterSet = observable.map<ClinicalDataBinFilter>();
 
     @observable.ref private _mutatedGeneFilter: MutationGeneFilter[] = [];
-
+    @observable.ref private _fusionGeneFilter: FusionGeneFilter[] = [];
     @observable.ref private _cnaGeneFilter: CopyNumberGeneFilter[] = [];
     @observable private _mutationCountVsCNAFilter:RectangleBounds|undefined;
 
@@ -705,6 +706,18 @@ export class StudyViewPageStore {
                 });
                 return acc;
             }, [] as MutationGeneFilter[]);
+        }
+
+        if (_.isArray(filters.fusionGenes) && filters.fusionGenes.length > 0) {
+            this._fusionGeneFilter = _.reduce(filters.fusionGenes, (acc, next) => {
+                acc.push({
+                    entrezGeneIds: _.reduce(next.entrezGeneIds, (geneAcc, entrezGeneId) => {
+                        geneAcc.push(entrezGeneId);
+                        return geneAcc;
+                    }, [] as number[])
+                });
+                return acc;
+            }, [] as FusionGeneFilter[]);
         }
 
         if (_.isArray(filters.cnaGenes) && filters.cnaGenes.length > 0) {
@@ -896,6 +909,12 @@ export class StudyViewPageStore {
     @action
     clearGeneFilter() {
         this._mutatedGeneFilter = [];
+    }
+
+    @autobind
+    @action
+    clearFusionGeneFilter() {
+        this._fusionGeneFilter = [];
     }
 
     @autobind
@@ -1104,6 +1123,42 @@ export class StudyViewPageStore {
 
     @autobind
     @action
+    addFusionGeneFilters(genes: GeneIdentifier[]) {
+
+        trackStudyViewFilterEvent("geneFilter", this);
+
+        genes.forEach(gene => this.geneMapCache[gene.entrezGeneId] = gene.hugoGeneSymbol);
+        this._fusionGeneFilter = [...this._fusionGeneFilter, {entrezGeneIds: genes.map(gene => gene.entrezGeneId)}];
+    }
+
+    @autobind
+    @action
+    removeFusionGeneFilter(toBeRemoved: number) {
+        this._fusionGeneFilter = _.reduce(this._fusionGeneFilter, (acc, next) => {
+            const newGroup = _.reduce(next.entrezGeneIds, (list, entrezGeneId) => {
+                if (entrezGeneId !== toBeRemoved) {
+                    list.push(entrezGeneId);
+                }
+                return list;
+            }, [] as number[]);
+            if (newGroup.length > 0) {
+                acc.push({
+                    entrezGeneIds: newGroup
+                });
+            }
+            return acc;
+        }, [] as FusionGeneFilter[]);
+    }
+
+    @autobind
+    @action resetFusionGeneFilter() {
+        if(this._fusionGeneFilter.length > 0) {
+            this._fusionGeneFilter = [];
+        }
+    }
+
+    @autobind
+    @action
     updateChartSampleIdentifierFilter(chartKey:string, cases: SampleIdentifier[], keepCurrent?:boolean) {
 
         let newSampleIdentifiers:SampleIdentifier[] = cases;
@@ -1234,6 +1289,9 @@ export class StudyViewPageStore {
         if (!visible) {
             switch (this.chartsType.get(chartMeta.uniqueKey)) {
                 case ChartTypeEnum.MUTATED_GENES_TABLE:
+                    this.resetGeneFilter();
+                    break;
+                case ChartTypeEnum.FUSION_GENES_TABLE:
                     this.resetGeneFilter();
                     break;
                 case ChartTypeEnum.CNA_GENES_TABLE:
@@ -1370,7 +1428,11 @@ export class StudyViewPageStore {
         }
 
         if (this._mutatedGeneFilter.length > 0) {
-            filters.mutatedGenes = this._mutatedGeneFilter;;
+            filters.mutatedGenes = this._mutatedGeneFilter;
+        }
+
+        if (this._fusionGeneFilter.length > 0) {
+            filters.fusionGenes = this._fusionGeneFilter;
         }
 
         if (this._cnaGeneFilter.length > 0) {
@@ -1429,6 +1491,10 @@ export class StudyViewPageStore {
 
     public getMutatedGenesTableFilters(): number[] {
         return _.flatMap(this._mutatedGeneFilter, filter => filter.entrezGeneIds);
+    }
+
+    public getFusionGenesTableFilters(): number[] {
+        return _.flatMap(this._fusionGeneFilter, filter => filter.entrezGeneIds);
     }
 
     public getCNAGenesTableFilters(): CopyNumberGeneFilterElement[] {
@@ -2264,7 +2330,7 @@ export class StudyViewPageStore {
             return acc;
         }, _chartMetaSet);
 
-        if (!_.isEmpty(this.mutationProfiles.result!)) {
+        if (!_.isEmpty(this.mutationProfiles.result)) {
             _chartMetaSet[UniqueKey.MUTATED_GENES_TABLE] = {
                 uniqueKey: UniqueKey.MUTATED_GENES_TABLE,
                 dataType: getChartMetaDataType(UniqueKey.MUTATED_GENES_TABLE),
@@ -2272,6 +2338,18 @@ export class StudyViewPageStore {
                 displayName: 'Mutated Genes',
                 priority: getDefaultPriorityByUniqueKey(UniqueKey.MUTATED_GENES_TABLE),
                 renderWhenDataChange: false,
+                description: ''
+            };
+        }
+
+        if (!_.isEmpty(this.mutationProfiles.result)) {
+            _chartMetaSet[UniqueKey.FUSION_GENES_TABLE] = {
+                uniqueKey: UniqueKey.FUSION_GENES_TABLE,
+                dataType: getChartMetaDataType(UniqueKey.FUSION_GENES_TABLE),
+                patientAttribute:false,
+                displayName: 'Fusion Genes',
+                priority: getDefaultPriorityByUniqueKey(UniqueKey.FUSION_GENES_TABLE),
+                renderWhenDataChange: true,
                 description: ''
             };
         }
@@ -2349,6 +2427,14 @@ export class StudyViewPageStore {
             }
             this.chartsType.set(UniqueKey.MUTATED_GENES_TABLE, ChartTypeEnum.MUTATED_GENES_TABLE);
             this.chartsDimension.set(UniqueKey.MUTATED_GENES_TABLE, STUDY_VIEW_CONFIG.layout.dimensions[ChartTypeEnum.MUTATED_GENES_TABLE]);
+        }
+        if (!_.isEmpty(this.mutationProfiles.result)) {
+            const fusionGeneMeta = _.find(this.chartMetaSet, chartMeta => chartMeta.uniqueKey === UniqueKey.FUSION_GENES_TABLE);
+            if (fusionGeneMeta && fusionGeneMeta.priority !== 0) {
+                this.changeChartVisibility(UniqueKey.FUSION_GENES_TABLE, true);
+            }
+            this.chartsType.set(UniqueKey.FUSION_GENES_TABLE, ChartTypeEnum.FUSION_GENES_TABLE);
+            this.chartsDimension.set(UniqueKey.FUSION_GENES_TABLE,STUDY_VIEW_CONFIG.layout.dimensions[ChartTypeEnum.FUSION_GENES_TABLE]);
         }
         if (!_.isEmpty(this.cnaProfiles.result)) {
             const cnaGeneMeta = _.find(this.chartMetaSet, chartMeta => chartMeta.uniqueKey === UniqueKey.CNA_GENES_TABLE);
@@ -2715,17 +2801,44 @@ export class StudyViewPageStore {
         }
     }));
 
-    readonly mutatedGeneData = remoteData<MutationCountByGeneWithCancerGene[]>({
+    readonly mutatedGeneData = remoteData<AlteredCountByGeneWithCancerGene[]>({
         await: () => this.oncokbCancerGeneFilterEnabled ?
             [this.mutationProfiles, this.oncokbAnnotatedGeneEntrezGeneIds, this.oncokbOncogeneEntrezGeneIds, this.oncokbTumorSuppressorGeneEntrezGeneIds, this.oncokbCancerGeneEntrezGeneIds] :
             [this.mutationProfiles],
         invoke: async () => {
-            if (!_.isEmpty(this.mutationProfiles.result!)) {
-                // TODO: get data for all profiles
+            if (!_.isEmpty(this.mutationProfiles.result)) {
                 let mutatedGenes = await internalClient.fetchMutatedGenesUsingPOST({
                     studyViewFilter: this.filters
                 });
                 return mutatedGenes.map(item => {
+                    return {
+                        ...item,
+                        oncokbAnnotated: this.oncokbCancerGeneFilterEnabled ? this.oncokbAnnotatedGeneEntrezGeneIds.result.includes(item.entrezGeneId) : false,
+                        oncokbOncogene: this.oncokbCancerGeneFilterEnabled ? this.oncokbOncogeneEntrezGeneIds.result.includes(item.entrezGeneId) : false,
+                        oncokbTumorSuppressorGene: this.oncokbCancerGeneFilterEnabled ? this.oncokbTumorSuppressorGeneEntrezGeneIds.result.includes(item.entrezGeneId) : false,
+                        isCancerGene: this.oncokbCancerGeneFilterEnabled ? this.oncokbCancerGeneEntrezGeneIds.result.includes(item.entrezGeneId) : false
+                    };
+                });
+            } else {
+                return [];
+            }
+        },
+        onError: (error => {
+        }),
+        default: []
+    });
+
+    // @ts-ignore
+    readonly fusionGeneData = remoteData<AlteredCountByGeneWithCancerGene>({
+        await: () => this.oncokbCancerGeneFilterEnabled ?
+            [this.mutationProfiles, this.oncokbAnnotatedGeneEntrezGeneIds, this.oncokbOncogeneEntrezGeneIds, this.oncokbTumorSuppressorGeneEntrezGeneIds, this.oncokbCancerGeneEntrezGeneIds] :
+            [this.mutationProfiles],
+        invoke: async () => {
+            if (!_.isEmpty(this.mutationProfiles.result)) {
+                const fusionGenes = await internalClient.fetchFusionGenesUsingPOST({
+                    studyViewFilter: this.filters
+                });
+                return fusionGenes.map(item => {
                     return {
                         ...item,
                         oncokbAnnotated: this.oncokbCancerGeneFilterEnabled ? this.oncokbAnnotatedGeneEntrezGeneIds.result.includes(item.entrezGeneId) : false,
@@ -2749,7 +2862,6 @@ export class StudyViewPageStore {
             [this.mutationProfiles],
         invoke: async () => {
             if (!_.isEmpty(this.cnaProfiles.result)) {
-                // TODO: get data for all profiles
                 let cnaGenes = await internalClient.fetchCNAGenesUsingPOST({
                     studyViewFilter: this.filters
                 });
@@ -3011,10 +3123,34 @@ export class StudyViewPageStore {
                 header.push('Is Cancer Gene (source: OncoKB)');
             }
             let data = [header.join('\t')];
-            _.each(this.mutatedGeneData.result, (record: MutationCountByGeneWithCancerGene) => {
+            _.each(this.mutatedGeneData.result, (record: AlteredCountByGeneWithCancerGene) => {
                 let rowData = [
                     record.hugoGeneSymbol,
                     record.qValue === undefined ? '' : getQValue(record.qValue),
+                    record.totalCount,
+                    record.numberOfAlteredCases,
+                    getFrequencyStr(record.numberOfAlteredCases / record.numberOfSamplesProfiled * 100)
+                ];
+                if (this.oncokbCancerGeneFilterEnabled) {
+                    rowData.push(this.oncokbCancerGeneFilterEnabled ? (record.isCancerGene ? 'Yes' : 'No') : 'NA');
+                }
+                data.push(rowData.join("\t"));
+            });
+            return data.join("\n");
+        } else
+            return '';
+    }
+
+    public async getFusionGenesDownloadData() {
+        if (this.fusionGeneData.result) {
+            const header = ['Gene','# Fusion', '#', 'Freq'];
+            if(this.oncokbCancerGeneFilterEnabled) {
+                header.push('Is Cancer Gene (source: OncoKB)');
+            }
+            const data = [header.join('\t')];
+            _.each(this.fusionGeneData.result, (record: AlteredCountByGeneWithCancerGene) => {
+                const rowData = [
+                    record.hugoGeneSymbol,
                     record.totalCount,
                     record.numberOfAlteredCases,
                     getFrequencyStr(record.numberOfAlteredCases / record.numberOfSamplesProfiled * 100)
@@ -3336,6 +3472,11 @@ export class StudyViewPageStore {
                 if (UniqueKey.MUTATED_GENES_TABLE in this.chartMetaSet) {
                     ret[UniqueKey.MUTATED_GENES_TABLE] = this.molecularProfileSampleCounts.result ? this.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples : 0;
                     ret[UniqueKey.WITH_MUTATION_DATA] = this.molecularProfileSampleCounts.result ? this.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples : 0;
+                }
+
+                if (UniqueKey.FUSION_GENES_TABLE in this.chartMetaSet) {
+                    ret[UniqueKey.FUSION_GENES_TABLE] = this.molecularProfileSampleCounts.result ? this.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples : 0;
+                    ret[UniqueKey.WITH_FUSION_DATA] = this.molecularProfileSampleCounts.result ? this.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples : 0;
                 }
 
                 if (UniqueKey.CNA_GENES_TABLE in this.chartMetaSet) {

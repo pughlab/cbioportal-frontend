@@ -64,6 +64,15 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
             resetGeneFilter: (chartMeta: ChartMeta) => {
                 this.store.resetGeneFilter();
             },
+            addFusionGeneFilters: (genes: GeneIdentifier[]) => {
+                this.store.addFusionGeneFilters(genes);
+            },
+            removeFusionGeneFilter: (entrezGeneId:number) => {
+                this.store.removeFusionGeneFilter(entrezGeneId);
+            },
+            resetFustionGeneFilter: (chartMeta: ChartMeta) => {
+                this.store.resetFusionGeneFilter();
+            },
             resetCNAGeneFilter: (chartMeta: ChartMeta) => {
                 this.store.resetCNAGeneFilter();
             },
@@ -129,9 +138,9 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
             setComparisonConfirmationModal: this.store.setComparisonConfirmationModal
         };
 
-        const {BAR_CHART, SURVIVAL, CNA_GENES_TABLE, TABLE, SCATTER, PIE_CHART, MUTATED_GENES_TABLE} = ChartTypeEnum;
+        const {BAR_CHART, SURVIVAL, CNA_GENES_TABLE, TABLE, SCATTER, PIE_CHART, MUTATED_GENES_TABLE, FUSION_GENES_TABLE} = ChartTypeEnum;
         switch (this.store.chartsType.get(chartMeta.uniqueKey)) {
-            case ChartTypeEnum.PIE_CHART: {
+            case PIE_CHART: {
 
                 //if the chart is one of the custom charts then get the appropriate promise
                 if(this.store.isCustomChart(chartMeta.uniqueKey)) {
@@ -190,6 +199,17 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
                 props.title = props.title + ( !this.store.molecularProfileSampleCounts.isComplete || this.store.molecularProfileSampleCounts.result === undefined ? '' : ` (${this.store.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples} profiled samples)`),
                 props.getData = () => this.store.getMutatedGenesDownloadData();
                 props.genePanelCache = this.store.genePanelCache;
+                props.downloadTypes = ["Data"];
+                break;
+            }
+            case FUSION_GENES_TABLE: {
+                props.filters = this.store.getFusionGenesTableFilters();
+                props.promise = this.store.fusionGeneData;
+                props.onValueSelection = this.handlers.addFusionGeneFilters;
+                props.onResetSelection = this.handlers.resetFustionGeneFilter;
+                props.selectedGenes=this.store.selectedGenes;
+                props.onGeneSelect=this.store.onCheckGene;
+                props.title = props.title + ( !this.store.molecularProfileSampleCounts.isComplete || this.store.molecularProfileSampleCounts.result === undefined ? '' : ` (${this.store.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples} profiled samples)`),
                 props.downloadTypes = ["Data"];
                 break;
             }

@@ -14,6 +14,7 @@ import ClinicalTable from "pages/studyView/table/ClinicalTable";
 import MobxPromise from "mobxpromise";
 import SurvivalChart, {LegendLocation} from "../../resultsView/survival/SurvivalChart";
 import {MutatedGenesTable} from "../table/MutatedGenesTable";
+import {FusionGenesTable} from "../table/FusionGenesTable";
 import {CNAGenesTable} from "../table/CNAGenesTable";
 
 import autobind from 'autobind-decorator';
@@ -135,6 +136,9 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                 this.props.onValueSelection(filters);
             }),
             updateGeneFilters: action((value: number[]) => {
+                this.props.onValueSelection(value);
+            }),
+            updateFusionGeneFilters: action((value: number[]) => {
                 this.props.onValueSelection(value);
             }),
             onMouseEnterChart: action((event: React.MouseEvent<any>) => {
@@ -294,7 +298,7 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
 
     @computed
     get chart() {
-        const {BAR_CHART, SURVIVAL, CNA_GENES_TABLE, TABLE, SCATTER, PIE_CHART, MUTATED_GENES_TABLE} = ChartTypeEnum;
+        const {BAR_CHART, SURVIVAL, CNA_GENES_TABLE, TABLE, SCATTER, PIE_CHART, MUTATED_GENES_TABLE, FUSION_GENES_TABLE} = ChartTypeEnum;
         switch (this.chartType) {
             case PIE_CHART: {
                 return ()=>(<PieChart
@@ -343,6 +347,22 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                         numOfSelectedSamples={100}
                         filters={this.props.filters}
                         onUserSelection={this.handlers.updateGeneFilters}
+                        onGeneSelect={this.props.onGeneSelect}
+                        selectedGenes={this.props.selectedGenes}
+                        genePanelCache={this.props.genePanelCache}
+                        cancerGeneFilterEnabled={this.props.cancerGeneFilterEnabled}
+                    />
+                );
+            }
+            case FUSION_GENES_TABLE: {
+                return ()=>(
+                    <FusionGenesTable
+                        promise={this.props.promise}
+                        width={getWidthByDimension(this.props.dimension, this.borderWidth)}
+                        height={getTableHeightByDimension(this.props.dimension, this.chartHeaderHeight)}
+                        numOfSelectedSamples={100}
+                        filters={this.props.filters}
+                        onUserSelection={this.handlers.updateFusionGeneFilters}
                         onGeneSelect={this.props.onGeneSelect}
                         selectedGenes={this.props.selectedGenes}
                         genePanelCache={this.props.genePanelCache}

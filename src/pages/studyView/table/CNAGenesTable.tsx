@@ -29,7 +29,6 @@ import { DEFAULT_SORTING_COLUMN } from "../StudyViewConfig";
 import { GenePanelModal } from "./GenePanelModal";
 import {getFreqColumnRender, getGeneColumnHeaderRender} from "pages/studyView/TableUtils";
 import {GeneCell} from "pages/studyView/table/GeneCell";
-import {IMutatedGenesTablePros} from "pages/studyView/table/MutatedGenesTable";
 import {GenePanel, GenePanelToGene} from "shared/api/generated/CBioPortalAPI";
 import MobxPromiseCache from "shared/lib/MobxPromiseCache";
 

@@ -1,46 +1,38 @@
 import * as React from "react";
-import {GeneIdentifier, MutatedGenesData, AlteredCountByGeneWithCancerGene} from "pages/studyView/StudyViewPageStore";
+import {AlteredCountByGeneWithCancerGene} from "pages/studyView/StudyViewPageStore";
 import { observer } from "mobx-react";
 import styles from "./tables.module.scss";
 import LabeledCheckbox from "../../../shared/components/labeledCheckbox/LabeledCheckbox";
-import MobxPromise from "mobxpromise";
-import { If } from "react-if";
 import * as _ from "lodash";
-import classnames from "classnames";
-import DefaultTooltip from "public-lib/components/defaultTooltip/DefaultTooltip";
 import FixedHeaderTable from "./FixedHeaderTable";
-import { action, computed, IReactionDisposer, observable, reaction } from "mobx";
+import { action, computed, observable } from "mobx";
 import autobind from "autobind-decorator";
 import {
     correctMargin,
     correctColumnWidth,
     getFixedHeaderNumberCellMargin,
     getFixedHeaderTableMaxLengthStringPixel,
-    getFrequencyStr,
-    getQValue
+    getFrequencyStr
 } from "../StudyViewUtils";
 import {Column, SortDirection} from "../../../shared/components/lazyMobXTable/LazyMobXTable";
-import { DEFAULT_SORTING_COLUMN } from "../StudyViewConfig";
-import {GenePanel, GenePanelToGene} from "shared/api/generated/CBioPortalAPI";
 import { GenePanelModal } from "./GenePanelModal";
 import {getFreqColumnRender,
         getGeneColumnHeaderRender,
         IAlteredGenesTablePros,
         AlteredGenesTableUserSelectionWithIndex} from "pages/studyView/TableUtils";
 import {GeneCell} from "pages/studyView/table/GeneCell";
-import MobxPromiseCache from "shared/lib/MobxPromiseCache";
 
 enum ColumnKey {
     GENE = "Gene",
-    NUMBER_MUTATIONS = "# Mut",
+    NUMBER_FUSIONS = "# Fusion",
     NUMBER = "#",
     FREQ = "Freq"
 }
 
-class MutatedGenesTableComponent extends FixedHeaderTable<AlteredCountByGeneWithCancerGene> {}
+class FusionGenesTableComponent extends FixedHeaderTable<AlteredCountByGeneWithCancerGene> {}
 
 @observer
-export class MutatedGenesTable extends React.Component<IAlteredGenesTablePros, {}> {
+export class FusionGenesTable extends React.Component<IAlteredGenesTablePros, {}> {
     @observable private preSelectedRows: AlteredGenesTableUserSelectionWithIndex[] = [];
     @observable private sortBy: string = ColumnKey.FREQ;
     @observable private sortDirection: SortDirection;
@@ -77,7 +69,7 @@ export class MutatedGenesTable extends React.Component<IAlteredGenesTablePros, {
     get columnsWidth() {
         return {
             [ColumnKey.GENE]: correctColumnWidth(this.props.width * 0.35),
-            [ColumnKey.NUMBER_MUTATIONS]: correctColumnWidth(this.props.width * 0.25),
+            [ColumnKey.NUMBER_FUSIONS]: correctColumnWidth(this.props.width * 0.25),
             [ColumnKey.NUMBER]: correctColumnWidth(this.props.width * 0.25),
             [ColumnKey.FREQ]: correctColumnWidth(this.props.width * 0.15)
         };
@@ -85,16 +77,16 @@ export class MutatedGenesTable extends React.Component<IAlteredGenesTablePros, {
 
     @computed
     get cellMargin() {
-        const maxNumberMutationsColumn = _.max(this.tableData.map(item => item.totalCount));
+        const maxNumberFusionsColumn = _.max(this.tableData.map(item => item.totalCount));
         const maxNumberColumn = _.max(this.tableData!.map(item => item.numberOfAlteredCases));
-        const localeNumberMutationsString = maxNumberMutationsColumn === undefined ? '' : maxNumberMutationsColumn.toLocaleString();
+        const localeNumberFusionsString = maxNumberFusionsColumn === undefined ? '' : maxNumberFusionsColumn.toLocaleString();
         const localeNumberString = maxNumberColumn === undefined ? '' : maxNumberColumn.toLocaleString();
         return {
             [ColumnKey.GENE]: 0,
-            [ColumnKey.NUMBER_MUTATIONS]: correctMargin(
+            [ColumnKey.NUMBER_FUSIONS]: correctMargin(
                 getFixedHeaderNumberCellMargin(
-                    this.columnsWidth[ColumnKey.NUMBER_MUTATIONS],
-                    localeNumberMutationsString
+                    this.columnsWidth[ColumnKey.NUMBER_FUSIONS],
+                    localeNumberFusionsString
                 )
             ),
             [ColumnKey.NUMBER]: correctMargin(
@@ -134,7 +126,7 @@ export class MutatedGenesTable extends React.Component<IAlteredGenesTablePros, {
                 },
                 render: (data: AlteredCountByGeneWithCancerGene) => {
                     return <GeneCell
-                        tableType={'mutation'}
+                        tableType={'fusion'}
                         selectedGenes={this.props.selectedGenes}
                         hugoGeneSymbol={data.hugoGeneSymbol}
                         qValue={data.qValue}
@@ -157,13 +149,11 @@ export class MutatedGenesTable extends React.Component<IAlteredGenesTablePros, {
                 width: this.columnsWidth[ColumnKey.GENE]
             },
             {
-                name: ColumnKey.NUMBER_MUTATIONS,
+                name: ColumnKey.NUMBER_FUSIONS,
                 tooltip: <span>Total number of mutations</span>,
                 headerRender: () => {
                     return (
-                        <div style={{ marginLeft: this.cellMargin[ColumnKey.NUMBER_MUTATIONS] }}>
-                            # Mut
-                        </div>
+                        <span># Fusion</span>
                     );
                 },
                 render: (data: AlteredCountByGeneWithCancerGene) => (
@@ -171,7 +161,7 @@ export class MutatedGenesTable extends React.Component<IAlteredGenesTablePros, {
                         style={{
                             flexDirection: "row-reverse",
                             display: "flex",
-                            marginRight: this.cellMargin[ColumnKey.NUMBER_MUTATIONS]
+                            marginRight: this.cellMargin[ColumnKey.NUMBER_FUSIONS]
                         }}
                     >
                         {data.totalCount.toLocaleString()}
@@ -182,7 +172,7 @@ export class MutatedGenesTable extends React.Component<IAlteredGenesTablePros, {
                 filter: (data: AlteredCountByGeneWithCancerGene, filterString: string) => {
                     return _.toString(data.totalCount).includes(filterString);
                 },
-                width: this.columnsWidth[ColumnKey.NUMBER_MUTATIONS]
+                width: this.columnsWidth[ColumnKey.NUMBER_FUSIONS]
             },
             {
                 name: ColumnKey.NUMBER,
@@ -219,12 +209,12 @@ export class MutatedGenesTable extends React.Component<IAlteredGenesTablePros, {
             },
             {
                 name: ColumnKey.FREQ,
-                tooltip: <span>Percentage of samples with one or more mutations</span>,
+                tooltip: <span>Percentage of samples with one or more fusions</span>,
                 headerRender: () => {
                     return <div style={{ marginLeft: this.cellMargin[ColumnKey.FREQ] }}>Freq</div>;
                 },
                 render: (data: AlteredCountByGeneWithCancerGene) => {
-                    return getFreqColumnRender('mutation', data.numberOfSamplesProfiled, data.numberOfAlteredCases, data.matchingGenePanelIds, this.toggleModal, {marginLeft: this.cellMargin[ColumnKey.FREQ]});
+                    return getFreqColumnRender('fusion', data.numberOfSamplesProfiled, data.numberOfAlteredCases, data.matchingGenePanelIds, this.toggleModal, {marginLeft: this.cellMargin[ColumnKey.FREQ]});
                 },
                 sortBy: (data: AlteredCountByGeneWithCancerGene) =>
                     (data.numberOfAlteredCases / data.numberOfSamplesProfiled) * 100,
@@ -363,7 +353,7 @@ export class MutatedGenesTable extends React.Component<IAlteredGenesTablePros, {
         return (
             <>
                 {this.props.promise.isComplete && (
-                    <MutatedGenesTableComponent
+                    <FusionGenesTableComponent
                         width={this.props.width}
                         height={this.props.height}
                         data={this.tableData}

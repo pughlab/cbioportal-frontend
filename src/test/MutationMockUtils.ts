@@ -47,7 +47,10 @@ export function emptyMutation(): Mutation
         tumorRefCount: -1,
         validationStatus: "",
         variantAllele: "",
-        variantType: ""
+        variantType: "",
+        chr: "",
+        cancerCellFraction: 0,
+        subclonalNode: ''
     };
 }
 

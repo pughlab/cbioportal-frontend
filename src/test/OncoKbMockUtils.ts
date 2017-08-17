@@ -25,13 +25,14 @@ export function emptyQueryIndicator(): IndicatorQueryResp
             proteinEnd: -1,
             proteinStart: -1,
             tumorType: "",
-            type: "web"
+            type: "web",
+            hgvs: ""
         },
         treatments: [],
         tumorTypeSummary: "",
         variantExist: false,
         variantSummary: "",
-        vus: false
+        vus: false,
     };
 }
 

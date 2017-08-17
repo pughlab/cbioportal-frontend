@@ -6,3 +6,5 @@ export const MUTATION_STATUS_GERMLINE = 'Germline';
 // between patients that have no germline mutations and those that weren't
 // screened)
 export const IMPACT_GERMLINE_TESTING_CONSENT = '12_245_PARTC_CONSENTED';
+export const GENETIC_PROFILE_MRNA_EXPRESSION='MRNA_EXPRESSION';
+export const GENETIC_PROFILE_SEGMENT='COPY_NUMBER_SEGMENT';

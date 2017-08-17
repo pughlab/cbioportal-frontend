@@ -21,6 +21,7 @@ import MutationCountColumnFormatter from "./column/MutationCountColumnFormatter"
 import CancerTypeColumnFormatter from "./column/CancerTypeColumnFormatter";
 import MutationStatusColumnFormatter from "./column/MutationStatusColumnFormatter";
 import ValidationStatusColumnFormatter from "./column/ValidationStatusColumnFormatter";
+import CancerCellFractionColumnFormatter from "./column/CancerCellFractionColumnFormatter"
 import {ICosmicData} from "shared/model/Cosmic";
 import AnnotationColumnFormatter from "./column/AnnotationColumnFormatter";
 import {IMyCancerGenomeData} from "shared/model/MyCancerGenome";
@@ -95,7 +96,9 @@ export enum MutationTableColumnType {
     REF_READS,
     VAR_READS,
     CANCER_TYPE,
-    NUM_MUTATIONS
+    NUM_MUTATIONS,
+    CANCER_CELL_FRACTION,
+    SUBCLONAL_NODE
 }
 
 type MutationTableColumn = Column<Mutation[]>&{order?:number, shouldExclude?:()=>boolean};
@@ -426,6 +429,24 @@ export default class MutationTable<P extends IMutationTableProps> extends React.
             sortBy: (d:Mutation[]) => MutationCountColumnFormatter.sortBy(d, this.props.mutationCountCache),
             tooltip:(<span>Total number of nonsynonymous mutations in the sample</span>)
         };
+
+        this._columns[MutationTableColumnType.CANCER_CELL_FRACTION] = {
+            name: "Cancer Cell Fraction",
+            render: CancerCellFractionColumnFormatter.renderFunction,
+            headerRender: (name: string) => <span style={{display:'inline-block', maxWidth:55}}>{name}</span>,
+            sortBy: CancerCellFractionColumnFormatter.getSortValue,
+            tooltip:(<span>Variant allele frequency in the tumor sample</span>),
+            visible: true
+        };
+
+        this._columns[MutationTableColumnType.SUBCLONAL_NODE] = {
+            name: "Subclonal Node",
+            render: (d:Mutation[])=>getSpanForDataField(d, "subclonalNode"),
+            download: (d:Mutation[])=>getTextForDataField(d, "subclonalNode"),
+            sortBy:(d:Mutation[])=>d.map(m=>m.subclonalNode),
+            visible: false
+        };
+
     }
 
     @computed protected get orderedColumns(): MutationTableColumnType[] {

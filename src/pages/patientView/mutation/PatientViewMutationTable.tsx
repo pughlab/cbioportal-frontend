@@ -8,6 +8,7 @@ import SampleManager from "../sampleManager";
 import {Mutation} from "shared/api/generated/CBioPortalAPI";
 import AlleleCountColumnFormatter from "shared/components/mutationTable/column/AlleleCountColumnFormatter";
 import AlleleFreqColumnFormatter from "./column/AlleleFreqColumnFormatter";
+import CancerCellFractionColumnFormatter from "./column/CancerCellFractionColumnFormatter"
 import TumorColumnFormatter from "./column/TumorColumnFormatter";
 import {isUncalled} from "shared/lib/MutationUtils";
 
@@ -51,7 +52,9 @@ export default class PatientViewMutationTable extends MutationTable<IPatientView
             MutationTableColumnType.MUTATION_ASSESSOR,
             MutationTableColumnType.COSMIC,
             MutationTableColumnType.TUMOR_ALLELE_FREQ,
-            MutationTableColumnType.TUMORS
+            MutationTableColumnType.TUMORS,
+            MutationTableColumnType.CANCER_CELL_FRACTION,
+            MutationTableColumnType.SUBCLONAL_NODE
         ]
     };
 
@@ -104,6 +107,23 @@ export default class PatientViewMutationTable extends MutationTable<IPatientView
         this._columns[MutationTableColumnType.VAR_READS].download =
             (d:Mutation[])=>AlleleCountColumnFormatter.getTextValue(d, this.getSamples(), "tumorAltCount");
 
+        /*this._columns[MutationTableColumnType.CANCER_CELL_FRACTION].render =
+            (d:Mutation[])=>AlleleCountColumnFormatter.renderFunction(d, this.getSamples(), "cancerCellFraction");
+        this._columns[MutationTableColumnType.CANCER_CELL_FRACTION].download =
+            (d:Mutation[])=>AlleleCountColumnFormatter.getTextValue(d, this.getSamples(), "cancerCellFraction");*/
+        this._columns[MutationTableColumnType.CANCER_CELL_FRACTION] = {
+            name: "Cell Fraction",
+            render: (d:Mutation[])=>CancerCellFractionColumnFormatter.renderFunction(d, this.props.sampleManager),
+            sortBy:(d:Mutation[])=>CancerCellFractionColumnFormatter.getSortValue(d, this.props.sampleManager),
+            tooltip:(<span>Variant allele frequency in the tumor sample</span>),
+            visible: CancerCellFractionColumnFormatter.isVisible(this.props.sampleManager,
+                this.props.dataStore ? this.props.dataStore.allData : this.props.data)
+        };
+
+        this._columns[MutationTableColumnType.SUBCLONAL_NODE].render =
+            (d:Mutation[])=>AlleleCountColumnFormatter.renderFunction(d, this.getSamples(), "subclonalNode");
+        this._columns[MutationTableColumnType.CANCER_CELL_FRACTION].download =
+            (d:Mutation[])=>AlleleCountColumnFormatter.getTextValue(d, this.getSamples(), "cancerCellFrsubclonalNodeaction");
 
         // order columns
         this._columns[MutationTableColumnType.TUMORS].order = 5;
@@ -120,7 +140,9 @@ export default class PatientViewMutationTable extends MutationTable<IPatientView
         this._columns[MutationTableColumnType.MUTATION_TYPE].order = 110;
         this._columns[MutationTableColumnType.CENTER].order = 120;
         this._columns[MutationTableColumnType.TUMOR_ALLELE_FREQ].order = 130;
-        this._columns[MutationTableColumnType.VAR_READS].order = 140;
+        this._columns[MutationTableColumnType.CANCER_CELL_FRACTION].order = 135;
+        this._columns[MutationTableColumnType.SUBCLONAL_NODE].order = 140;
+        this._columns[MutationTableColumnType.VAR_READS].order = 145;
         this._columns[MutationTableColumnType.REF_READS].order = 150;
         this._columns[MutationTableColumnType.VAR_READS_N].order = 170;
         this._columns[MutationTableColumnType.REF_READS_N].order = 180;
@@ -129,6 +151,7 @@ export default class PatientViewMutationTable extends MutationTable<IPatientView
         this._columns[MutationTableColumnType.COHORT].order = 183;
         this._columns[MutationTableColumnType.COSMIC].order = 184;
         this._columns[MutationTableColumnType.MUTATION_ASSESSOR].order = 190;
+
 
         // exclusions
         this._columns[MutationTableColumnType.MRNA_EXPR].shouldExclude = ()=>{

@@ -37,7 +37,8 @@ import {IMyCancerGenomeData, IMyCancerGenome} from "shared/model/MyCancerGenome"
 import {IHotspotData, ICancerHotspotData} from "shared/model/CancerHotspots";
 import {ICivicGeneData, ICivicVariant, ICivicGene} from "shared/model/Civic.ts";
 import CancerHotspotsAPI from "shared/api/generated/CancerHotspotsAPI";
-import {GENETIC_PROFILE_MUTATIONS_SUFFIX, GENETIC_PROFILE_UNCALLED_MUTATIONS_SUFFIX} from "shared/constants";
+import {GENETIC_PROFILE_MUTATIONS_SUFFIX, GENETIC_PROFILE_UNCALLED_MUTATIONS_SUFFIX,
+                GENETIC_PROFILE_MRNA_EXPRESSION, GENETIC_PROFILE_SEGMENT} from "shared/constants";
 
 export const ONCOKB_DEFAULT: IOncoKbData = {
     sampleToTumorMap : {},
@@ -153,12 +154,14 @@ export async function fetchClinicalDataForPatient(studyId:string,
 }
 
 export async function fetchCopyNumberSegments(studyId:string,
+                                              profileIds: any,
                                               sampleIds:string[],
                                               client:CBioPortalAPI = defaultClient)
 {
-    if (studyId && sampleIds.length > 0)
+    if (studyId && profileIds && sampleIds.length > 0)
     {
         return await client.fetchCopyNumberSegmentsUsingPOST({
+            profileIds,
             sampleIdentifiers: sampleIds.map((sampleId: string) => ({
                 sampleId,
                 studyId
@@ -543,6 +546,20 @@ export function findGeneticProfileIdDiscrete(geneticProfilesInStudy:MobxPromise<
 
     const profile = geneticProfilesInStudy.result.find((p: GeneticProfile) => {
         return p.datatype === 'DISCRETE';
+    });
+
+    return profile ? profile.geneticProfileId : undefined;
+}
+
+export function findGeneticProfileIdContinuous(geneticProfilesInStudy:MobxPromise<GeneticProfile[]>)
+{
+    if (!geneticProfilesInStudy.result) {
+        return undefined;
+    }
+
+    const profile = geneticProfilesInStudy.result.find((p: GeneticProfile) => {
+        return (p.geneticAlterationType === GENETIC_PROFILE_MRNA_EXPRESSION ||
+                p.geneticAlterationType === GENETIC_PROFILE_SEGMENT);
     });
 
     return profile ? profile.geneticProfileId : undefined;

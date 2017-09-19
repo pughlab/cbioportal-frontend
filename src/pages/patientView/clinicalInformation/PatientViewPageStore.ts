@@ -330,7 +330,7 @@ export class PatientViewPageStore {
     }, {});
 
     readonly sequencedSampleIdsInStudy = remoteData(async() => {
-        return stringListToSet(await client.getAllSampleIdsInSampleListUsingGET({sampleListId:`${this.studyId}_sequenced`}));
+        return stringListToSet(await client.getAllSampleIdsInSampleListUsingGET({sampleListId:`${this.studyId}_all`}));
     }, {});
 
     readonly geneticProfilesInStudy = remoteData(() => {

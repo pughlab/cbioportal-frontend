@@ -443,16 +443,15 @@ export default class MutationTable<P extends IMutationTableProps> extends React.
 
         this._columns[MutationTableColumnType.CANCER_CELL_FRACTION] = {
             name: "Cancer Cell Fraction",
-            render: CancerCellFractionColumnFormatter.renderFunction,
-            headerRender: (name: string) => <span style={{display:'inline-block', maxWidth:55}}>{name}</span>,
-            sortBy: CancerCellFractionColumnFormatter.getSortValue,
-            tooltip:(<span>Variant allele frequency in the tumor sample</span>),
-            visible: true
+            render: (d:Mutation[])=>getDivForDataField(d, "cancerCellFraction"),
+            download: (d:Mutation[])=>getTextForDataField(d, "cancerCellFraction"),
+            sortBy:(d:Mutation[])=>d.map(m=>m.cancerCellFraction),
+            visible: false
         };
 
         this._columns[MutationTableColumnType.SUBCLONAL_NODE] = {
             name: "Subclonal Node",
-            render: (d:Mutation[])=>getSpanForDataField(d, "subclonalNode"),
+            render: (d:Mutation[])=>getDivForDataField(d, "subclonalNode"),
             download: (d:Mutation[])=>getTextForDataField(d, "subclonalNode"),
             sortBy:(d:Mutation[])=>d.map(m=>m.subclonalNode),
             visible: false

@@ -158,7 +158,7 @@ export async function fetchCopyNumberSegments(studyId:string,
                                               sampleIds:string[],
                                               client:CBioPortalAPI = defaultClient)
 {
-    if (studyId && profileIds && sampleIds.length > 0)
+    if (studyId && profileIds && profileIds.length > 0 && sampleIds.length > 0)
     {
         return await client.fetchCopyNumberSegmentsUsingPOST({
             profileIds,

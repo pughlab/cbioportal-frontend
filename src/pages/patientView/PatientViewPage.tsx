@@ -464,7 +464,16 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                             <IFrameLoader height={700} url={  `http://cancer.digitalslidearchive.net/index_mskcc.php?slide_name=${patientViewPageStore.patientId}` } />
                         </div>
                     </MSKTab>
-
+                    <MSKTab key={6} id="pathSlidesTab" linkText="Pathology Slide"
+                            hide={/https/.test(window.location.protocol) ||
+                            patientViewPageStore.pathologySlides.isError ||
+                            (patientViewPageStore.pathologySlides.isComplete &&
+                                patientViewPageStore.pathologySlides.result.length===0)}
+                    >
+                        <div style={{position: "relative"}}>
+                            <IFrameLoader height={700} url={  `http://riswtp01/eSlideTray.php?ImageIds=${patientViewPageStore.pathologySlides.result}` } />
+                        </div>
+                    </MSKTab>
                     </MSKTabs>
 
                     </Then>

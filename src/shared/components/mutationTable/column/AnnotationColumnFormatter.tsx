@@ -7,6 +7,7 @@ import CancerHotspots from "shared/components/annotation/CancerHotspots";
 import MyCancerGenome from "shared/components/annotation/MyCancerGenome";
 import OncoKB from "shared/components/annotation/OncoKB";
 import Civic from "shared/components/annotation/Civic";
+import Trial from "shared/components/annotation/Trial";
 import {IOncoKbData, IOncoKbDataWrapper} from "shared/model/OncoKB";
 import {IMyCancerGenomeData, IMyCancerGenome} from "shared/model/MyCancerGenome";
 import {IHotspotDataWrapper} from "shared/model/CancerHotspots";
@@ -243,7 +244,7 @@ export default class AnnotationColumnFormatter
 
         return _.flatten([
             OncoKB.sortValue(annotationData.oncoKbIndicator),
-            Civic.sortValue(annotationData.civicEntry),
+            Trial.sortValue(annotationData.civicEntry),
             MyCancerGenome.sortValue(annotationData.myCancerGenomeLinks),
             CancerHotspots.sortValue(annotationData.isHotspot, annotationData.is3dHotspot)
         ]);
@@ -262,7 +263,7 @@ export default class AnnotationColumnFormatter
 
         return [
             `OncoKB: ${OncoKB.download(annotationData.oncoKbIndicator)}`,
-            `CIViC: ${Civic.download(annotationData.civicEntry)}`,
+            `CIViC: ${Trial.download(annotationData.civicEntry)}`,
             `MyCancerGenome: ${MyCancerGenome.download(annotationData.myCancerGenomeLinks)}`,
             `CancerHotspot: ${annotationData.isHotspot ? 'yes' : 'no'}`,
             `3DHotspot: ${annotationData.is3dHotspot ? 'yes' : 'no'}`,
@@ -333,6 +334,13 @@ export default class AnnotationColumnFormatter
                         isHotspot={annotation.isHotspot}
                         is3dHotspot={annotation.is3dHotspot}
                         status={annotation.hotspotStatus}
+                    />
+                </If>
+                <If condition={columnProps.enableCivic || false}>
+                    <Trial
+                        civicEntry={annotation.civicEntry}
+                        civicStatus={annotation.civicStatus}
+                        hasCivicVariants={annotation.hasCivicVariants}
                     />
                 </If>
             </span>

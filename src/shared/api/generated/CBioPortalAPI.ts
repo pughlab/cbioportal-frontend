@@ -378,8 +378,6 @@ export type MutationCount = {
 
         'patientId': string
 
-        'patientId': string
-
         'sampleId': string
 
         'studyId': string

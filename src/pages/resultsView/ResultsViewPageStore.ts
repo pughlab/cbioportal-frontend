@@ -85,8 +85,9 @@ export const AlterationTypeConstants = {
     MRNA_EXPRESSION: 'MRNA_EXPRESSION',
     PROTEIN_LEVEL: 'PROTEIN_LEVEL',
     FUSION: 'FUSION',
-    GENESET_SCORE: 'GENESET_SCORE'
-};
+    GENESET_SCORE: 'GENESET_SCORE',
+    METHYLATION: 'METHYLATION'
+}
 
 export interface ExtendedAlteration extends Mutation, NumericGeneMolecularData {
     molecularProfileAlterationType: MolecularProfile["molecularAlterationType"];
@@ -792,6 +793,29 @@ export class ResultsViewPageStore {
     //     return undefined;
     // });
 
+    readonly givenSampleOrder = remoteData<Sample[]>({
+        await: ()=>[
+            this.samples
+        ],
+        invoke: async()=>{
+            // for now, just assume we won't mix sample lists and samples in the specification
+            if (this.samplesSpecification.find(x=>!x.sampleId)) {
+                // for now, if theres any sample list id specification, then there is no given sample order
+                return [];
+            }
+            // at this point, we know samplesSpecification is a list of samples
+            const studyToSampleToIndex:{[studyId:string]:{[sampleId:string]:number}} =
+                _.reduce(this.samplesSpecification,
+                    (map:{[studyId:string]:{[sampleId:string]:number}}, next:SamplesSpecificationElement, index:number)=>{
+                        map[next.studyId] = map[next.studyId] || {};
+                        map[next.studyId][next.sampleId!] = index; // we know sampleId defined otherwise we would have returned from function already
+                        return map;
+                    },
+                {});
+            return _.sortBy(this.samples.result, sample=>studyToSampleToIndex[sample.studyId][sample.sampleId]);
+        }
+    });
+
     readonly studyToSampleIds = remoteData<{ [studyId: string]: { [sampleId: string]: boolean } }>(async () => {
         const sampleListsToQuery: { studyId: string, sampleListId: string }[] = [];
         const ret: { [studyId: string]: { [sampleId: string]: boolean } } = {};
@@ -1249,33 +1273,37 @@ export class ResultsViewPageStore {
             this.genesetMolecularProfile
         ],
         invoke: () => {
-            const MRNA_EXPRESSION = "MRNA_EXPRESSION";
-            const PROTEIN_LEVEL = "PROTEIN_LEVEL";
+            const MRNA_EXPRESSION = AlterationTypeConstants.MRNA_EXPRESSION;
+            const PROTEIN_LEVEL = AlterationTypeConstants.PROTEIN_LEVEL;
+            const METHYLATION = AlterationTypeConstants.METHYLATION;
             const selectedMolecularProfileIds = stringListToSet(this.selectedMolecularProfileIds);
 
             const expressionHeatmaps = _.sortBy(
-                _.filter(
-                    this.molecularProfilesInStudies.result!,
-                    ({showProfileInAnalysisTab, molecularAlterationType}) => (
-                        showProfileInAnalysisTab && (
-                            molecularAlterationType === MRNA_EXPRESSION ||
-                            molecularAlterationType === PROTEIN_LEVEL
-                        )
-                    )
+                _.filter(this.molecularProfilesInStudies.result!, profile=>{
+                    return ((profile.molecularAlterationType === MRNA_EXPRESSION ||
+                        profile.molecularAlterationType === PROTEIN_LEVEL) && profile.showProfileInAnalysisTab) ||
+                        profile.molecularAlterationType === METHYLATION;
+                    }
                 ),
-                profile => {
-                    // Sort order: selected and mrna, selected and protein, unselected and mrna, unselected and protein
+                profile=>{
+                    // Sort order: selected and [mrna, protein, methylation], unselected and [mrna, protein, meth]
                     if (profile.molecularProfileId in selectedMolecularProfileIds) {
-                        if (profile.molecularAlterationType === MRNA_EXPRESSION) {
-                            return 0;
-                        } else if (profile.molecularAlterationType === PROTEIN_LEVEL) {
-                            return 1;
+                        switch (profile.molecularAlterationType) {
+                            case MRNA_EXPRESSION:
+                                return 0;
+                            case PROTEIN_LEVEL:
+                                return 1;
+                            case METHYLATION:
+                                return 2;
                         }
                     } else {
-                        if (profile.molecularAlterationType === MRNA_EXPRESSION) {
-                            return 2;
-                        } else if (profile.molecularAlterationType === PROTEIN_LEVEL) {
-                            return 3;
+                        switch(profile.molecularAlterationType) {
+                            case MRNA_EXPRESSION:
+                                return 3;
+                            case PROTEIN_LEVEL:
+                                return 4;
+                            case METHYLATION:
+                                return 5;
                         }
                     }
                 }

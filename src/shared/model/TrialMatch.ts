@@ -21,12 +21,12 @@ export interface ITrialMatchEntry {
 
 export type MobXStatus = "pending" | "error" | "complete";
 
-export interface ICivicGeneDataWrapper {
+export interface ITrialMatchGeneDataWrapper {
     status: MobXStatus;
     result?: ITrialMatchGene;
 }
 
-export interface ICivicVariantDataWrapper {
+export interface ITrialMatchVariantDataWrapper {
     status: MobXStatus;
     result?: ITrialMatchVariant;
 }

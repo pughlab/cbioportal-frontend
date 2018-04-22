@@ -4,11 +4,20 @@ import MobxPromise, {cached, labelMobxPromises} from "mobxpromise";
 
 import {Gene, Mutation} from "shared/api/generated/CBioPortalAPI";
 import {IHotspotIndex} from "shared/model/CancerHotspots";
+import {IPdbChain, PdbAlignmentIndex} from "shared/model/Pdb";
+import {ICivicGene, ICivicVariant} from "shared/model/Civic";
+import {ITrialMatchGene, ITrialMatchVariant} from "shared/model/TrialMatch";
+import PdbPositionMappingCache from "shared/cache/PdbPositionMappingCache";
 import {IOncoKbDataWrapper} from "shared/model/OncoKB";
 import GenomeNexusEnrichmentCache from "shared/cache/GenomeNexusEnrichment";
 import ResidueMappingCache from "shared/cache/ResidueMappingCache";
 import {remoteData} from "shared/api/remoteData";
 import {
+    fetchCosmicData, fetchOncoKbData,
+    fetchMutationData, generateUniqueSampleKeyToTumorTypeMap, generateDataQueryFilter,
+    ONCOKB_DEFAULT, fetchPdbAlignmentData, fetchSwissProtAccession, fetchUniprotId, indexPdbAlignmentData,
+    fetchPfamDomainData, fetchCivicGenes, fetchCivicVariants, fetchTrialMatchGenes, fetchTrialMatchVariants,
+    IDataQueryFilter, fetchCanonicalTranscriptWithFallback, fetchEnsemblTranscriptsByEnsemblFilter
     fetchPdbAlignmentData, fetchSwissProtAccession, fetchUniprotId, indexPdbAlignmentData,
     fetchPfamDomainData, fetchCanonicalTranscriptWithFallback,
     fetchEnsemblTranscriptsByEnsemblFilter
@@ -22,6 +31,13 @@ import {MutationTableDownloadDataFetcher} from "shared/lib/MutationTableDownload
 import PdbChainDataStore from "./PdbChainDataStore";
 import MutationMapperDataStore from "./MutationMapperDataStore";
 import {IMutationMapperConfig} from "./MutationMapper";
+
+    readonly cosmicData = remoteData({
+        await: () => [
+            this.mutationData
+        ],
+        invoke: () => fetchCosmicData(this.mutationData)
+    });
 
 export default class MutationMapperStore
 {
@@ -142,6 +158,93 @@ export default class MutationMapperStore
             throw new Error("Failed to get canonical transcript");
         }
     }, undefined);
+
+    readonly civicGenes = remoteData<ICivicGene | undefined>({
+        await: () => [
+            this.mutationData,
+            this.clinicalDataForSamples
+        ],
+        invoke: async() => this.config.showCivic ? fetchCivicGenes(this.mutationData) : {},
+        onError: (err: Error) => {
+            // fail silently
+        }
+    }, undefined);
+
+    readonly civicVariants = remoteData<ICivicVariant | undefined>({
+        await: () => [
+            this.civicGenes,
+            this.mutationData
+        ],
+        invoke: async() => {
+            if (this.config.showCivic && this.civicGenes.result) {
+                return fetchCivicVariants(this.civicGenes.result as ICivicGene, this.mutationData);
+            }
+            else {
+                return {};
+            }
+        },
+        onError: (err: Error) => {
+            // fail silently
+        }
+    }, undefined);
+
+    readonly trialMatchGenes = remoteData<ITrialMatchGene | undefined>({
+        await: () => [
+            this.mutationData,
+            this.clinicalDataForSamples
+        ],
+        invoke: async() => this.config.showTrialMatch? fetchTrialMatchGenes(this.mutationData) : {},
+        onError: (err: Error) => {
+            // fail silently
+        }
+    }, undefined);
+
+    readonly trialMatchVariants = remoteData<ITrialMatchVariant | undefined>({
+        await: () => [
+            this.trialMatchGenes,
+            this.mutationData
+        ],
+        invoke: async() => {
+            if (this.config.showTrialMatch && this.trialMatchGenes.result) {
+                return fetchTrialMatchVariants(this.trialMatchGenes.result as ITrialMatchGene, this.mutationData);
+            }
+            else {
+                return {};
+            }
+        },
+        onError: (err: Error) => {
+            // fail silently
+        }
+    }, undefined);
+
+    constructor(protected config: IMutationMapperConfig,
+                public gene:Gene,
+                public samples:MobxPromise<SampleIdentifier[]>,
+                public oncoKbAnnotatedGenes:{[entrezGeneId:number]:boolean},
+                // getMutationDataCache needs to be a getter for the following reason:
+                // when the input parameters to the mutationDataCache change, the cache
+                // is recomputed. Mobx needs to respond to this. But if we pass the mutationDataCache
+                // in as a value, then when using it we don't access the observable property mutationDataCache,
+                // so that when it changes we won't react. Thus we need to access it as store.mutationDataCache
+                // (which will be done in the getter thats passed in here) so that the cache itself is observable
+                // and we will react when it changes to a new object.
+                public mutations:Mutation[],
+                private getMutationDataCache: ()=>MutationDataCache,
+                private genomeNexusEnrichmentCache: ()=>GenomeNexusEnrichmentCache,
+                private getMutationCountCache: ()=>MutationCountCache,
+                public studyIdToStudy:MobxPromise<{[studyId:string]:CancerStudy}>,
+                public molecularProfileIdToMolecularProfile:MobxPromise<{[molecularProfileId:string]:MolecularProfile}>,
+                public clinicalDataForSamples: MobxPromise<ClinicalData[]>,
+                public studiesForSamplesWithoutCancerTypeClinicalData: MobxPromise<CancerStudy[]>,
+                private samplesWithoutCancerTypeClinicalData: MobxPromise<Sample[]>,
+                public germlineConsentedSamples:MobxPromise<SampleIdentifier[]>,
+                public indexedHotspotData:MobxPromise<IHotspotIndex|undefined>,
+                public uniqueSampleKeyToTumorType:{[uniqueSampleKey:string]:string},
+                public oncoKbData:IOncoKbDataWrapper
+    )
+    {
+        labelMobxPromises(this);
+    }
 
     @computed get isoformOverrideSource(): string {
         return this.config.isoformOverrideSource || "uniprot";

@@ -15,6 +15,7 @@ if (parentProjectFrontendConfig) {
         // @ts-ignore: ENV_* are defined in webpack.config.js
         genomeNexusApiUrl : ENV_GENOME_NEXUS_URL,
         showCivic : true,
+        showTrialMatch: true,
         showHotspot : true,
         showMyCancerGenome : true,
         showOncoKB : true,

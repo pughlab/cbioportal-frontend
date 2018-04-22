@@ -28,6 +28,7 @@ import {IMyCancerGenomeData} from "shared/model/MyCancerGenome";
 import {IHotspotDataWrapper} from "shared/model/CancerHotspots";
 import {IOncoKbDataWrapper} from "shared/model/OncoKB";
 import {ICivicVariantDataWrapper, ICivicGeneDataWrapper} from "shared/model/Civic";
+import {ITrialMatchVariantDataWrapper, ITrialMatchGeneDataWrapper} from "shared/model/TrialMatch";
 import {IMutSigData} from "shared/model/MutSig";
 import DiscreteCNACache from "shared/cache/DiscreteCNACache";
 import OncoKbEvidenceCache from "shared/cache/OncoKbEvidenceCache";
@@ -59,6 +60,7 @@ export interface IMutationTableProps {
     enableMyCancerGenome?: boolean;
     enableHotspot?: boolean;
     enableCivic?: boolean;
+    enableTrialMatch?: boolean;
     enableFunctionalImpact?: boolean;
     myCancerGenomeData?: IMyCancerGenomeData;
     hotspotData?: IHotspotDataWrapper;
@@ -67,6 +69,8 @@ export interface IMutationTableProps {
     oncoKbAnnotatedGenes:{[entrezGeneId:number]:boolean};
     civicGenes?: ICivicGeneDataWrapper;
     civicVariants?: ICivicVariantDataWrapper;
+    trialMatchGenes?: ITrialMatchGeneDataWrapper;
+    trialMatchVariants?: ITrialMatchVariantDataWrapper;
     mrnaExprRankMolecularProfileId?:string;
     discreteCNAMolecularProfileId?:string;
     columns?:MutationTableColumnType[];
@@ -446,6 +450,9 @@ export default class MutationTable<P extends IMutationTableProps> extends React.
                 civicGenes: this.props.civicGenes,
                 civicVariants: this.props.civicVariants,
                 enableCivic: this.props.enableCivic as boolean,
+                trialMatchGenes: this.props.trialMatchGenes,
+                trialMatchVariants: this.props.trialMatchVariants,
+                enableTrialMatch: this.props.enableTrialMatch as boolean,
                 enableOncoKb: this.props.enableOncoKb as boolean,
                 enableMyCancerGenome: this.props.enableMyCancerGenome as boolean,
                 enableHotspot: this.props.enableHotspot as boolean,
@@ -458,7 +465,9 @@ export default class MutationTable<P extends IMutationTableProps> extends React.
                     this.props.myCancerGenomeData,
                     this.props.oncoKbData,
                     this.props.civicGenes,
-                    this.props.civicVariants);
+                    this.props.civicVariants,
+                    this.props.trialMatchGenes,
+                    this.props.trialMatchVariants);
             },
             sortBy:(d:Mutation[])=>{
                 return AnnotationColumnFormatter.sortValue(d,
@@ -467,7 +476,9 @@ export default class MutationTable<P extends IMutationTableProps> extends React.
                     this.props.myCancerGenomeData,
                     this.props.oncoKbData,
                     this.props.civicGenes,
-                    this.props.civicVariants);
+                    this.props.civicVariants,
+                    this.props.trialMatchGenes,
+                    this.props.trialMatchVariants);
             }
         };
 

@@ -122,7 +122,7 @@ export function getTrialMatchVariants(trialMatchGenes: ITrialMatchGene, mutation
 /**
  * Build a Civic Entry with the data given.
  */
-export function buildCivicEntry(geneEntry: ITrialMatchGeneData, geneVariants: {[name: string]: ITrialMatchVariantData}) {
+export function buildTrialMatchEntry(geneEntry: ITrialMatchGeneData, geneVariants: {[name: string]: ITrialMatchVariantData}) {
     return {
         name: geneEntry.name,
         variants: geneVariants

@@ -33,6 +33,7 @@ import { getMouseIcon } from './SVGIcons';
 
 import './patient.scss';
 import IFrameLoader from "../../shared/components/iframeLoader/IFrameLoader";
+import RadiologyReport from "./clinicalInformation/RadiologyReport";
 
 const patientViewPageStore = new PatientViewPageStore();
 
@@ -464,6 +465,22 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                             <IFrameLoader height={700} url={  `http://cancer.digitalslidearchive.net/index_mskcc.php?slide_name=${patientViewPageStore.patientId}` } />
                         </div>
                     </MSKTab>
+                    {(patientViewPageStore.pageMode === 'patient') && (
+                        <MSKTab key={6} id="radiologyDataTab" linkText="Radiology Report">
+
+                            <div className="clearfix">
+                                <FeatureTitle title="Patient"
+                                              isLoading={ patientViewPageStore.clinicalDataPatient.isPending }
+                                              className="pull-left"/>
+                                { (patientViewPageStore.clinicalDataPatient.isComplete) && (
+                                    <RadiologyReport showTitleBar={true}
+                                                                     data={patientViewPageStore.clinicalDataPatient.result}/>
+
+                                )
+                                }
+                            </div>
+                        </MSKTab>
+                    )}
 
                     </MSKTabs>
 

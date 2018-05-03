@@ -2,7 +2,7 @@ import * as React from "react";
 import {ClinicalData} from "../../../shared/api/generated/CBioPortalAPI";
 import LazyMobXTable from "shared/components/lazyMobXTable/LazyMobXTable";
 
-import styles from "./style/patientTable.module.scss";
+import styles from "./style/radiologyReport.module.scss";
 import {SHOW_ALL_PAGE_SIZE} from "../../../shared/components/paginationControls/PaginationControls";
 
 export interface IClinicalInformationPatientTableProps {
@@ -31,103 +31,297 @@ export default class RadiologyReport extends React.Component<IClinicalInformatio
 
         return (
             <div>
-            <table>
-                <caption>Sex: M Size: 1.88 Weight: 108.0 BirthDate: Confidential</caption>
-                <tr>
-                    <th>seriesDescription</th>
-                    <th>acquisitionDate</th>
-                    <th>acquisitionTime</th>
-                    <th>modality</th>
-                    <th>radiopharmaceutical</th>
-                    <th>radiopharmaceuticalStartTime</th>
-                    <th>initialNoRois</th>
-                    <th>initialRoiVolume</th>
-                    <th>netMatv</th>
-                    <th>netTla</th>
-                    <th>radiologicalFinding</th>
-                    <th>automatedAnalysisFinding</th>
-                </tr>
-                <tr>
-                    <td>*MRAC_PET_AC Images</td>
-                    <td>2017-05-26T00:00:00.000Z</td>
-                    <td>12:58:53</td>
-                    <td>PET/MR</td>
-                    <td>DCFPyL</td>
-                    <td>11:05:00</td>
-                    <td>7.0</td>
-                    <td>80.84</td>
-                    <td>31.47</td>
-                    <td>716.67</td>
-                    <td>
-                        <table>
-                            <tr>
-                                <th>lesionNumber</th>
-                                <th>lesionType</th>
-                                <th>location</th>
-                            </tr>
-                            <tr>
-                                <td>1.0</td>
-                                <td>Prostate</td>
-                                <td>Prostate</td>
-                            </tr>
-                        </table>
-                    </td>
-                    <td>
-                        <table>
-                            <tr>
-                                <th>contourLabel</th>
-                                <th>max</th>
-                                <th>min</th>
-                                <th>volume</th>
-                                <th>activeMin</th>
-                                <th>activeMean</th>
-                                <th>matv</th>
-                                <th>tla</th>
-                            </tr>
-                            <tr>
-                                <td>ROI 1</td>
-                                <td>108.35</td>
-                                <td>2.81</td>
-                                <td>51.38</td>
-                                <td>43.43</td>
-                                <td>64.97</td>
-                                <td>9.37</td>
-                                <td>608.82</td>
-                            </tr>
-                            <tr>
-                                <td>ROI 2</td>
-                                <td>4.73</td>
-                                <td>2.8</td>
-                                <td>14.04</td>
-                                <td>2.8</td>
-                                <td>3.26</td>
-                                <td>14.04</td>
-                                <td>5.76</td>
-                            </tr>
-                            <tr>
-                                <td>ROI 3</td>
-                                <td>13.77</td>
-                                <td>2.8</td>
-                                <td>3.89</td>
-                                <td>5.79</td>
-                                <td>9.05</td>
-                                <td>1.73</td>
-                                <td>15.68</td>
-                            </tr>
-                            <tr>
-                                <td>ROI 4</td>
-                                <td>7.1</td>
-                                <td>2.86</td>
-                                <td>2.23</td>
-                                <td>2.86</td>
-                                <td>4.23</td>
-                                <td>2.23</td>
-                                <td>9.43</td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
+                <div>
+                    <span>Sex: M Size: 1.88 Weight: 108.0 BirthDate: Confidential</span>
+                </div>
+                <div>
+                <table className="report-table">
+                    <tr>
+                        <td>
+                            <table className="report-table">
+                                <tr>
+                                    <td>Modality</td><td>PET/MR</td>
+                                </tr>
+                                <tr>
+                                    <td>Acquisition Date</td><td>2017-05-26</td>
+                                </tr>
+                                <tr>
+                                    <td>Radiopharmaceutical Start Time</td><td>11:05:00</td>
+                                </tr>
+                                <tr>
+                                    <td>Acquisition Time</td><td>12:58:53</td>
+                                </tr>
+                                <tr>
+                                    <td>radiopharmaceutical</td><td>DCFPyL</td>
+                                </tr>
+                                <tr>
+                                    <td>Series Description</td><td>*MRAC_PET_AC Images</td>
+                                </tr>
+                                <tr>
+                                    <td>studyInstanceUid</td><td>1.3.6.1.4.1.12201.1077.1.228576162245353281593824550634323772191</td>
+                                </tr>
+                                <tr>
+                                    <td>Radiological Finding</td>
+                                    <td>
+                                        <table>
+                                            <tr>
+                                                <th>lesionNumber</th>
+                                                <th>lesionType</th>
+                                                <th>location</th>
+                                            </tr>
+                                            <tr>
+                                                <td>1.0</td>
+                                                <td>Prostate</td>
+                                                <td>Prostate</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <table>
+                                            <tr>
+                                                <td>initialNoRois</td><td>7.0</td>
+                                            </tr>
+                                            <tr>
+                                                <td>initialRoiVolume</td><td>80.84</td>
+                                            </tr>
+                                            <tr>
+                                                <td>netMatv</td><td>31.47</td>
+                                            </tr>
+                                            <tr>
+                                                <td>netTla</td><td>716.67</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Automated Analysis Finding</td>
+                                    <td>
+                                        <table className="report-table">
+                                            <tr>
+                                                <th>contourLabel</th>
+                                                <th>max</th>
+                                                <th>min</th>
+                                                <th>volume</th>
+                                                <th>activeMin</th>
+                                                <th>activeMean</th>
+                                                <th>matv</th>
+                                                <th>tla</th>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 1</td>
+                                                <td>108.35</td>
+                                                <td>2.81</td>
+                                                <td>51.38</td>
+                                                <td>43.43</td>
+                                                <td>64.97</td>
+                                                <td>9.37</td>
+                                                <td>608.82</td>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 2</td>
+                                                <td>4.73</td>
+                                                <td>2.8</td>
+                                                <td>14.04</td>
+                                                <td>2.8</td>
+                                                <td>3.26</td>
+                                                <td>14.04</td>
+                                                <td>5.76</td>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 3</td>
+                                                <td>13.77</td>
+                                                <td>2.8</td>
+                                                <td>3.89</td>
+                                                <td>5.79</td>
+                                                <td>9.05</td>
+                                                <td>1.73</td>
+                                                <td>15.68</td>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 4</td>
+                                                <td>7.1</td>
+                                                <td>2.86</td>
+                                                <td>2.23</td>
+                                                <td>2.86</td>
+                                                <td>4.23</td>
+                                                <td>2.23</td>
+                                                <td>9.43</td>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 5</td>
+                                                <td>9.45</td>
+                                                <td>2.81</td>
+                                                <td>1.77</td>
+                                                <td>3.95</td>
+                                                <td>6.23</td>
+                                                <td>0.92</td>
+                                                <td>5.72</td>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 6</td>
+                                                <td>10.07</td>
+                                                <td>2.8</td>
+                                                <td>2.72</td>
+                                                <td>4.04</td>
+                                                <td>5.67</td>
+                                                <td>1.38</td>
+                                                <td>7.82</td>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 7</td>
+                                                <td>19.46</td>
+                                                <td>2.81</td>
+                                                <td>4.81</td>
+                                                <td>7.84</td>
+                                                <td>12.99</td>
+                                                <td>1.8</td>
+                                                <td>23.44</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                        <td>
+                            <table className="report-table">
+                                <tr>
+                                    <td>Modality</td><td>PET/CT</td>
+                                </tr>
+                                <tr>
+                                    <td>Acquisition Date</td><td>2017-05-26</td>
+                                </tr>
+                                <tr>
+                                    <td>Radiopharmaceutical StartTime</td><td>11:05:00</td>
+                                </tr>
+                                <tr>
+                                    <td>Acquisition Time</td><td>14:30:16</td>
+                                </tr>
+                                <tr>
+                                    <td>Radiopharmaceutical</td><td>F- -- Fluorine</td>
+                                </tr>
+                                <tr>
+                                    <td>Series Description</td><td>AC2-192</td>
+                                </tr>
+                                <tr>
+                                    <td>Study Instance Uid</td><td>1.3.6.1.4.1.12201.1077.1.216240413971636795293333148204334302812</td>
+                                </tr>
+                                <tr>
+                                    <td>Radiological Finding</td>
+                                    <td>
+                                        <table>
+                                            <tr>
+                                                <th>Lesion Number</th>
+                                                <th>Lesion Type</th>
+                                                <th>Location</th>
+                                            </tr>
+                                            <tr>
+                                                <td>1.0</td>
+                                                <td>No radiology read</td>
+                                                <td>No radiology read</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <table>
+                                            <tr>
+                                                <td>Initial NoRois</td><td>5.0</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Initial RoiVolume</td><td>79.99</td>
+                                            </tr>
+                                            <tr>
+                                                <td>NetMatv</td><td>33.26</td>
+                                            </tr>
+                                            <tr>
+                                                <td>NetTla</td><td>1357.01</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Automated Analysis Finding</td>
+                                    <td>
+                                        <table className="report-table">
+                                            <tr>
+                                                <th>contourLabel</th>
+                                                <th>max</th>
+                                                <th>min</th>
+                                                <th>volume</th>
+                                                <th>activeMin</th>
+                                                <th>activeMean</th>
+                                                <th>matv</th>
+                                                <th>tla</th>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 1</td>
+                                                <td>75.19</td>
+                                                <td>2.8</td>
+                                                <td>71.92</td>
+                                                <td>30.09</td>
+                                                <td>50.25</td>
+                                                <td>26.43</td>
+                                                <td>1328.2</td>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 2</td>
+                                                <td>5.79</td>
+                                                <td>2.82</td>
+                                                <td>2.53</td>
+                                                <td>2.82</td>
+                                                <td>3.75</td>
+                                                <td>2.53</td>
+                                                <td>9.49</td>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 3</td>
+                                                <td>11.41</td>
+                                                <td>2.85</td>
+                                                <td>2.13</td>
+                                                <td>4.63</td>
+                                                <td>6.94</td>
+                                                <td>1.06</td>
+                                                <td>7.39</td>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 4</td>
+                                                <td>7.32</td>
+                                                <td>2.83</td>
+                                                <td>1.77</td>
+                                                <td>2.95</td>
+                                                <td>4.29</td>
+                                                <td>1.6</td>
+                                                <td>6.85</td>
+                                            </tr>
+                                            <tr>
+                                                <td>ROI 5</td>
+                                                <td>3.9</td>
+                                                <td>2.8</td>
+                                                <td>1.64</td>
+                                                <td>2.8</td>
+                                                <td>3.1</td>
+                                                <td>1.64</td>
+                                                <td>5.08</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            &nbsp;
+                        </td>
+                        <td>
+                            &nbsp;
+                        </td>
+                    </tr>
+                </table>
+                </div>
             </div>
         );
     }

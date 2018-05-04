@@ -469,7 +469,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                         <MSKTab key={6} id="radiologyDataTab" linkText="Radiology Report">
 
                             <div className="clearfix">
-                                <FeatureTitle title="Patient"
+                                <FeatureTitle title=""
                                               isLoading={ patientViewPageStore.clinicalDataPatient.isPending }
                                               className="pull-left"/>
                                 { (patientViewPageStore.clinicalDataPatient.isComplete) && (

@@ -1,8 +1,17 @@
-.report-table {
-  table-layout: fixed;
-  word-wrap: break-word;
 
-  td:first-child {
-    width:300px;
-  }
+.report-table, th, td {
+  border-collapse: collapse;
+  border-color: #666;
+  padding: 5px;
+}
+
+.report-table tr:nth-child(even) {
+  background-color: #eee;
+}
+.report-table tr:nth-child(odd) {
+  background-color: #fff;
+}
+.report-table th {
+  color: white;
+  background-color: skyblue;
 }

@@ -31,32 +31,16 @@ export default class RadiologyReport extends React.Component<IClinicalInformatio
             value: el.value
         }));
 
-        new Chart(this.chartTarget, {
-            type: 'bar',
-            data: {
-                labels: ["Red", "Blue", "Yellow"],
-                datasets: [{
-                    label: '# of Likes',
-                    data: [12, 19, 3],
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.2)',
-                        'rgba(54, 162, 235, 0.2)',
-                        'rgba(255, 206, 86, 0.2)'
-                    ]
-                }]
-            }
-        });
-
         return (
             <div>
                 <div>
                     <span>Sex: M Size: 1.88 Weight: 108.0 BirthDate: Confidential</span>
                 </div>
                 <div>
-                <table className="report-table">
+                <table className={styles["report-table"]}>
                     <tr>
                         <td>
-                            <table className="report-table">
+                            <table className={styles["report-table"]}>
                                 <tr>
                                     <td>Modality</td><td>PET/MR</td>
                                 </tr>
@@ -96,6 +80,7 @@ export default class RadiologyReport extends React.Component<IClinicalInformatio
                                     </td>
                                 </tr>
                                 <tr>
+                                    <td>Initail/Net values</td>
                                     <td>
                                         <table>
                                             <tr>
@@ -116,7 +101,7 @@ export default class RadiologyReport extends React.Component<IClinicalInformatio
                                 <tr>
                                     <td>Automated Analysis Finding</td>
                                     <td>
-                                        <table className="report-table">
+                                        <table className={styles["report-table"]}>
                                             <tr>
                                                 <th>contourLabel</th>
                                                 <th>max</th>
@@ -202,145 +187,9 @@ export default class RadiologyReport extends React.Component<IClinicalInformatio
                                 </tr>
                             </table>
                         </td>
-                        <td>
-                            <table className="report-table">
-                                <tr>
-                                    <td>Modality</td><td>PET/CT</td>
-                                </tr>
-                                <tr>
-                                    <td>Acquisition Date</td><td>2017-05-26</td>
-                                </tr>
-                                <tr>
-                                    <td>Radiopharmaceutical StartTime</td><td>11:05:00</td>
-                                </tr>
-                                <tr>
-                                    <td>Acquisition Time</td><td>14:30:16</td>
-                                </tr>
-                                <tr>
-                                    <td>Radiopharmaceutical</td><td>F- -- Fluorine</td>
-                                </tr>
-                                <tr>
-                                    <td>Series Description</td><td>AC2-192</td>
-                                </tr>
-                                <tr>
-                                    <td>Study Instance Uid</td><td>1.3.6.1.4.1.12201.1077.1.216240413971636795293333148204334302812</td>
-                                </tr>
-                                <tr>
-                                    <td>Radiological Finding</td>
-                                    <td>
-                                        <table>
-                                            <tr>
-                                                <th>Lesion Number</th>
-                                                <th>Lesion Type</th>
-                                                <th>Location</th>
-                                            </tr>
-                                            <tr>
-                                                <td>1.0</td>
-                                                <td>No radiology read</td>
-                                                <td>No radiology read</td>
-                                            </tr>
-                                        </table>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <table>
-                                            <tr>
-                                                <td>Initial NoRois</td><td>5.0</td>
-                                            </tr>
-                                            <tr>
-                                                <td>Initial RoiVolume</td><td>79.99</td>
-                                            </tr>
-                                            <tr>
-                                                <td>NetMatv</td><td>33.26</td>
-                                            </tr>
-                                            <tr>
-                                                <td>NetTla</td><td>1357.01</td>
-                                            </tr>
-                                        </table>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Automated Analysis Finding</td>
-                                    <td>
-                                        <table className="report-table">
-                                            <tr>
-                                                <th>contourLabel</th>
-                                                <th>max</th>
-                                                <th>min</th>
-                                                <th>volume</th>
-                                                <th>activeMin</th>
-                                                <th>activeMean</th>
-                                                <th>matv</th>
-                                                <th>tla</th>
-                                            </tr>
-                                            <tr>
-                                                <td>ROI 1</td>
-                                                <td>75.19</td>
-                                                <td>2.8</td>
-                                                <td>71.92</td>
-                                                <td>30.09</td>
-                                                <td>50.25</td>
-                                                <td>26.43</td>
-                                                <td>1328.2</td>
-                                            </tr>
-                                            <tr>
-                                                <td>ROI 2</td>
-                                                <td>5.79</td>
-                                                <td>2.82</td>
-                                                <td>2.53</td>
-                                                <td>2.82</td>
-                                                <td>3.75</td>
-                                                <td>2.53</td>
-                                                <td>9.49</td>
-                                            </tr>
-                                            <tr>
-                                                <td>ROI 3</td>
-                                                <td>11.41</td>
-                                                <td>2.85</td>
-                                                <td>2.13</td>
-                                                <td>4.63</td>
-                                                <td>6.94</td>
-                                                <td>1.06</td>
-                                                <td>7.39</td>
-                                            </tr>
-                                            <tr>
-                                                <td>ROI 4</td>
-                                                <td>7.32</td>
-                                                <td>2.83</td>
-                                                <td>1.77</td>
-                                                <td>2.95</td>
-                                                <td>4.29</td>
-                                                <td>1.6</td>
-                                                <td>6.85</td>
-                                            </tr>
-                                            <tr>
-                                                <td>ROI 5</td>
-                                                <td>3.9</td>
-                                                <td>2.8</td>
-                                                <td>1.64</td>
-                                                <td>2.8</td>
-                                                <td>3.1</td>
-                                                <td>1.64</td>
-                                                <td>5.08</td>
-                                            </tr>
-                                        </table>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            &nbsp;
-                        </td>
-                        <td>
-                            &nbsp;
-                        </td>
                     </tr>
                 </table>
                 </div>
-                <canvas ref={(el:HTMLCanvasElement) => this.chartTarget = el} width="800" height="450" />
             </div>
         );
     }

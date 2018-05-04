@@ -1,7 +1,8 @@
 import * as React from "react";
 import {ClinicalData} from "../../../shared/api/generated/CBioPortalAPI";
 import LazyMobXTable from "shared/components/lazyMobXTable/LazyMobXTable";
-
+import Chart from 'chart.js';
+import { ChartTooltipItem } from 'chart.js';
 import styles from "./style/radiologyReport.module.scss";
 import {SHOW_ALL_PAGE_SIZE} from "../../../shared/components/paginationControls/PaginationControls";
 
@@ -21,6 +22,7 @@ interface IPatientRow {
 };
 
 export default class RadiologyReport extends React.Component<IClinicalInformationPatientTableProps, {}> {
+    chartTarget:HTMLCanvasElement;
 
     public render() {
 
@@ -28,6 +30,22 @@ export default class RadiologyReport extends React.Component<IClinicalInformatio
             attribute: el.clinicalAttribute.displayName || '',
             value: el.value
         }));
+
+        new Chart(this.chartTarget, {
+            type: 'bar',
+            data: {
+                labels: ["Red", "Blue", "Yellow"],
+                datasets: [{
+                    label: '# of Likes',
+                    data: [12, 19, 3],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.2)',
+                        'rgba(54, 162, 235, 0.2)',
+                        'rgba(255, 206, 86, 0.2)'
+                    ]
+                }]
+            }
+        });
 
         return (
             <div>
@@ -322,6 +340,7 @@ export default class RadiologyReport extends React.Component<IClinicalInformatio
                     </tr>
                 </table>
                 </div>
+                <canvas ref={(el:HTMLCanvasElement) => this.chartTarget = el} width="800" height="450" />
             </div>
         );
     }

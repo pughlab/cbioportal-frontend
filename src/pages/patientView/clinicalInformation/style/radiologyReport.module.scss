@@ -1,18 +1,37 @@
 
-.report-table, th, td {
+.report-table {
   border-collapse: collapse;
-  border-color: #666;
+  margin: 5px;
   padding: 10px;
-  vertical-align: top;
 }
 
-.report-table tr:nth-child(even) {
+.report-table tr:nth-child(odd) {
   background-color: #eee;
 }
-.report-table tr:nth-child(odd) {
+.report-table tr:nth-child(even) {
   background-color: #fff;
 }
 .report-table th {
   color: white;
   background-color: skyblue;
+  text-align: left;
+  border: 1px solid #ccc;
+}
+
+.report-table td {
+  display: table-cell;
+  vertical-align: top;
+  text-align: left;
+  padding: 1px;
+  border: 1px solid #ccc;
+}
+.report-table tr:hover {
+  background-color: #ccc;
+}
+
+.report-child-table {
+  border-collapse: collapse;
+  margin: 5px;
+  padding: 10px;
+  vertical-align: top;
 }

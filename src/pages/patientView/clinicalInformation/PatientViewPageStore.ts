@@ -16,7 +16,7 @@ import {labelMobxPromises, cached} from "mobxpromise";
 import MrnaExprRankCache from 'shared/cache/MrnaExprRankCache';
 import request from 'superagent';
 import DiscreteCNACache from "shared/cache/DiscreteCNACache";
-import {getTissueImageCheckUrl, getDarwinUrl} from "../../../shared/api/urls";
+import {getTissueImageCheckUrl, getDarwinUrl, getPathologySlideCheckUrl} from "../../../shared/api/urls";
 import OncoKbEvidenceCache from "shared/cache/OncoKbEvidenceCache";
 import GenomeNexusEnrichmentCache from "shared/cache/GenomeNexusEnrichment";
 import PubMedCache from "shared/cache/PubMedCache";
@@ -254,6 +254,17 @@ export class PatientViewPageStore {
         }
 
     }, []);
+
+    readonly pathologySlides = remoteData({
+        await: () => [this.derivedPatientId],
+        invoke: async() => {
+            let resp: any = await request.get(getPathologySlideCheckUrl(this.patientId));
+            return JSON.parse(resp.text);
+        },
+        onError: ()=>{
+            //fail silently
+        }
+    }, false);
 
     readonly cosmicData = remoteData({
         await: () => [

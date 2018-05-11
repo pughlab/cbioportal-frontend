@@ -104,6 +104,11 @@ export function getTissueImageCheckUrl(filter:string) {
         slide_name_filter: filter
     });
 }
+
+export function getPathologySlideCheckUrl(patientId:string) {
+    return `//localhost:8081/webapi/api/fetch-image-ids/${patientId}`;
+}
+
 export function getDarwinUrl(sampleIds:string[], caseId:string) {
     return cbioUrl('checkDarwinAccess.do', {sample_id: sampleIds.join(','), case_id: caseId});
 }

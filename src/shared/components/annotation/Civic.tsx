@@ -72,9 +72,9 @@ export default class Civic extends React.Component<ICivicProps, {}>
             <span className={`${annotationStyles["annotation-item"]}`} />
         );
         
-        const civicImgWidth:number = 14;
-        let civicImgHeight:number = 14;
-        let civicImgSrc = require("./images/civic-logo.png");
+        const civicImgWidth:number = 16;
+        let civicImgHeight:number = 16;
+        let civicImgSrc = require("./images/red-blue-3.png");
         if (!this.props.hasCivicVariants)
         {
             civicImgSrc = require("./images/civic-logo-no-variants.png");

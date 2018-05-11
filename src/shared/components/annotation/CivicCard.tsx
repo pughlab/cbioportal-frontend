@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { If, Then, Else } from 'react-if';
 import { ICivicVariantData } from "shared/model/Civic.ts";
-import "./styles/civicCard.scss";
+import "./styles/phamacoCard.scss";
 import * as _ from "lodash";
 
 export interface ICivicCardProps {
@@ -86,39 +86,64 @@ export default class CivicCard extends React.Component<ICivicCardProps, {}> {
      * @returns {any}
      */
     public render() {
+        const imgWidth:number = 14;
+        const imgHeight:number = 14;
         return (
             <div className="civic-card">
-                <span>
                     <div className="col s12 tip-header">
-                        {this.props.title}
+                        ERBB2 Amplification In Breast Invasive Ductal Carcinoma
                     </div>
                     <div className="col s12 civic-card-content">
-                        <div className="col s12 civic-card-gene">
-                            <p>
-                                <span className="civic-card-gene-name">
-                                    <a href={this.props.geneUrl} target="_blank"><b>{this.props.geneName}</b></a>
-                                </span> - {this.props.geneDescription}
-                            </p>
-                        </div>
-                        <div className="col s12">
-                            <ul>
-                                {this.generateVariants(this.props.variants)}
-                            </ul>
-                        </div>
-
+                        <table className="table">
+                            <caption>CP724714
+                            <img src={require("./images/pill_logo.png")} width={imgWidth}
+                                 height={imgHeight} className="civic-logo" />
+                            </caption>
+                        <tr>
+                            <th>Level</th>
+                            <th>Tissue</th>
+                            <th>FWER Corrected</th>
+                            <th>FDA Approved</th>
+                            <th>In Clinical Trials</th>
+                        </tr>
+                        <tr>
+                            <td>2</td>
+                            <td>Breast</td>
+                            <td>0.02</td>
+                            <td>No</td>
+                            <td>No</td>
+                        </tr>
+                        </table>
+                        <table className="table">
+                            <caption>Lapatinib
+                            <img src={require("./images/pill_logo.png")} width={imgWidth}
+                                 height={imgHeight} className="civic-logo" />
+                            </caption>
+                        <tr>
+                            <th>Level</th>
+                            <th>Tissue</th>
+                            <th>FWER Corrected</th>
+                            <th>FDA Approved</th>
+                            <th>In Clinical Trials</th>
+                        </tr>
+                        <tr>
+                            <td>4</td>
+                            <td>Solid</td>
+                            <td>7.53e-32</td>
+                            <td>Yes</td>
+                            <td>Yes</td>
+                        </tr>
+                        </table>
+                    </div>
                         <div className="item disclaimer">
                             <span>
                                 Disclaimer: This resource is intended for purely research purposes.
                                 It should not be used for emergencies or medical or professional advice.
                             </span>
                         </div>
-                    </div>
-                </span>
 
                 <div className="item footer">
-                    <a href={this.props.geneUrl} target="_blank">
-                        <img src={require("./images/civic_text_logo.png")} className="civic-logo" alt="CIViC"/>
-                    </a>
+                    Powered by <a href="https://pharmacodb.pmgenomics.ca/"> PhamacoDB</a>
                 </div>
             </div>
         );

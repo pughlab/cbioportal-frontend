@@ -86,20 +86,15 @@ export default class CivicCard extends React.Component<ICivicCardProps, {}> {
      * @returns {any}
      */
     public render() {
-        const imgWidth:number = 14;
-        const imgHeight:number = 14;
         return (
             <div className="civic-card">
                     <div className="col s12 tip-header">
-                        ERBB2 Amplification In Breast Invasive Ductal Carcinoma
+                        Preclinical Associations for ERBB2 Amplification
                     </div>
                     <div className="col s12 civic-card-content">
                         <table className="table">
-                            <caption>CP724714
-                            <img src={require("./images/pill_logo.png")} width={imgWidth}
-                                 height={imgHeight} className="civic-logo" />
-                            </caption>
                         <tr>
+                            <th>Drug</th>
                             <th>Level</th>
                             <th>Tissue</th>
                             <th>FWER Corrected</th>
@@ -107,26 +102,15 @@ export default class CivicCard extends React.Component<ICivicCardProps, {}> {
                             <th>In Clinical Trials</th>
                         </tr>
                         <tr>
+                            <td><a href="https://pharmacodb.pmgenomics.ca/drugs/246">CP724714</a></td>
                             <td>2</td>
                             <td>Breast</td>
                             <td>0.02</td>
                             <td>No</td>
                             <td>No</td>
                         </tr>
-                        </table>
-                        <table className="table">
-                            <caption>Lapatinib
-                            <img src={require("./images/pill_logo.png")} width={imgWidth}
-                                 height={imgHeight} className="civic-logo" />
-                            </caption>
                         <tr>
-                            <th>Level</th>
-                            <th>Tissue</th>
-                            <th>FWER Corrected</th>
-                            <th>FDA Approved</th>
-                            <th>In Clinical Trials</th>
-                        </tr>
-                        <tr>
+                            <td><a href="https://pharmacodb.pmgenomics.ca/drugs/415">Lapatinib</a></td>
                             <td>4</td>
                             <td>Solid</td>
                             <td>7.53e-32</td>
@@ -141,7 +125,6 @@ export default class CivicCard extends React.Component<ICivicCardProps, {}> {
                                 It should not be used for emergencies or medical or professional advice.
                             </span>
                         </div>
-
                 <div className="item footer">
                     Powered by <a href="https://pharmacodb.pmgenomics.ca/"> PhamacoDB</a>
                 </div>

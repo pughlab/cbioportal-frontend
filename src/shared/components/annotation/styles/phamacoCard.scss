@@ -36,6 +36,7 @@
 .civic-card-content {
   max-height: 400px;
   overflow: auto;
+  text-align: center;
 }
 .civic-card-gene,
 .civic-card-variant {
@@ -57,9 +58,8 @@
 }
 .civic-card .table {
   font-size: 12px;
-  text-align: center;
+  text-align: inherit;
   margin-bottom: 0; }
 .civic-card td,th {
-  text-align: inherit;
   border-bottom: 1px solid #d0d0d0;
 }

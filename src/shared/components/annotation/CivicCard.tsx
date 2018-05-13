@@ -95,15 +95,13 @@ export default class CivicCard extends React.Component<ICivicCardProps, {}> {
                         <table className="table">
                         <tr>
                             <th>Drug</th>
-                            <th>Level</th>
                             <th>Tissue</th>
                             <th>FWER Corrected</th>
                             <th>FDA Approved</th>
-                            <th>In Clinical Trials</th>
+                            <th>In Trial</th>
                         </tr>
                         <tr>
                             <td><a href="https://pharmacodb.pmgenomics.ca/drugs/246">CP724714</a></td>
-                            <td>2</td>
                             <td>Breast</td>
                             <td>0.02</td>
                             <td>No</td>
@@ -111,7 +109,6 @@ export default class CivicCard extends React.Component<ICivicCardProps, {}> {
                         </tr>
                         <tr>
                             <td><a href="https://pharmacodb.pmgenomics.ca/drugs/415">Lapatinib</a></td>
-                            <td>4</td>
                             <td>Solid</td>
                             <td>7.53e-32</td>
                             <td>Yes</td>

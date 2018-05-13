@@ -74,7 +74,7 @@ export default class Civic extends React.Component<ICivicProps, {}>
         
         const civicImgWidth:number = 16;
         let civicImgHeight:number = 16;
-        let civicImgSrc = require("./images/pill_logo.png");
+        let civicImgSrc = require("./images/pills.png");
         if (!this.props.hasCivicVariants)
         {
             civicImgSrc = require("./images/civic-logo-no-variants.png");

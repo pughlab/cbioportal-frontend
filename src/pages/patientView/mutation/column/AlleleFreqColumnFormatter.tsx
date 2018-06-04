@@ -187,7 +187,7 @@ export default class AlleleFreqColumnFormatter {
         return (altReads / (altReads + refReads));
     }
 
-    public static isVisible(sampleManager:SampleManager|null, allMutations?: Mutation[][]): boolean {
+    /*public static isVisible(sampleManager:SampleManager|null, allMutations?: Mutation[][]): boolean {
 
         if (allMutations) {
             for (const rowMutations of allMutations) {
@@ -199,5 +199,5 @@ export default class AlleleFreqColumnFormatter {
         }
 
         return false;
-    }
+    }*/
 }

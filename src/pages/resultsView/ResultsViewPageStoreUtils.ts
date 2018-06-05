@@ -1,12 +1,16 @@
+
 import {
-    Gene, GeneMolecularData, GenePanel, GenePanelData, MolecularProfile,
-    Mutation, Patient, Sample
+    Gene, NumericGeneMolecularData, GenePanel, GenePanelData, MolecularProfile,
+    Mutation, Patient, Sample, CancerStudy
 } from "../../shared/api/generated/CBioPortalAPI";
 import {action} from "mobx";
 import {getSimplifiedMutationType} from "../../shared/lib/oql/accessors";
-import {AnnotatedGeneMolecularData, AnnotatedMutation} from "./ResultsViewPageStore";
+import {AnnotatedNumericGeneMolecularData, AnnotatedMutation} from "./ResultsViewPageStore";
 import {IndicatorQueryResp} from "../../shared/api/generated/OncoKbAPI";
 import _ from "lodash";
+import sessionServiceClient from "shared/api//sessionServiceInstance";
+import { VirtualStudy } from "shared/model/VirtualStudy";
+import client from "shared/api/cbioportalClientInstance";
 
 type CustomDriverAnnotationReport = {
     hasBinary: boolean,
@@ -190,10 +194,10 @@ export function computeGenePanelInformation(
 }
 
 export function annotateMolecularDatum(
-    molecularDatum:GeneMolecularData,
-    getOncoKbCnaAnnotationForOncoprint:(datum:GeneMolecularData)=>IndicatorQueryResp|undefined,
+    molecularDatum:NumericGeneMolecularData,
+    getOncoKbCnaAnnotationForOncoprint:(datum:NumericGeneMolecularData)=>IndicatorQueryResp|undefined,
     molecularProfileIdToMolecularProfile:{[molecularProfileId:string]:MolecularProfile}
-):AnnotatedGeneMolecularData {
+):AnnotatedNumericGeneMolecularData {
     let oncogenic = "";
     if (molecularProfileIdToMolecularProfile[molecularDatum.molecularProfileId].molecularAlterationType
         === "COPY_NUMBER_ALTERATION") {
@@ -203,4 +207,46 @@ export function annotateMolecularDatum(
         }
     }
     return Object.assign({oncoKbOncogenic: oncogenic}, molecularDatum);
+}
+
+export async function fetchQueriedStudies(filteredPhysicalStudies:{[id:string]:CancerStudy},queriedIds:string[]):Promise<CancerStudy[]>{
+    const queriedStudies:CancerStudy[] = [];
+    let unknownIds:{[id:string]:boolean} = {};
+    for(const id of queriedIds){
+        if(filteredPhysicalStudies[id]){
+            queriedStudies.push(filteredPhysicalStudies[id])
+        } else {
+            unknownIds[id]=true;
+        }
+    }
+
+    if(!_.isEmpty(unknownIds)){
+        await client.fetchStudiesUsingPOST({
+            studyIds:Object.keys(unknownIds),
+            projection:'DETAILED'
+        }).then(studies=>{
+            studies.forEach(study=>{
+                queriedStudies.push(study);
+                delete unknownIds[study.studyId];
+            })
+    
+        }).catch(() => {}) //this is for private instances. it throws error when the study is not found
+    }
+
+    let virtualStudypromises = Object.keys(unknownIds).map(id =>sessionServiceClient.getVirtualStudy(id))
+
+    await Promise.all(virtualStudypromises).then((allData: VirtualStudy[]) => {
+        allData.forEach(virtualStudy=>{
+            let study = {
+                allSampleCount:_.sumBy(virtualStudy.data.studies, study=>study.samples.length),
+                studyId: virtualStudy.id,
+                name: virtualStudy.data.name,
+                description: virtualStudy.data.description,
+                cancerTypeId: "My Virtual Studies"
+            } as CancerStudy;
+            queriedStudies.push(study)
+        })
+    });
+
+    return queriedStudies;
 }

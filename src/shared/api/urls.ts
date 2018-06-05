@@ -93,9 +93,11 @@ export function getGenomeNexusApiUrl() {
         return undefined;
     }
 }
-export function getPdbAnnotationApiUrl() {
-    return 'https://cbioportal.mskcc.org/pdb-annotation';
+
+export function getSessionServiceApiUrl() {
+    return cbioUrl(`/api-legacy/proxy/session/virtual_study`);
 }
+
 export function getG2SApiUrl() {
     return 'https://g2s.genomenexus.org';
 }

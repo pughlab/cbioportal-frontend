@@ -482,7 +482,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                                 this.getSlideId(patientViewPageStore.clinicalDataPatient.result)==='')}
                     >
                         <div style={{position: "relative"}}>
-                            <IFrameLoader height={700} url={  `http://riswtp01/eSlideTray.php?ImageIds=${this.getSlideId(patientViewPageStore.clinicalDataPatient.result)}` } />
+                            <IFrameLoader height={700} url={  `https://riswtp01-ext.uhnresearch.ca/eSlideTray.php?ImageIds=${this.getSlideId(patientViewPageStore.clinicalDataPatient.result)}` } />
                         </div>
                     </MSKTab>
                     </MSKTabs>

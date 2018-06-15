@@ -475,7 +475,8 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                                               className="pull-left"/>
                                 { (patientViewPageStore.clinicalDataPatient.isComplete) && (
                                     <RadiologyReport showTitleBar={true}
-                                                                     data={patientViewPageStore.clinicalDataPatient.result} patientId={patientViewPageStore.patientId}/>
+                                                     data={patientViewPageStore.clinicalDataPatient.result}
+                                                     patientId={patientViewPageStore.patientId}/>
 
                                 )
                                 }

@@ -14,9 +14,9 @@
 }
 .report-table th {
   color: white;
-  background-color: seagreen;
+  background-color: #6495ED;
   text-align: left;
-  border: 1px solid #ccc;
+  border: 1px solid #1E90FF;
 }
 
 .report-table td {
@@ -46,7 +46,14 @@
 
 .report-child-table th {
   color: white;
-  background-color: skyblue;
+  background-color: #ADD8E6;
+  text-align: left;
+  border: 1px solid #ccc;
+}
+
+.report-child-table td {
+  display: table-cell;
+  vertical-align: top;
   text-align: left;
   border: 1px solid #ccc;
 }

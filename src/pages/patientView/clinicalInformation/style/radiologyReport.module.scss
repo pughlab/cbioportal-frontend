@@ -1,8 +1,9 @@
 
 .report-table {
   border-collapse: collapse;
-  margin: 5px;
-  padding: 10px;
+  margin: 1px;
+  padding: 1px;
+  width: 100%;
 }
 
 .report-table tr:nth-child(odd) {
@@ -13,7 +14,7 @@
 }
 .report-table th {
   color: white;
-  background-color: skyblue;
+  background-color: seagreen;
   text-align: left;
   border: 1px solid #ccc;
 }
@@ -22,16 +23,30 @@
   display: table-cell;
   vertical-align: top;
   text-align: left;
-  padding: 1px;
   border: 1px solid #ccc;
 }
+
+.report-table img{
+  display:block;
+  width:100%;
+  height:auto;
+}
 .report-table tr:hover {
-  background-color: #ccc;
+  background-color: #fcfcfc;
 }
 
 .report-child-table {
   border-collapse: collapse;
-  margin: 5px;
-  padding: 10px;
-  vertical-align: top;
+  margin: 1px;
+  padding: 1px;
+  vertical-align: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.report-child-table th {
+  color: white;
+  background-color: skyblue;
+  text-align: left;
+  border: 1px solid #ccc;
 }

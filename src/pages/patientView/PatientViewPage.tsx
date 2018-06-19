@@ -467,7 +467,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                         </div>
                     </MSKTab>
                     {(patientViewPageStore.pageMode === 'patient') && (
-                        <MSKTab key={6} id="radiologyDataTab" linkText="Radiology Report">
+                        <MSKTab key={6} id="radiologyDataTab" linkText="Radiology Image" hide={patientViewPageStore.studyId !== 'PSMA_Imaging'}>
 
                             <div className="clearfix">
                                 <FeatureTitle title=""

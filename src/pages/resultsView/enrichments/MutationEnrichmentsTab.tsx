@@ -9,7 +9,7 @@ import { MolecularProfile } from 'shared/api/generated/CBioPortalAPI';
 import autobind from 'autobind-decorator';
 
 export interface IMutationEnrichmentsTabProps {
-    store: ResultsViewPageStore
+    store: ResultsViewPageStore;
 }
 
 @observer

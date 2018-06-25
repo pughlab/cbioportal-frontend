@@ -190,6 +190,16 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
         return patientViewPageStore.pathologyReport.isComplete && patientViewPageStore.pathologyReport.result.length > 0;
     }
 
+
+    private getSlideId(data:Array<ClinicalData>):string {
+        for (const row in data) {
+            if (data[row]['clinicalAttributeId'] === 'SLIDE_ID') {
+                return data[row]['value'];
+            }
+        }
+        return '';
+    }
+
     public render() {
 
         let sampleManager: SampleManager | null = null;
@@ -494,7 +504,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                         </div>
                     </MSKTab>
                     {(patientViewPageStore.pageMode === 'patient') && (
-                        <MSKTab key={6} id="radiologyDataTab" linkText="Radiology Image" hide={patientViewPageStore.studyId !== 'PSMA_Imaging'}>
+                        <MSKTab key={6} id="radiologyDataTab" linkText="Radiology Images" hide={patientViewPageStore.studyId !== 'PSMA_Imaging'}>
 
                             <div className="clearfix">
                                 <FeatureTitle title=""
@@ -504,13 +514,29 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                                     <RadiologyReport showTitleBar={true}
                                                      data={patientViewPageStore.clinicalDataPatient.result}
                                                      patientId={patientViewPageStore.patientId}/>
-
                                 )
                                 }
                             </div>
                         </MSKTab>
                     )}
-
+                    <MSKTab key={7} id="pathSlidesTab" linkText="Pathology Slides"
+                            hide={patientViewPageStore.clinicalDataPatient.isError ||
+                            (patientViewPageStore.clinicalDataPatient.isComplete &&
+                                this.getSlideId(patientViewPageStore.clinicalDataPatient.result)==='')}
+                    >
+                        <div style={{position: "relative"}}>
+                            <IFrameLoader height={700} url={  `https://riswtp01-ext.uhnresearch.ca/eSlideTray.php?ImageIds=${this.getSlideId(patientViewPageStore.clinicalDataPatient.result)}` } />
+                        </div>
+                    </MSKTab>
+                    <MSKTab key={8} id="IPRTab" linkText="BCGSC Integrated Pipeline Reports"
+                            hide={patientViewPageStore.clinicalDataPatient.isError ||
+                            (patientViewPageStore.clinicalDataPatient.isComplete &&
+                                patientViewPageStore.studyId !== 'COMPARISON')}
+                    >
+                        <div style={{position: "relative"}}>
+                            <IFrameLoader height={900} url={  `https://iprweb.bcgsc.ca/reports/${patientViewPageStore.patientId}` } />
+                        </div>
+                    </MSKTab>
                     </MSKTabs>
 
                     </Then>

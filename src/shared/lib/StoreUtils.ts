@@ -17,7 +17,6 @@ import {
     GisticToGene, Gistic, MutSig
 } from "shared/api/generated/CBioPortalAPIInternal";
 import oncokbClient from "shared/api/oncokbClientInstance";
-import civicClient from "shared/api/civicClientInstance";
 import genomeNexusClient from "shared/api/genomeNexusClientInstance";
 import {
     generateIdToIndicatorMap, generateQueryVariant, generateEvidenceQuery
@@ -37,8 +36,8 @@ import {IOncoKbData} from "shared/model/OncoKB";
 import {IGisticData} from "shared/model/Gistic";
 import {IMutSigData} from "shared/model/MutSig";
 import {IMyCancerGenomeData, IMyCancerGenome} from "shared/model/MyCancerGenome";
-import {ICivicGeneData, ICivicVariant, ICivicGene} from "shared/model/Civic.ts";
-import {ITrialMatchGeneData, ITrialMatchVariant, ITrialMatchGene} from "shared/model/TrialMatch.ts";
+import {ICivicVariant, ICivicGene} from "shared/model/Civic.ts";
+import {ITrialMatchVariant, ITrialMatchGene} from "shared/model/TrialMatch.ts";
 import {MOLECULAR_PROFILE_MUTATIONS_SUFFIX, MOLECULAR_PROFILE_UNCALLED_MUTATIONS_SUFFIX} from "shared/constants";
 import GenomeNexusAPI from "shared/api/generated/GenomeNexusAPI";
 import {AlterationTypeConstants} from "../../pages/resultsView/ResultsViewPageStore";

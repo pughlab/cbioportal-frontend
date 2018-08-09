@@ -4,19 +4,14 @@ import MobxPromise, {cached, labelMobxPromises} from "mobxpromise";
 
 import {Gene, Mutation} from "shared/api/generated/CBioPortalAPI";
 import {IHotspotIndex} from "shared/model/CancerHotspots";
-import {ICivicGene, ICivicVariant} from "shared/model/Civic";
-import {ITrialMatchGene, ITrialMatchVariant} from "shared/model/TrialMatch";
 import {IOncoKbDataWrapper} from "shared/model/OncoKB";
 import GenomeNexusEnrichmentCache from "shared/cache/GenomeNexusEnrichment";
 import ResidueMappingCache from "shared/cache/ResidueMappingCache";
 import {remoteData} from "shared/api/remoteData";
 import {
-    fetchCosmicData, fetchOncoKbData,
-    fetchMutationData, generateUniqueSampleKeyToTumorTypeMap, generateDataQueryFilter,
-    ONCOKB_DEFAULT, fetchSwissProtAccession, fetchUniprotId, indexPdbAlignmentData,
-    fetchPfamDomainData, fetchCivicGenes, fetchCivicVariants, fetchTrialMatchGenes, fetchTrialMatchVariants,
-    IDataQueryFilter, fetchCanonicalTranscriptWithFallback, fetchEnsemblTranscriptsByEnsemblFilter,
-    fetchPdbAlignmentData
+    fetchPdbAlignmentData, fetchSwissProtAccession, fetchUniprotId, indexPdbAlignmentData,
+    fetchPfamDomainData, fetchCanonicalTranscriptWithFallback,
+    fetchEnsemblTranscriptsByEnsemblFilter
 } from "shared/lib/StoreUtils";
 import {EnsemblTranscript, PfamDomain, PfamDomainRange} from "shared/api/generated/GenomeNexusAPI";
 import {IPdbChain, PdbAlignmentIndex} from "shared/model/Pdb";
@@ -28,15 +23,21 @@ import PdbChainDataStore from "./PdbChainDataStore";
 import MutationMapperDataStore from "./MutationMapperDataStore";
 import {IMutationMapperConfig} from "./MutationMapper";
 
-
 export default class MutationMapperStore
 {
-    readonly cosmicData = remoteData({
-        await: () => [
-            this.mutationData
-        ],
-        invoke: () => fetchCosmicData(this.mutationData)
-    });
+    constructor(
+        protected config: IMutationMapperConfig,
+        public gene:Gene,
+        public mutations:Mutation[],
+        public indexedHotspotData:MobxPromise<IHotspotIndex|undefined>,
+        public oncoKbAnnotatedGenes:{[entrezGeneId:number]:boolean},
+        public oncoKbData:IOncoKbDataWrapper,
+        public uniqueSampleKeyToTumorType:{[uniqueSampleKey:string]:string},
+        protected genomeNexusEnrichmentCache: () => GenomeNexusEnrichmentCache,
+    )
+    {
+        labelMobxPromises(this);
+    }
 
     readonly mutationData = remoteData({
         invoke: async () => {
@@ -141,77 +142,6 @@ export default class MutationMapperStore
             throw new Error("Failed to get canonical transcript");
         }
     }, undefined);
-
-    readonly civicGenes = remoteData<ICivicGene | undefined>({
-        await: () => [
-            this.mutationData
-        ],
-        invoke: async() => this.config.showCivic ? fetchCivicGenes(this.mutationData) : {},
-        onError: (err: Error) => {
-            // fail silently
-        }
-    }, undefined);
-
-    readonly civicVariants = remoteData<ICivicVariant | undefined>({
-        await: () => [
-            this.civicGenes,
-            this.mutationData
-        ],
-        invoke: async() => {
-            if (this.config.showCivic && this.civicGenes.result) {
-                return fetchCivicVariants(this.civicGenes.result as ICivicGene, this.mutationData);
-            }
-            else {
-                return {};
-            }
-        },
-        onError: (err: Error) => {
-            // fail silently
-        }
-    }, undefined);
-
-
-    readonly trialMatchGenes = remoteData<ITrialMatchGene | undefined>({
-        await: () => [
-            this.mutationData
-        ],
-        invoke: async() => this.config.showCivic? fetchTrialMatchGenes(this.mutationData) : {},
-        onError: (err: Error) => {
-            // fail silently
-        }
-    }, undefined);
-
-    readonly trialMatchVariants = remoteData<ITrialMatchVariant | undefined>({
-        await: () => [
-            this.trialMatchGenes,
-            this.mutationData
-        ],
-        invoke: async() => {
-            if (this.config.showCivic && this.trialMatchGenes.result) {
-                return fetchTrialMatchVariants(this.trialMatchGenes.result as ITrialMatchGene, this.mutationData);
-            }
-            else {
-                return {};
-            }
-        },
-        onError: (err: Error) => {
-            // fail silently
-        }
-    }, undefined);
-
-    constructor(
-        protected config: IMutationMapperConfig,
-        public gene:Gene,
-        public mutations:Mutation[],
-        public indexedHotspotData:MobxPromise<IHotspotIndex|undefined>,
-        public oncoKbAnnotatedGenes:{[entrezGeneId:number]:boolean},
-        public oncoKbData:IOncoKbDataWrapper,
-        public uniqueSampleKeyToTumorType:{[uniqueSampleKey:string]:string},
-        protected genomeNexusEnrichmentCache: () => GenomeNexusEnrichmentCache,
-    )
-    {
-        labelMobxPromises(this);
-    }
 
     @computed get isoformOverrideSource(): string {
         return this.config.isoformOverrideSource || "uniprot";

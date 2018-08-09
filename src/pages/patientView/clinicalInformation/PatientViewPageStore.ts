@@ -24,6 +24,7 @@ import {IOncoKbData} from "shared/model/OncoKB";
 import {IHotspotIndex} from "shared/model/CancerHotspots";
 import {IMutSigData} from "shared/model/MutSig";
 import {ICivicVariant, ICivicGene} from "shared/model/Civic.ts";
+import {ITrialMatchGene, ITrialMatchVariant} from "shared/model/TrialMatch";
 import {ClinicalInformationData} from "shared/model/ClinicalInformation";
 import VariantCountCache from "shared/cache/VariantCountCache";
 import CopyNumberCountCache from "./CopyNumberCountCache";
@@ -36,7 +37,7 @@ import {
     fetchMutationData, fetchDiscreteCNAData, generateUniqueSampleKeyToTumorTypeMap, findMutationMolecularProfileId,
     findUncalledMutationMolecularProfileId, mergeMutationsIncludingUncalled, fetchGisticData, fetchCopyNumberData,
     fetchMutSigData, findMrnaRankMolecularProfileId, mergeDiscreteCNAData, fetchSamplesForPatient, fetchClinicalData,
-    fetchCopyNumberSegments, fetchClinicalDataForPatient, makeStudyToCancerTypeMap,
+    fetchCopyNumberSegments, fetchClinicalDataForPatient, makeStudyToCancerTypeMap,fetchTrialMatchGenes, fetchTrialMatchVariants,
     fetchCivicGenes, fetchCnaCivicGenes, fetchCivicVariants, groupBySampleId, findSamplesWithoutCancerTypeClinicalData,
     fetchStudiesForSamplesWithoutCancerTypeClinicalData, fetchOncoKbAnnotatedGenesSuppressErrors
 } from "shared/lib/StoreUtils";
@@ -540,6 +541,35 @@ export class PatientViewPageStore {
                 return fetchCivicVariants(this.civicGenes.result as ICivicGene,
                     this.mutationData,
                     this.uncalledMutationData);
+            }
+            else {
+                return {};
+            }
+        },
+        onError: (err: Error) => {
+            // fail silently
+        }
+    }, undefined);
+
+    readonly trialMatchGenes = remoteData<ITrialMatchGene | undefined>({
+        await: () => [
+            this.mutationData,
+            this.clinicalDataForSamples
+        ],
+        invoke: async() => AppConfig.showCivic? fetchTrialMatchGenes(this.mutationData) : {},
+        onError: (err: Error) => {
+            // fail silently
+        }
+    }, undefined);
+
+    readonly trialMatchVariants = remoteData<ITrialMatchVariant | undefined>({
+        await: () => [
+            this.trialMatchGenes,
+            this.mutationData
+        ],
+        invoke: async() => {
+            if (AppConfig.showCivic && this.trialMatchGenes.result) {
+                return fetchTrialMatchVariants(this.trialMatchGenes.result as ITrialMatchGene, this.mutationData);
             }
             else {
                 return {};

@@ -6,8 +6,9 @@ import {labelMobxPromises, MobxPromise, cached} from "mobxpromise";
 import {IOncoKbDataWrapper} from "shared/model/OncoKB";
 import {IHotspotIndex} from "shared/model/CancerHotspots";
 import {ICivicGene, ICivicVariant} from "shared/model/Civic";
+import {ITrialMatchGene, ITrialMatchVariant} from "shared/model/TrialMatch";
 import {
-    fetchCosmicData, fetchCivicGenes, fetchCivicVariants
+    fetchCosmicData, fetchCivicGenes, fetchCivicVariants,fetchTrialMatchGenes, fetchTrialMatchVariants
 } from "shared/lib/StoreUtils";
 import {IMutationMapperConfig} from "shared/components/mutationMapper/MutationMapper";
 import GenomeNexusEnrichmentCache from "shared/cache/GenomeNexusEnrichment";
@@ -80,6 +81,35 @@ export default class ResultsViewMutationMapperStore extends MutationMapperStore
         invoke: async() => {
             if (this.config.showCivic && this.civicGenes.result) {
                 return fetchCivicVariants(this.civicGenes.result as ICivicGene, this.mutationData);
+            }
+            else {
+                return {};
+            }
+        },
+        onError: (err: Error) => {
+            // fail silently
+        }
+    }, undefined);
+
+    readonly trialMatchGenes = remoteData<ITrialMatchGene | undefined>({
+        await: () => [
+            this.mutationData,
+            this.clinicalDataForSamples
+        ],
+        invoke: async() => this.config.showCivic? fetchTrialMatchGenes(this.mutationData) : {},
+        onError: (err: Error) => {
+            // fail silently
+        }
+    }, undefined);
+
+    readonly trialMatchVariants = remoteData<ITrialMatchVariant | undefined>({
+        await: () => [
+            this.trialMatchGenes,
+            this.mutationData
+        ],
+        invoke: async() => {
+            if (this.config.showCivic && this.trialMatchGenes.result) {
+                return fetchTrialMatchVariants(this.trialMatchGenes.result as ITrialMatchGene, this.mutationData);
             }
             else {
                 return {};

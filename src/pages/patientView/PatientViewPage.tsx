@@ -407,7 +407,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                                         enableHotspot={AppConfig.showHotspot}
                                         enableMyCancerGenome={AppConfig.showMyCancerGenome}
                                         enableCivic={AppConfig.showCivic}
-                                        enableTrialMatch={AppConfig.showCivic}
+                                        enableTrialMatch={AppConfig.showTrialMatch}
                                         columnVisibility={this.mutationTableColumnVisibility}
                                         columnVisibilityProps={{
                                             onColumnToggled: this.onMutationTableColumnVisibilityToggled

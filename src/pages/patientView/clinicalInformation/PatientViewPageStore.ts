@@ -38,8 +38,8 @@ import {
     findUncalledMutationMolecularProfileId, mergeMutationsIncludingUncalled, fetchGisticData, fetchCopyNumberData,
     fetchMutSigData, findMrnaRankMolecularProfileId, mergeDiscreteCNAData, fetchSamplesForPatient, fetchClinicalData,
     fetchCopyNumberSegments, fetchClinicalDataForPatient, makeStudyToCancerTypeMap,fetchTrialMatchGenes, fetchTrialMatchVariants,
-    fetchCivicGenes, fetchCnaCivicGenes, fetchCivicVariants, groupBySampleId, findSamplesWithoutCancerTypeClinicalData,
-    fetchStudiesForSamplesWithoutCancerTypeClinicalData, fetchOncoKbAnnotatedGenesSuppressErrors
+    fetchCnaTrialMatchGenes, fetchCivicGenes, fetchCnaCivicGenes, fetchCivicVariants, groupBySampleId,
+    findSamplesWithoutCancerTypeClinicalData, fetchStudiesForSamplesWithoutCancerTypeClinicalData, fetchOncoKbAnnotatedGenesSuppressErrors
 } from "shared/lib/StoreUtils";
 import {indexHotspotsData, fetchHotspotsData} from "shared/lib/CancerHotspotsUtils";
 import {stringListToSet} from "../../../shared/lib/StringUtils";
@@ -610,8 +610,34 @@ export class PatientViewPageStore {
             this.mutationData
         ],
         invoke: async() => {
-            if (this.cnaCivicGenes.status == "complete") {
+            if (this.cnaCivicGenes.status === "complete") {
                 return fetchCivicVariants(this.cnaCivicGenes.result as ICivicGene);
+            }
+        },
+        onError: (err: Error) => {
+            // fail silently
+        }
+    }, undefined);
+
+    readonly cnaTrialMatchGenes = remoteData<ITrialMatchGene | undefined>({
+        await: () => [
+            this.discreteCNAData,
+            this.clinicalDataForSamples
+        ],
+        invoke: async() => AppConfig.showCivic ? fetchCnaTrialMatchGenes(this.discreteCNAData) : {},
+        onError: (err: Error) => {
+            // fail silently
+        }
+    }, undefined);
+
+    readonly cnaTrialMatchVariants = remoteData<ITrialMatchVariant | undefined>({
+        await: () => [
+            this.trialMatchGenes,
+            this.mutationData
+        ],
+        invoke: async() => {
+            if (this.cnaTrialMatchGenes.status === "complete") {
+                return fetchTrialMatchVariants(this.cnaTrialMatchGenes.result as ITrialMatchGene);
             }
         },
         onError: (err: Error) => {

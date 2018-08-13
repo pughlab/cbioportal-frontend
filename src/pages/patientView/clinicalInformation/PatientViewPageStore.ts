@@ -624,7 +624,7 @@ export class PatientViewPageStore {
             this.discreteCNAData,
             this.clinicalDataForSamples
         ],
-        invoke: async() => AppConfig.showCivic ? fetchCnaTrialMatchGenes(this.discreteCNAData) : {},
+        invoke: async() => AppConfig.showTrialMatch ? fetchCnaTrialMatchGenes(this.discreteCNAData) : {},
         onError: (err: Error) => {
             // fail silently
         }

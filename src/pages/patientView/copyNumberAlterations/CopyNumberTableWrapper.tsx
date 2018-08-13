@@ -57,7 +57,8 @@ export default class CopyNumberTableWrapper extends React.Component<ICopyNumberT
 
     public static defaultProps = {
         enableOncoKb: true,
-        enableCivic: false
+        enableCivic: false,
+        enableTrialMatch: false
     };
 
     render() {
@@ -111,7 +112,7 @@ export default class CopyNumberTableWrapper extends React.Component<ICopyNumberT
                 enableCivic: this.props.enableCivic as boolean,
                 trialMatchGenes: this.props.cnaTrialMatchGenes,
                 trialMatchVariants: this.props.cnaTrialMatchVariants,
-                enableTrialMatch: this.props.enableTrialMatch as boolean,
+                enableTrialMatch: false,
                 enableMyCancerGenome: false,
                 enableHotspot: false,
                 userEmailAddress: this.props.userEmailAddress

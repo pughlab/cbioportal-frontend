@@ -80,6 +80,7 @@ import {BookmarkLinks} from "../../shared/model/BookmarkLinks";
 import {getBitlyServiceUrl, getSessionServiceUrl} from "../../shared/api/urls";
 import url from 'url';
 import OncoprintClinicalDataCache, {SpecialAttribute} from "../../shared/cache/OncoprintClinicalDataCache";
+import {getProteinPositionFromProteinChange} from "../../shared/lib/ProteinChangeUtils";
 
 type Optional<T> = (
     {isApplicable: true, value: T}
@@ -418,6 +419,12 @@ export class ResultsViewPageStore {
                 map[next.clinicalAttributeId] += next.count;
                 return map;
             }, {});
+            // add count = 0 for any remaining clinical attributes, since service doesnt return count 0
+            for (const clinicalAttribute of this.clinicalAttributes.result!) {
+                if (!(clinicalAttribute.clinicalAttributeId in ret)) {
+                    ret[clinicalAttribute.clinicalAttributeId] = 0;
+                }
+            }
             // add counts for "special" clinical attributes
             ret[SpecialAttribute.StudyOfOrigin] = this.samples.result!.length;
             let samplesWithMutationData = 0, samplesWithCNAData = 0;
@@ -2039,9 +2046,17 @@ export class ResultsViewPageStore {
             return Promise.resolve((mutation:Mutation):number=>{
                 const keyword = mutation.keyword;
                 const counts = countMap[keyword];
-                if (counts) {
+                const targetPosObj = getProteinPositionFromProteinChange(mutation.proteinChange);
+                if (counts && targetPosObj) {
+                    const targetPos = targetPosObj.start;
                     return counts.reduce((count, next:CosmicMutation)=>{
-                        return count + next.count;
+                        const pos = getProteinPositionFromProteinChange(next.proteinChange);
+                        if (pos && (pos.start === targetPos)) {
+                            // only tally cosmic entries with same keyword and same start position
+                            return count + next.count;
+                        } else {
+                            return count;
+                        }
                     }, 0);
                 } else {
                     return -1;

@@ -29,7 +29,7 @@ export default class ResultsViewMutationMapperStore extends MutationMapperStore
                 // so that when it changes we won't react. Thus we need to access it as store.mutationDataCache
                 // (which will be done in the getter thats passed in here) so that the cache itself is observable
                 // and we will react when it changes to a new object.
-                public mutations:Mutation[],
+                getMutations:()=>Mutation[],
                 protected genomeNexusEnrichmentCache: ()=>GenomeNexusEnrichmentCache,
                 private getMutationCountCache: ()=>MutationCountCache,
                 public studyIdToStudy:MobxPromise<{[studyId:string]:CancerStudy}>,
@@ -44,7 +44,7 @@ export default class ResultsViewMutationMapperStore extends MutationMapperStore
         super(
             config,
             gene,
-            mutations,
+            getMutations,
             indexedHotspotData,
             oncoKbAnnotatedGenes,
             oncoKbData,

@@ -35,10 +35,7 @@ import {
     fetchCnaOncoKbData, mergeMutations, fetchMyCancerGenomeData, fetchCosmicData,
     fetchMutationData, fetchDiscreteCNAData, generateUniqueSampleKeyToTumorTypeMap, findMutationMolecularProfileId,
     findUncalledMutationMolecularProfileId, mergeMutationsIncludingUncalled, fetchGisticData, fetchCopyNumberData,
-    fetchMutSigData, findMrnaRankMolecularProfileId, mergeDiscreteCNAData, fetchSamplesForPatient, fetchClinicalData,
-    fetchCopyNumberSegments, fetchClinicalDataForPatient, makeStudyToCancerTypeMap,
-    fetchCivicGenes, fetchCnaCivicGenes, fetchCivicVariants, groupBySampleId, findSamplesWithoutCancerTypeClinicalData,
-    fetchStudiesForSamplesWithoutCancerTypeClinicalData, fetchOncoKbAnnotatedGenesSuppressErrors, concatMutationData
+    fetchMutSigData, findMrnaRankMolecularProfileId, mergeDiscreteCNAData, fetchSamplesForPatient, fetchClinicalData, concatMutationData,
     fetchCopyNumberSegments, fetchClinicalDataForPatient, makeStudyToCancerTypeMap,fetchTrialMatchGenes, fetchTrialMatchVariants,
     fetchCnaTrialMatchGenes, fetchCivicGenes, fetchCnaCivicGenes, fetchCivicVariants, groupBySampleId,
     findSamplesWithoutCancerTypeClinicalData, fetchStudiesForSamplesWithoutCancerTypeClinicalData, fetchOncoKbAnnotatedGenesSuppressErrors

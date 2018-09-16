@@ -117,7 +117,7 @@ export default class MutationMapperTool extends React.Component<IMutationMapperT
                     <p>
                         Please input <b>tab-delimited</b> or <b>space-delimited</b> mutation data. (Load example data:
                         <span> <a onClick={this.handleLoadExampleGenomicCoordinates} data-test="GenomicChangesExampleButton">Genomic Changes</a></span>,
-                        <span> <a onClick={this.handleLoadExampleGeneAndProteinChange}>Protein Changes</a></span>,
+                        <span> <a onClick={this.handleLoadExampleGeneAndProteinChange} data-test="ProteinChangesExampleButton">Protein Changes</a></span>,
                         <span> <a onClick={this.handleLoadExamplePartiallyAnnotated}>Genomic and Protein Changes</a></span>)
                     </p>
 
@@ -318,7 +318,6 @@ export default class MutationMapperTool extends React.Component<IMutationMapperT
                             oncoKbEvidenceCache={this.store.oncoKbEvidenceCache}
                             pubMedCache={this.store.pubMedCache}
                             pdbHeaderCache={this.store.pdbHeaderCache}
-                            genomeNexusEnrichmentCache={this.store.genomeNexusEnrichmentCache}
                             myCancerGenomeData={this.store.myCancerGenomeData}
                             config={AppConfig}
                         />

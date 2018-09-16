@@ -32,7 +32,6 @@ import {ITrialMatchVariantDataWrapper, ITrialMatchGeneDataWrapper} from "shared/
 import {IMutSigData} from "shared/model/MutSig";
 import DiscreteCNACache from "shared/cache/DiscreteCNACache";
 import OncoKbEvidenceCache from "shared/cache/OncoKbEvidenceCache";
-import GenomeNexusEnrichmentCache from "shared/cache/GenomeNexusEnrichment";
 import MrnaExprRankCache from "shared/cache/MrnaExprRankCache";
 import VariantCountCache from "shared/cache/VariantCountCache";
 import PubMedCache from "shared/cache/PubMedCache";
@@ -43,6 +42,8 @@ import generalStyles from "./column/styles.module.scss";
 import classnames from 'classnames';
 import {IPaginationControlsProps} from "../paginationControls/PaginationControls";
 import {IColumnVisibilityControlsProps} from "../columnVisibilityControls/ColumnVisibilityControls";
+import MobxPromise from "mobxpromise";
+import { VariantAnnotation } from "shared/api/generated/GenomeNexusAPI";
 
 export interface IMutationTableProps {
     studyIdToStudy?: {[studyId:string]:CancerStudy};
@@ -50,7 +51,6 @@ export interface IMutationTableProps {
     molecularProfileIdToMolecularProfile?: {[molecularProfileId:string]:MolecularProfile};
     discreteCNACache?:DiscreteCNACache;
     oncoKbEvidenceCache?:OncoKbEvidenceCache;
-    genomeNexusEnrichmentCache?:GenomeNexusEnrichmentCache;
     mrnaExprRankCache?:MrnaExprRankCache;
     variantCountCache?:VariantCountCache;
     pubMedCache?:PubMedCache;
@@ -64,6 +64,7 @@ export interface IMutationTableProps {
     enableFunctionalImpact?: boolean;
     myCancerGenomeData?: IMyCancerGenomeData;
     hotspotData?: IHotspotDataWrapper;
+    indexedVariantAnnotations?: MobxPromise<{ [genomicLocation: string]: VariantAnnotation; } | undefined>;
     cosmicData?:ICosmicData;
     oncoKbData?: IOncoKbDataWrapper;
     oncoKbAnnotatedGenes:{[entrezGeneId:number]:boolean};
@@ -418,11 +419,11 @@ export default class MutationTable<P extends IMutationTableProps> extends React.
 
         this._columns[MutationTableColumnType.FUNCTIONAL_IMPACT] = {
             name:"Functional Impact",
-            render:(d:Mutation[])=>(this.props.genomeNexusEnrichmentCache
-                ? FunctionalImpactColumnFormatter.renderFunction(d, this.props.genomeNexusEnrichmentCache as GenomeNexusEnrichmentCache)
+            render:(d:Mutation[])=>(this.props.indexedVariantAnnotations
+                ? FunctionalImpactColumnFormatter.renderFunction(d, this.props.indexedVariantAnnotations as MobxPromise<{ [genomicLocation: string]: VariantAnnotation; } | undefined>)
                 : (<span></span>)),
             download: (d:Mutation[]) => FunctionalImpactColumnFormatter.download(
-                d, this.props.genomeNexusEnrichmentCache as GenomeNexusEnrichmentCache),
+                d, this.props.indexedVariantAnnotations as MobxPromise<{ [genomicLocation: string]: VariantAnnotation; } | undefined>),
             headerRender: FunctionalImpactColumnFormatter.headerRender,
             visible: false,
             shouldExclude: () => !this.props.enableFunctionalImpact

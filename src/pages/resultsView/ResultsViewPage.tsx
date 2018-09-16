@@ -38,7 +38,6 @@ import ResultsViewOncoprint from "shared/components/oncoprint/ResultsViewOncopri
 import QuerySummary from "./querySummary/QuerySummary";
 import {QueryStore} from "../../shared/components/query/QueryStore";
 import Loader from "../../shared/components/loadingIndicator/LoadingIndicator";
-import {getGAInstance} from "../../shared/lib/tracking";
 import ExpressionWrapper from "./expression/ExpressionWrapper";
 import CoExpressionTabContainer from "./coExpression/CoExpressionTabContainer";
 import EnrichmentsTab from 'pages/resultsView/enrichments/EnrichmentsTab';
@@ -170,11 +169,6 @@ export default class ResultsViewPage extends React.Component<IResultsViewPagePro
                 $('a#data-download-result-tab').parent().hide();
             }
 
-            if (win.cancerStudyIdList !== 'null') {
-                getGAInstance().event('results view', 'show', { eventLabel: win.cancerStudyIdList  });
-            } else if (_.includes(['all','null'],win.cancerStudyId) === false) {
-                getGAInstance().event('results view', 'show', { eventLabel: win.cancerStudyId  });
-            }
         });
     }
 
@@ -260,13 +254,14 @@ export default class ResultsViewPage extends React.Component<IResultsViewPagePro
 
                             const store = this.resultsViewPageStore;
 
-                            if (store.rnaSeqMolecularData.isComplete && store.studyIdToStudy.isComplete
-                                && store.mutations.isComplete && store.genes.isComplete && store.coverageInformation.isComplete) {
+                            if (store.studyIdToStudy.isComplete
+                                && store.putativeDriverAnnotatedMutations.isComplete && store.genes.isComplete && store.coverageInformation.isComplete) {
                                 return <ExpressionWrapper store={store}
                                                         studyMap={store.studyIdToStudy.result}
                                                           genes={store.genes.result}
-                                                          data={store.rnaSeqMolecularData.result}
-                                                          mutations={store.mutations.result}
+                                                          expressionProfiles={store.expressionProfiles}
+                                                          numericGeneMolecularDataCache={store.numericGeneMolecularDataCache}
+                                                          mutations={store.putativeDriverAnnotatedMutations.result}
                                                           RNASeqVersion={store.expressionTabSeqVersion}
                                                           coverageInformation={store.coverageInformation.result}
                                                           onRNASeqVersionChange={(version:number)=>store.expressionTabSeqVersion=version}

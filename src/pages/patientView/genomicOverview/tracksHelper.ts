@@ -59,6 +59,9 @@ function getChmEndsPerc(chms: Array<any>, total: any) {
 export function getChmInfo(genomeBuild:string) {
     let sel: any = {};
     const chromSizes = require('./chromSizes.json');
+    if (genomeBuild === '' || genomeBuild === undefined) {
+        genomeBuild = 'GRCh37';
+    }
     for (let i = 0; i < chromSizes.length; i++) {
         if (chromSizes[i]["build"] === genomeBuild) {
             sel.hg19 = chromSizes[i]['size'];

@@ -51,7 +51,8 @@ export default class Network extends React.Component<INetworkTabParams, {}> {
             path = "//cbioportal-network-tab.herokuapp.com";
         }
 
-        return path + "/reactapp/network/network.htm?apiHost="+ AppConfig.baseUrl +"&networkParams=" + JSON.stringify(networkParams)
+        return path + "/reactapp/network/network.htm?apiHost="+ AppConfig.baseUrl +"&networkParams=" +
+            encodeURIComponent(JSON.stringify(networkParams))
             + `&${AppConfig.appVersion}`;
     }
 

@@ -172,17 +172,14 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
         return patientViewPageStore.pathologyReport.isComplete && patientViewPageStore.pathologyReport.result.length > 0;
     }
 
-    hideTissueImageTab(){
-        // can't show this iframe if we're on https:
-        return patientViewPageStore.hasTissueImageIFrameUrl.isPending || patientViewPageStore.hasTissueImageIFrameUrl.isError
-            || /https/.test(window.location.protocol)
-            || (patientViewPageStore.hasTissueImageIFrameUrl.isComplete && !patientViewPageStore.hasTissueImageIFrameUrl.result);
-    }
 
-
-    @autobind
-    private customTabMountCallback(div:HTMLDivElement,tab:any){
-        showCustomTab(div, tab, this.props.routing.location, patientViewPageStore);
+    private getSlideId(data:Array<ClinicalData>):string {
+        for (const row in data) {
+            if (data[row]['clinicalAttributeId'] === 'SLIDE_ID') {
+                return data[row]['value'];
+            }
+        }
+        return '';
     }
 
     public render() {
@@ -488,36 +485,32 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                         </div>
                     </MSKTab>
 
-                    <MSKTab key={5} id="tissueImage" linkText="Tissue Image"
-                            hide={this.hideTissueImageTab()}
+
+                    <MSKTab key={4} id="heatMapReportTab" linkText="Heatmap"
+                             hide={(patientViewPageStore.MDAndersonHeatMapAvailable.isComplete && !patientViewPageStore.MDAndersonHeatMapAvailable.result)}
+                    >
+                            <IFrameLoader height={700} url={ `//bioinformatics.mdanderson.org/TCGA/NGCHMPortal/?participant=${patientViewPageStore.patientId}` } />
+                    </MSKTab>
+
+                    <MSKTab key={5} id="tissueImageTab" linkText="Tissue Image"
+                            hide={/https/.test(window.location.protocol) // can't show this iframe if we're on https:
+                                    || (patientViewPageStore.hasTissueImageIFrameUrl.isComplete && !patientViewPageStore.hasTissueImageIFrameUrl.result)}
                     >
                         <div style={{position: "relative"}}>
                             <IFrameLoader height={700} url={  `http://cancer.digitalslidearchive.net/index_mskcc.php?slide_name=${patientViewPageStore.patientId}` } />
                         </div>
                     </MSKTab>
-
-                    {/*<MSKTab key={5} id="mutationalSignatures" linkText="Mutational Signature Data" hide={true}>*/}
-                        {/*<div className="clearfix">*/}
-                            {/*<FeatureTitle title="Mutational Signatures" isLoading={ patientViewPageStore.clinicalDataGroupedBySample.isPending } className="pull-left" />*/}
-                            {/*<LoadingIndicator isLoading={patientViewPageStore.mutationalSignatureData.isPending}/>*/}
-                            {/*{*/}
-                                {/*(patientViewPageStore.clinicalDataGroupedBySample.isComplete && patientViewPageStore.mutationalSignatureData.isComplete) && (*/}
-                                    {/*<ClinicalInformationMutationalSignatureTable data={patientViewPageStore.mutationalSignatureData.result} showTitleBar={true}/>*/}
-                                {/*)*/}
-                            {/*}*/}
-                        {/*</div>*/}
-
-                    {/*</MSKTab>*/}
-
-                                {
-                                    (AppConfig.serverConfig.custom_tabs) && AppConfig.serverConfig.custom_tabs.filter((tab:any)=>tab.location==="PATIENT_PAGE").map((tab:any, i:number)=>{
-                                        return (<MSKTab key={100+i} id={'customTab'+1} unmountOnHide={(tab.unmountOnHide===true)}
-                                                        onTabDidMount={(div)=>{ this.customTabMountCallback(div, tab) }} linkText={tab.title}>
-                                        </MSKTab>)
-                                    })
-                                }
-
-                            </MSKTabs>
+                    <MSKTab key={6} id="pathSlidesTab" linkText="Pathology Slide"
+                            hide={/https/.test(window.location.protocol) ||
+                            patientViewPageStore.clinicalDataPatient.isError ||
+                            (patientViewPageStore.clinicalDataPatient.isComplete &&
+                                this.getSlideId(patientViewPageStore.clinicalDataPatient.result)==='')}
+                    >
+                        <div style={{position: "relative"}}>
+                            <IFrameLoader height={700} url={  `https://riswtp01-ext.uhnresearch.ca/eSlideTray.php?ImageIds=${this.getSlideId(patientViewPageStore.clinicalDataPatient.result)}` } />
+                        </div>
+                    </MSKTab>
+                    </MSKTabs>
 
                         </Then>
                         <Else>

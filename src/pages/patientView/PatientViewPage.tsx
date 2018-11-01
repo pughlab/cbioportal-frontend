@@ -408,12 +408,15 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                                                 oncoKbAnnotatedGenes={patientViewPageStore.oncoKbAnnotatedGenes.result}
                                                 civicGenes={patientViewPageStore.civicGenes}
                                                 civicVariants={patientViewPageStore.civicVariants}
+                                                trialMatchGenes={patientViewPageStore.trialMatchGenes}
+                                                trialMatchVariants={patientViewPageStore.trialMatchVariants}
                                                 userEmailAddress={ServerConfigHelpers.getUserEmailAddress()}
                                                 enableOncoKb={AppConfig.serverConfig.show_oncokb}
                                                 enableFunctionalImpact={AppConfig.serverConfig.show_genomenexus}
                                                 enableHotspot={AppConfig.serverConfig.show_hotspot}
                                                 enableMyCancerGenome={AppConfig.serverConfig.mycancergenome_show}
                                                 enableCivic={AppConfig.serverConfig.show_civic}
+                                                enableTrialMatch={AppConfig.serverConfig.show_trial_match}
                                                 columnVisibility={this.mutationTableColumnVisibility}
                                                 columnVisibilityProps={{
                                                     onColumnToggled: this.onMutationTableColumnVisibilityToggled
@@ -432,10 +435,13 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                                         cnaOncoKbData={patientViewPageStore.cnaOncoKbData}
                                         cnaCivicGenes={patientViewPageStore.cnaCivicGenes}
                                         cnaCivicVariants={patientViewPageStore.cnaCivicVariants}
+                                        cnaTrialMatchGenes={patientViewPageStore.cnaTrialMatchGenes}
+                                        cnaTrialMatchVariants={patientViewPageStore.cnaTrialMatchVariants}
                                         oncoKbEvidenceCache={patientViewPageStore.oncoKbEvidenceCache}
                                         oncoKbAnnotatedGenes={patientViewPageStore.oncoKbAnnotatedGenes.result}
                                         enableOncoKb={AppConfig.serverConfig.show_oncokb}
                                         enableCivic={AppConfig.serverConfig.show_civic}
+                                        enableTrialMatch={AppConfig.serverConfig.show_trial_match}
                                         userEmailAddress={AppConfig.serverConfig.user_email_address}
                                         pubMedCache={patientViewPageStore.pubMedCache}
                                         data={patientViewPageStore.mergedDiscreteCNAData}

@@ -583,7 +583,7 @@ export class PatientViewPageStore {
             this.mutationData,
             this.clinicalDataForSamples
         ],
-        invoke: async() => AppConfig.showCivic? fetchTrialMatchGenes(this.mutationData) : {},
+        invoke: async() => AppConfig.serverConfig.show_civic? fetchTrialMatchGenes(this.mutationData) : {},
         onError: (err: Error) => {
             // fail silently
         }
@@ -595,7 +595,7 @@ export class PatientViewPageStore {
             this.mutationData
         ],
         invoke: async() => {
-            if (AppConfig.showCivic && this.trialMatchGenes.result) {
+            if (AppConfig.serverConfig.show_civic && this.trialMatchGenes.result) {
                 return fetchTrialMatchVariants(this.trialMatchGenes.result as ITrialMatchGene, this.mutationData);
             }
             else {
@@ -657,7 +657,7 @@ export class PatientViewPageStore {
             this.discreteCNAData,
             this.clinicalDataForSamples
         ],
-        invoke: async() => AppConfig.showTrialMatch ? fetchCnaTrialMatchGenes(this.discreteCNAData) : {},
+        invoke: async() => AppConfig.serverConfig.show_trial_match ? fetchCnaTrialMatchGenes(this.discreteCNAData) : {},
         onError: (err: Error) => {
             // fail silently
         }

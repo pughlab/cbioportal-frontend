@@ -3,6 +3,7 @@ declare module '*.scss';
 declare module '*.json';
 
 // these packages are missing typings
+declare module 'save-svg-as-png'
 declare module 'react-file-download';
 declare module 'react-select-checked';
 declare module 'react-zeroclipboard';
@@ -23,10 +24,15 @@ declare module 'react-text-truncate';
 declare module 'react-resize-detector';
 declare module 'react-rangeslider';
 declare module 'jStat';
-declare module 'victory';
 declare module 'svgsaver';
 declare module 'addthis-snippet';
 declare module 'd3-dsv';
+declare module 'd3';
 declare module 'victory';
 declare module 'universal-ga';
 declare module 'mixpanel-browser';
+declare module 'measure-text';
+declare module 'contrast';
+declare module 'react-spinkit';
+declare module 'react-portal';
+declare module 'little-loader';

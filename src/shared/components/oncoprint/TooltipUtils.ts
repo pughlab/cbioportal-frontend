@@ -7,10 +7,11 @@ import {
 import client from "shared/api/cbioportalClientInstance";
 import {ClinicalTrackSpec, GeneticTrackDatum} from "./Oncoprint";
 import {
-    AnnotatedExtendedAlteration, AnnotatedMutation,
+    AnnotatedExtendedAlteration, AnnotatedMutation, AnnotatedNumericGeneMolecularData,
     ExtendedAlteration
 } from "../../../pages/resultsView/ResultsViewPageStore";
 import _ from "lodash";
+import {alterationTypeToProfiledForText} from "./ResultsViewOncoprintUtils";
 
 export const TOOLTIP_DIV_CLASS = "oncoprint__tooltip";
 
@@ -114,6 +115,8 @@ export function makeHeatmapTrackTooltip(genetic_alteration_type:MolecularProfile
 export function makeGeneticTrackTooltip_getCoverageInformation(
     profiled_in: {genePanelId?:string, molecularProfileId:string}[]|undefined,
     not_profiled_in: {genePanelId?:string, molecularProfileId:string}[]|undefined,
+    alterationTypesInQuery?: string[],
+    molecularProfileIdToMolecularProfile?: {[molecularProfileId:string]:MolecularProfile}
 ):{
     dispProfiledGenePanelIds: string[];
     dispNotProfiledGenePanelIds: string[];
@@ -128,14 +131,27 @@ export function makeGeneticTrackTooltip_getCoverageInformation(
     let dispProfiledInMap:{[molecularProfileId:string]:string} = {};
     let dispNotProfiledIn:string[]|undefined = undefined;
     let dispNotProfiledGenePanelIds:string[] = [];
+    let profiledInTypes:{[type:string]:string}|undefined = undefined;
     if (profiled_in) {
         dispProfiledGenePanelIds = _.uniq((profiled_in.map(x=>x.genePanelId) as (string|undefined)[]).filter(x=>!!x) as string[]);
         dispProfiledIn = _.uniq(profiled_in.map(x=>x.molecularProfileId));
+        if (molecularProfileIdToMolecularProfile) {
+            profiledInTypes = _.keyBy(dispProfiledIn, molecularProfileId=>molecularProfileIdToMolecularProfile[molecularProfileId].molecularAlterationType);
+        }
         dispProfiledInMap = _.keyBy(dispProfiledIn);
         dispProfiledGenePanelIdsMap = _.keyBy(dispProfiledGenePanelIds);
     }
     if (not_profiled_in) {
         dispNotProfiledIn = _.uniq(not_profiled_in.map(x=>x.molecularProfileId)).filter(x=>!dispProfiledInMap[x]); // filter out profiles in profiled_in to avoid confusing tooltip (this occurs e.g. w multiple samples, one profiled one not)
+        if (profiledInTypes && alterationTypesInQuery && molecularProfileIdToMolecularProfile) {
+            let notProfiledInTypes = _.keyBy(dispNotProfiledIn, molecularProfileId=>molecularProfileIdToMolecularProfile[molecularProfileId].molecularAlterationType);
+            // add an entry to 'not profiled in' for each alteration type in the query iff the sample is not profiled in a profile of that type, and that type is not already accounted for.
+            // This is for the case of multiple study query - eg one study has CNA profile, the other doesnt, and we want to show in a tooltip from the other study that
+            //      the sample is not profiled for CNA. If the study actually has a CNA profile, then we wont show "not profiled for copy number alterations" because
+            //      that will be filtered out below because its in profiledInTypes or notProfiledInTypes. Otherwise, CNA will be in alterationTypesInQuery,
+            //      and it wont be covered in profiledInTypes or notProfiledInTypes, so it will make sense to say "copy number alterations" in that generality.
+            dispNotProfiledIn = dispNotProfiledIn.concat(alterationTypesInQuery.filter(t=>(!profiledInTypes![t] && !notProfiledInTypes[t])).map(t=>alterationTypeToProfiledForText[t]));
+        }
         dispNotProfiledGenePanelIds = _.uniq(not_profiled_in.map(x=>x.genePanelId)).filter(x=>(!!x && !dispProfiledGenePanelIdsMap[x])) as string[] ;
     }
     const dispAllProfiled = !!(dispProfiledIn && dispProfiledIn.length && dispNotProfiledIn && !dispNotProfiledIn.length);
@@ -147,26 +163,27 @@ export function makeGeneticTrackTooltip_getCoverageInformation(
 
 export function makeGeneticTrackTooltip(
     link_id?:boolean,
-    getMolecularProfileMap?:()=>{[molecularProfileId:string]:MolecularProfile}|undefined
+    getMolecularProfileMap?:()=>{[molecularProfileId:string]:MolecularProfile}|undefined,
+    alterationTypesInQuery?:string[],
 ) {
     // TODO: all the data here is old API data
     function listOfMutationOrFusionDataToHTML(data:any[]) {
         return data.map(function(d:any) {
             var ret = $('<span>');
-            ret.append('<b>'+d.amino_acid_change+'</b>');
+            ret.append(`<b>${d.hugo_gene_symbol} ${d.amino_acid_change}</b>`);
             if (d.cancer_hotspots_hotspot) {
-                ret.append('<img src="images/cancer-hotspots.svg" title="Hotspot" style="height:11px; width:11px; margin-left:3px"/>');
+                ret.append(`<img src="${require("../../../rootImages/cancer-hotspots.svg")}" title="Hotspot" style="height:11px; width:11px; margin-left:3px"/>`);
             }
             if (d.oncokb_oncogenic) {
-                ret.append('<img src="images/oncokb-oncogenic-1.svg" title="'+d.oncokb_oncogenic+'" style="height:11px; width:11px;margin-left:3px"/>');
+                ret.append(`<img src="${require("../../../rootImages/oncokb-oncogenic-1.svg")}" title="'+d.oncokb_oncogenic+'" style="height:11px; width:11px;margin-left:3px"/>`);
             }
             //If we have data for the binary custom driver annotations, append an icon to the tooltip with the annotation information
             if (d.driver_filter && d.driver_filter === "Putative_Driver") {
-                ret.append('<img src="images/driver.png" title="'+d.driver_filter+': '+d.driver_filter_annotation+'" alt="driver filter" style="height:11px; width:11px;margin-left:3px"/>');
+                ret.append(`<img src="${require("../../../rootImages/driver.png")}" title="${d.driver_filter}: ${d.driver_filter_annotation}" alt="driver filter" style="height:11px; width:11px;margin-left:3px"/>`);
             }
             //If we have data for the class custom driver annotations, append an icon to the tooltip with the annotation information
             if (d.driver_tiers_filter) {
-                ret.append('<img src="images/driver_tiers.png" title="'+d.driver_tiers_filter+': '+d.driver_tiers_filter_annotation+'" alt="driver tiers filter" style="height:11px; width:11px;margin-left:3px"/>');
+                ret.append(`<img src="${require("../../../rootImages/driver_tiers.png")}" title="${d.driver_tiers_filter}: ${d.driver_tiers_filter_annotation}" alt="driver tiers filter" style="height:11px; width:11px;margin-left:3px"/>`);
             }
             return ret;
         });
@@ -174,9 +191,9 @@ export function makeGeneticTrackTooltip(
     function listOfCNAToHTML(data:any[]) {
         return data.map(function(d:any) {
             var ret = $('<span>');
-            ret.append('<b>'+d.cna+'</b>');
+            ret.append(`<b>${d.hugo_gene_symbol} ${d.cna}</b>`);
             if (d.oncokb_oncogenic) {
-                ret.append('<img src="images/oncokb-oncogenic-1.svg" title="'+d.oncokb_oncogenic+'" style="height:11px; width:11px;margin-left:3px"/>');
+                ret.append(`<img src=${require("../../../rootImages/oncokb-oncogenic-1.svg")} title="'+d.oncokb_oncogenic+'" style="height:11px; width:11px;margin-left:3px"/>`);
             }
             return ret;
         });
@@ -193,15 +210,17 @@ export function makeGeneticTrackTooltip(
         const ret = $('<div>').addClass(TOOLTIP_DIV_CLASS);
         let mutations:any[] = [];
         let cna:any[] = [];
-        const mrna:("UPREGULATED"|"DOWNREGULATED")[] = [];
-        const prot:("UPREGULATED"|"DOWNREGULATED")[] = [];
+        const mrna:{hugo_gene_symbol:string, direction:"UPREGULATED"|"DOWNREGULATED"}[] = [];
+        const prot:typeof mrna = [];
         let fusions:any[] = [];
         for (let i = 0; i < d.data.length; i++) {
             const datum = d.data[i];
             const molecularAlterationType = datum.molecularProfileAlterationType;
+            const hugoGeneSymbol = datum.hugoGeneSymbol;
             switch (molecularAlterationType) {
                 case "MUTATION_EXTENDED":
                     const tooltip_datum:any = {};
+                    tooltip_datum.hugo_gene_symbol = hugoGeneSymbol;
                     tooltip_datum.amino_acid_change = datum.proteinChange;
                     tooltip_datum.driver_filter = datum.driverFilter;
                     tooltip_datum.driver_filter_annotation = datum.driverFilterAnnotation;
@@ -217,9 +236,10 @@ export function makeGeneticTrackTooltip(
                     (datum.alterationSubType === "fusion" ? fusions : mutations).push(tooltip_datum);
                     break;
                 case "COPY_NUMBER_ALTERATION":
-                    if (disp_cna.hasOwnProperty((datum as NumericGeneMolecularData).value)) {
+                    if (disp_cna.hasOwnProperty((datum as AnnotatedNumericGeneMolecularData).value)) {
                         const tooltip_datum:any = {
-                            cna: disp_cna[(datum as NumericGeneMolecularData).value]
+                            cna: disp_cna[(datum as AnnotatedNumericGeneMolecularData).value],
+                            hugo_gene_symbol: hugoGeneSymbol
                         };
                         const oncokb_oncogenic = datum.oncoKbOncogenic;
                         if (oncokb_oncogenic) {
@@ -233,9 +253,9 @@ export function makeGeneticTrackTooltip(
                     let direction = datum.alterationSubType;
                     let array = (molecularAlterationType === "MRNA_EXPRESSION" ? mrna : prot);
                     if (direction === "up") {
-                        array.push("UPREGULATED");
+                        array.push({hugo_gene_symbol: hugoGeneSymbol, direction: "UPREGULATED"});
                     } else if (direction === "down") {
-                        array.push("DOWNREGULATED");
+                        array.push({hugo_gene_symbol: hugoGeneSymbol, direction: "DOWNREGULATED"});
                     }
                     break;
             }
@@ -256,7 +276,7 @@ export function makeGeneticTrackTooltip(
             mutations = listOfMutationOrFusionDataToHTML(mutations);
             for (var i = 0; i < mutations.length; i++) {
                 if (i > 0) {
-                    ret.append(",");
+                    ret.append(", ");
                 }
                 ret.append(mutations[i]);
             }
@@ -270,20 +290,21 @@ export function makeGeneticTrackTooltip(
             cna = listOfCNAToHTML(cna);
             for (var i = 0; i < cna.length; i++) {
                 if (i > 0) {
-                    ret.append(",");
+                    ret.append(", ");
                 }
                 ret.append(cna[i]);
             }
             ret.append('<br>');
         }
         if (mrna.length > 0) {
-            ret.append('MRNA: <b>' + mrna.join(", ") + '</b><br>');
+            ret.append(`MRNA: <b>${mrna.map(x=>`${x.hugo_gene_symbol} ${x.direction}`).join(", ")}</b><br>`);
         }
         if (prot.length > 0) {
-            ret.append('PROT: <b>' + prot.join(", ") + '</b><br>');
+            ret.append(`PROT: <b>${prot.map(x=>`${x.hugo_gene_symbol} ${x.direction}`).join(", ")}</b><br>`);
         }
         // CoverageInformation
-        const coverageInformation = makeGeneticTrackTooltip_getCoverageInformation(d.profiled_in, d.not_profiled_in);
+        const molecularProfileMap = getMolecularProfileMap && getMolecularProfileMap();
+        const coverageInformation = makeGeneticTrackTooltip_getCoverageInformation(d.profiled_in, d.not_profiled_in, alterationTypesInQuery, molecularProfileMap);
         if (coverageInformation.dispProfiledGenePanelIds.length || coverageInformation.dispNotProfiledGenePanelIds.length) {
             ret.append("Gene Panels: ");
             let needsCommaFirst = false;
@@ -310,11 +331,9 @@ export function makeGeneticTrackTooltip(
             ret.append('Not profiled in selected molecular profiles.');
             ret.append('<br>');
         } else {
-            const molecularProfileMap = getMolecularProfileMap && getMolecularProfileMap();
-
             if (coverageInformation.dispProfiledIn && coverageInformation.dispProfiledIn.length) {
                 ret.append("Profiled in: "+coverageInformation.dispProfiledIn.map(x=>{
-                        if (molecularProfileMap) {
+                        if (molecularProfileMap && (x in molecularProfileMap)) {
                             return molecularProfileMap[x].name;
                         } else {
                             return x;
@@ -324,7 +343,7 @@ export function makeGeneticTrackTooltip(
             }
             if (coverageInformation.dispNotProfiledIn && coverageInformation.dispNotProfiledIn.length) {
                 ret.append("<span style='color:red; font-weight:bold'>Not profiled in: "+coverageInformation.dispNotProfiledIn.map(x=>{
-                        if (molecularProfileMap) {
+                        if (molecularProfileMap && (x in molecularProfileMap)) {
                             return molecularProfileMap[x].name;
                         } else {
                             return x;

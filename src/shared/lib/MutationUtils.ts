@@ -3,12 +3,16 @@ import {
     default as getCanonicalMutationType, CanonicalMutationType,
     ProteinImpactType, getProteinImpactTypeFromCanonical
 } from "./getCanonicalMutationType";
-import {MolecularProfile, Mutation, SampleIdentifier} from "shared/api/generated/CBioPortalAPI";
+import {Gene, MolecularProfile, Mutation, SampleIdentifier} from "shared/api/generated/CBioPortalAPI";
 import {GenomicLocation} from "shared/api/generated/GenomeNexusAPIInternal";
 import {MUTATION_STATUS_GERMLINE, MOLECULAR_PROFILE_UNCALLED_MUTATIONS_SUFFIX} from "shared/constants";
 import {findFirstMostCommonElt} from "./findFirstMostCommonElt";
 import {toSampleUuid} from "./UuidUtils";
 import {stringListToSet} from "./StringUtils";
+import {
+    MUT_COLOR_INFRAME, MUT_COLOR_MISSENSE, MUT_COLOR_OTHER,
+    MUT_COLOR_TRUNC
+} from "../components/oncoprint/geneticrules";
 
 export interface IProteinImpactTypeColors
 {
@@ -19,10 +23,10 @@ export interface IProteinImpactTypeColors
 }
 
 export const DEFAULT_PROTEIN_IMPACT_TYPE_COLORS: IProteinImpactTypeColors = {
-    missenseColor: "#008000",
-    inframeColor: "#8B4513",
-    truncatingColor: "#000000",
-    otherColor: "#8B00C9"
+    missenseColor: MUT_COLOR_MISSENSE,
+    inframeColor: MUT_COLOR_INFRAME,
+    truncatingColor: MUT_COLOR_TRUNC,
+    otherColor: MUT_COLOR_OTHER
 };
 
 export const MUTATION_TYPE_PRIORITY: {[canonicalMutationType: string]: number} = {
@@ -232,15 +236,43 @@ export function somaticMutationRate(hugoGeneSymbol: string, mutations: Mutation[
     }
 }
 
+export function updateMissingGeneInfo(mutations: Partial<Mutation>[],
+                                      genesByHugoSymbol: {[hugoGeneSymbol:string]: Gene})
+{
+    mutations.forEach(mutation => {
+        if (mutation.gene && mutation.gene.hugoGeneSymbol)
+        {
+            const gene = genesByHugoSymbol[mutation.gene.hugoGeneSymbol];
+
+            if (gene) {
+                // keep the existing "mutation.gene" values: only overwrite missing (undefined) values
+                mutation.gene = _.merge({}, gene, mutation.gene);
+                // also update entrezGeneId for the mutation itself
+                mutation.entrezGeneId = mutation.entrezGeneId || gene.entrezGeneId;
+            }
+        }
+    });
+}
+
 export function extractGenomicLocation(mutation: Mutation)
 {
-    return {
-        chromosome: mutation.gene.chromosome.replace("chr", ""),
-        start: mutation.startPosition,
-        end: mutation.endPosition,
-        referenceAllele: mutation.referenceAllele,
-        variantAllele: mutation.variantAllele
-    };
+    if (mutation.gene && mutation.gene.chromosome &&
+        mutation.startPosition &&
+        mutation.endPosition &&
+        mutation.referenceAllele &&
+        mutation.variantAllele)
+    {
+        return {
+            chromosome: mutation.gene.chromosome.replace("chr", ""),
+            start: mutation.startPosition,
+            end: mutation.endPosition,
+            referenceAllele: mutation.referenceAllele,
+            variantAllele: mutation.variantAllele
+        };
+    }
+    else {
+        return undefined;
+    }
 }
 
 export function genomicLocationString(genomicLocation: GenomicLocation)
@@ -252,9 +284,12 @@ export function uniqueGenomicLocations(mutations: Mutation[]): GenomicLocation[]
 {
     const genomicLocationMap: {[key: string]: GenomicLocation} = {};
 
-    mutations.map((mutaiton: Mutation) => {
-        const genomicLocation: GenomicLocation = extractGenomicLocation(mutaiton);
-        genomicLocationMap[genomicLocationString(genomicLocation)] = genomicLocation;
+    mutations.map((mutation: Mutation) => {
+        const genomicLocation: GenomicLocation|undefined = extractGenomicLocation(mutation);
+
+        if (genomicLocation) {
+            genomicLocationMap[genomicLocationString(genomicLocation)] = genomicLocation;
+        }
     });
 
     return _.values(genomicLocationMap);

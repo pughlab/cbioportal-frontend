@@ -8,11 +8,12 @@ import Collapse from "react-collapse";
 import DefaultTooltip from "shared/components/defaultTooltip/DefaultTooltip";
 import {HitZone} from "../HitZone";
 import ProteinChain from "./ProteinChain";
-import {MutationMapperStore} from "../../../pages/resultsView/mutation/MutationMapperStore";
+import MutationMapperStore from "shared/components/mutationMapper/MutationMapperStore";
 import {ALIGNMENT_GAP, IPdbChain} from "../../model/Pdb";
 import PdbHeaderCache from "../../cache/PdbHeaderCache";
 import PdbChainInfo from "../PdbChainInfo";
 import onNextRenderFrame from "shared/lib/onNextRenderFrame";
+import setWindowVariable from "../../lib/setWindowVariable";
 
 type ProteinChainPanelProps = {
     store:MutationMapperStore;
@@ -51,6 +52,7 @@ export default class ProteinChainPanel extends React.Component<ProteinChainPanel
 
     constructor(props:ProteinChainPanelProps) {
         super(props);
+
         this.handlers = {
             onMouseEnter:action(()=>{
                 this.expandTimeout = window.setTimeout(()=>{

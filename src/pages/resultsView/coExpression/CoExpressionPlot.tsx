@@ -14,15 +14,16 @@ import {action, computed, observable} from "mobx";
 import {observer, Observer} from "mobx-react";
 import {MolecularProfile} from "../../../shared/api/generated/CBioPortalAPI";
 import {AlterationTypeConstants} from "../ResultsViewPageStore";
-import SvgSaver from "svgsaver";
 import svgToPdfDownload from "shared/lib/svgToPdfDownload";
 import {getSampleViewUrl} from "../../../shared/api/urls";
 import "./styles.scss";
 import {bind} from "bind-decorator";
-import ScatterPlot from "../../../shared/components/scatterPlot/ScatterPlot";
+import ScatterPlot from "../../../shared/components/plots/ScatterPlot";
 import Timer = NodeJS.Timer;
-import DownloadControls from "../../../shared/components/DownloadControls";
-import {axisLabel} from "./CoExpressionPlotUtils";
+import DownloadControls from "../../../shared/components/downloadControls/DownloadControls";
+import {axisLabel, isNotProfiled} from "./CoExpressionPlotUtils";
+import _ from "lodash";
+import {scatterPlotSize} from "../../../shared/components/plots/PlotUtils";
 
 type GeneId = { hugoGeneSymbol:string, entrezGeneId: number, cytoband:string};
 
@@ -47,7 +48,7 @@ export interface ICoExpressionPlotProps {
 }
 
 
-type CoExpressionPlotData = {
+export type CoExpressionPlotData = {
     x:number,
     y:number,
     mutationsX:string,
@@ -73,25 +74,20 @@ const NOT_PROFILED_FILL = "#ffffff";
 
 function noop() {};
 
+const SVG_ID = "coexpression-plot-svg";
+
 @observer
 export default class CoExpressionPlot extends React.Component<ICoExpressionPlotProps, {}> {
 
-    @observable private svg:SVGElement|null = null;
-
-    @bind
-    @action private svgRef(svg:SVGElement|null) {
-        this.svg = svg;
-    }
-
     @bind
     private getSvg() {
-        return this.svg;
+        return document.getElementById(SVG_ID) as SVGElement | null;
     }
 
     @computed get stroke() {
         if (this.props.showMutations) {
             return (d:{mutationsX:string, mutationsY:string, profiledX:boolean, profiledY:boolean})=>{
-                if (!d.profiledX && !d.profiledY) {
+                if (isNotProfiled(d)) {
                     return NOT_PROFILED_STROKE;
                 } else if (d.mutationsX && d.mutationsY) {
                     return BOTH_MUT_STROKE;
@@ -111,7 +107,7 @@ export default class CoExpressionPlot extends React.Component<ICoExpressionPlotP
     @computed get fill() {
         if (this.props.showMutations) {
             return (d:{mutationsX:string, mutationsY:string, profiledX:boolean, profiledY:boolean})=>{
-                if (!d.profiledX && !d.profiledY) {
+                if (isNotProfiled(d)) {
                     return NOT_PROFILED_FILL;
                 } else if (d.mutationsX && d.mutationsY) {
                     return BOTH_MUT_FILL;
@@ -137,8 +133,8 @@ export default class CoExpressionPlot extends React.Component<ICoExpressionPlotP
         let hasY = false;
         let hasNone = false;
         let hasNotProfiled = false;
-        for (const d of this.props.data) {
-            if (!d.profiledX && !d.profiledY) {
+        for (const d of this.data) {
+            if (isNotProfiled(d)) {
                 hasNotProfiled = true;
             }
             if (d.mutationsX && d.mutationsY) {
@@ -186,6 +182,22 @@ export default class CoExpressionPlot extends React.Component<ICoExpressionPlotP
         return ret;
     }
 
+    @computed get data() {
+        // sort in order to set z index in plot
+        // order: both mutated, one mutated, neither mutated, not profiled
+        return _.sortBy(this.props.data, d=>{
+            if (d.mutationsX && d.mutationsY) {
+                return 3;
+            } else if (d.mutationsX || d.mutationsY) {
+                return 2;
+            } else if (!isNotProfiled(d)) {
+                return 1;
+            } else {
+                return 0;
+            }
+        });
+    }
+
     private get title() {
         return `${this.props.molecularProfile.name}: ${this.props.xAxisGene.hugoGeneSymbol} vs. ${this.props.yAxisGene.hugoGeneSymbol}`;
     }
@@ -200,24 +212,21 @@ export default class CoExpressionPlot extends React.Component<ICoExpressionPlotP
 
     @bind
     private plot() {
-        if (!this.props.data.length) {
-            return <span>No data to plot.</span>;
+        if (!this.data.length) {
+            return <div className={'alert alert-info'}>No data to plot.</div>;
         }
         return (
             <CoExpressionScatterPlot
-                svgRef={this.svgRef}
+                svgId={SVG_ID}
                 title={this.title}
-                data={this.props.data}
+                data={this.data}
+                size={scatterPlotSize}
                 chartWidth={this.props.width}
                 chartHeight={this.props.height}
                 stroke={this.stroke}
                 fill={this.fill}
                 strokeWidth={1.2}
                 legendData={this.mutationLegendElements}
-                correlation={{
-                    pearson: this.props.coExpression.pearsonsCorrelation,
-                    spearman: this.props.coExpression.spearmansCorrelation
-                }}
                 logX={this.props.logScale}
                 logY={this.props.logScale}
                 useLogSpaceTicks={true}
@@ -232,7 +241,7 @@ export default class CoExpressionPlot extends React.Component<ICoExpressionPlotP
     @bind
     private toolbar() {
         return (
-            <div style={{textAlign:"center"}}>
+            <div style={{textAlign:"center", position:"relative"}}>
                 <div style={{display:"inline-block"}}>
                     {this.props.showMutationControls && (
                         <div className="checkbox coexpression-plot-toolbar-elt"><label>
@@ -257,15 +266,15 @@ export default class CoExpressionPlot extends React.Component<ICoExpressionPlotP
                         </div>
                     )}
                 </div>
-                <div style={{display:"inline-block"}}>
-                    <DownloadControls
-                        getSvg={this.svg === null ? undefined : this.getSvg}
-                        buttons={["SVG", "PDF"]}
-                        filename="coexpression"
-                        dontFade={true}
-                        style={{marginTop:13}}
-                    />
-                </div>
+
+                <DownloadControls
+                    getSvg={this.getSvg}
+                    filename="coexpression"
+                    dontFade={true}
+                    collapse={true}
+                    style={{position:"absolute", top:0, right:0}}
+                />
+
             </div>
         );
     }
@@ -314,7 +323,7 @@ export default class CoExpressionPlot extends React.Component<ICoExpressionPlotP
 
     render() {
         return (
-            <div className="borderedChart" data-test="CoExpressionPlot">
+            <div className="borderedChart inlineBlock" data-test="CoExpressionPlot">
                 <Observer>
                     {this.toolbar}
                 </Observer>

@@ -11,6 +11,7 @@ import DiscreteCNACache from "../../../shared/cache/DiscreteCNACache";
 import { If, Then, Else } from 'react-if';
 import Loader from "../../../shared/components/loadingIndicator/LoadingIndicator";
 import { getCountsText, getData, getFilteredData } from "./MutualExclusivityUtil";
+import OqlStatusBanner from "../../../shared/components/oqlStatusBanner/OqlStatusBanner";
 
 export interface IMutualExclusivityTabProps {
     store: ResultsViewPageStore
@@ -58,19 +59,24 @@ export default class MutualExclusivityTab extends React.Component<IMutualExclusi
         } else if (this.props.store.isSampleAlteredMap.isComplete) {
             if (_.size(this.props.store.isSampleAlteredMap.result) > 1) {
                 return (
-                    <div>
+                    <div data-test="mutualExclusivityTabDiv">
+                        <div className={"tabMessageContainer"}>
+                            <OqlStatusBanner className="mutex-oql-status-banner" store={this.props.store} tabReflectsOql={true} />
+                        </div>
+
                         {getCountsText(this.data)}
+
                         <div className={styles.Checkboxes}>
                             <Checkbox checked={this.mutualExclusivityFilter}
-                                onChange={this.mutualExclusivityFilterChange}>
+                                      onChange={this.mutualExclusivityFilterChange}>
                                 Mutual exclusivity
                             </Checkbox>
                             <Checkbox checked={this.coOccurenceFilter}
-                                onChange={this.coOccurenceFilterChange}>
+                                      onChange={this.coOccurenceFilterChange}>
                                 Co-occurrence
                             </Checkbox>
                             <Checkbox checked={this.significantPairsFilter}
-                                onChange={this.significantPairsFilterChange}>
+                                      onChange={this.significantPairsFilterChange}>
                                 Significant only
                             </Checkbox>
                         </div>
@@ -78,7 +84,9 @@ export default class MutualExclusivityTab extends React.Component<IMutualExclusi
                     </div>
                 );
             } else {
-                return <div>Mutual exclusivity analysis cannot be provided when only a single gene is selected.</div>
+                return <div className={"tabMessageContainer"}>
+                            <div className={"alert alert-info"}>Mutual exclusivity analysis cannot be provided when only a single gene is selected.</div>
+                        </div>
             }
         } else {
             return null;

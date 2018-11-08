@@ -1,47 +1,57 @@
-import * as React from 'react';
-import * as _ from 'lodash';
-import $ from 'jquery';
-import { default as ReactBootstrap} from 'react-bootstrap';
-import GenomicOverview from './genomicOverview/GenomicOverview';
-import { ClinicalData } from "shared/api/generated/CBioPortalAPI";
-import { ClinicalDataBySampleId } from "../../shared/api/api-types-extended";
-import { RequestStatus } from "../../shared/api/api-types-extended";
-import FeatureTitle from '../../shared/components/featureTitle/FeatureTitle';
-import {If, Then, Else} from 'react-if';
-import SampleManager from './sampleManager';
-import SelectCallback = ReactBootstrap.SelectCallback;
-import {ThreeBounce} from 'better-react-spinkit';
-import PatientHeader from './patientHeader/PatientHeader';
+import * as React from "react";
+import * as _ from "lodash";
+import $ from "jquery";
+import GenomicOverview from "./genomicOverview/GenomicOverview";
+import {ClinicalData} from "shared/api/generated/CBioPortalAPI";
+import {ClinicalDataBySampleId, RequestStatus} from "../../shared/api/api-types-extended";
+import FeatureTitle from "../../shared/components/featureTitle/FeatureTitle";
+import {Else, If, Then} from "react-if";
+import SampleManager from "./sampleManager";
+import PatientHeader from "./patientHeader/PatientHeader";
+import SignificantMutationalSignatures from "./patientHeader/SignificantMutationalSignatures";
 import {PaginationControls} from "../../shared/components/paginationControls/PaginationControls";
 import {IColumnVisibilityDef} from "shared/components/columnVisibilityControls/ColumnVisibilityControls";
 import {toggleColumnVisibility} from "shared/components/lazyMobXTable/ColumnVisibilityResolver";
-import { PatientViewPageStore } from './clinicalInformation/PatientViewPageStore';
+import {PatientViewPageStore} from "./clinicalInformation/PatientViewPageStore";
 import ClinicalInformationPatientTable from "./clinicalInformation/ClinicalInformationPatientTable";
 import ClinicalInformationSamples from "./clinicalInformation/ClinicalInformationSamplesTable";
-import {observer, inject } from "mobx-react";
-import {getSpanElementsFromCleanData} from './clinicalInformation/lib/clinicalAttributesUtil.js';
+import {inject, observer} from "mobx-react";
+import {getSpanElementsFromCleanData} from "./clinicalInformation/lib/clinicalAttributesUtil.js";
 import CopyNumberTableWrapper from "./copyNumberAlterations/CopyNumberTableWrapper";
-import {reaction, computed, autorun, IReactionDisposer, observable, action} from "mobx";
+import {action, computed, observable, reaction} from "mobx";
 import Timeline from "./timeline/Timeline";
 import {default as PatientViewMutationTable} from "./mutation/PatientViewMutationTable";
 import PathologyReport from "./pathologyReport/PathologyReport";
-import { MSKTabs, MSKTab } from "../../shared/components/MSKTabs/MSKTabs";
-import { validateParametersPatientView } from '../../shared/lib/validateParameters';
+import {MSKTab, MSKTabs} from "../../shared/components/MSKTabs/MSKTabs";
+import {validateParametersPatientView} from "../../shared/lib/validateParameters";
 import LoadingIndicator from "shared/components/loadingIndicator/LoadingIndicator";
 import ValidationAlert from "shared/components/ValidationAlert";
-import AjaxErrorModal from "shared/components/AjaxErrorModal";
-import AppConfig from 'appConfig';
-import { getMouseIcon } from './SVGIcons';
+import AppConfig from "appConfig";
+import {getMouseIcon} from "./SVGIcons";
 
-import './patient.scss';
+import "./patient.scss";
 import IFrameLoader from "../../shared/components/iframeLoader/IFrameLoader";
-import RadiologyReport from "./clinicalInformation/RadiologyReport";
+import {
+    getDigitalSlideArchiveIFrameUrl,
+    getSampleViewUrl
+} from "../../shared/api/urls";
+import {PageLayout} from "../../shared/components/PageLayout/PageLayout";
+import Helmet from "react-helmet";
+import {ServerConfigHelpers} from "../../config/config";
+import autobind from "autobind-decorator";
+import {showCustomTab} from "../../shared/lib/customTabs";
+import {StudyLink} from "../../shared/components/StudyLink/StudyLink";
+import WindowStore from "shared/components/window/WindowStore";
+import {QueryParams} from "url";
 
 const patientViewPageStore = new PatientViewPageStore();
 
-(window as any).patientViewPageStore = patientViewPageStore;
+const win:any = (window as any);
+
+win.patientViewPageStore = patientViewPageStore;
 
 export interface IPatientViewPageProps {
+    params: any; // react route
     routing: any;
     samples?: ClinicalDataBySampleId[];
     loadClinicalInformationTableData?: () => Promise<any>;
@@ -52,6 +62,12 @@ export interface IPatientViewPageProps {
     clinicalDataStatus?: RequestStatus;
 }
 
+export interface PatientViewUrlParams extends QueryParams{
+    studyId:string;
+    caseId?:string;
+    sampleId?:string;
+}
+
 @inject('routing')
 @observer
 export default class PatientViewPage extends React.Component<IPatientViewPageProps, {}> {
@@ -59,16 +75,19 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
     @observable private mutationTableColumnVisibility: {[columnId: string]: boolean}|undefined;
     @observable private cnaTableColumnVisibility: {[columnId: string]: boolean}|undefined;
 
-    private updatePageTitleReaction: IReactionDisposer;
-
     constructor(props: IPatientViewPageProps) {
 
         super();
 
         //TODO: this should be done by a module so that it can be reused on other pages
         const reaction1 = reaction(
-            () => props.routing.location.query,
-            query => {
+            () => [props.routing.location.query, props.routing.location.hash, props.routing.location.pathname],
+            ([query,hash,pathname]) => {
+
+                // we don't want to update patient if we aren't on a patient page route
+                if (!pathname.includes("/patient")) {
+                    return;
+                }
 
                 const validationResult = validateParametersPatientView(query);
 
@@ -86,11 +105,15 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                         patientViewPageStore.setSampleId(query.sampleId as string);
                     }
 
-                    let patientIdsInCohort = ('navCaseIds' in query ? (query.navCaseIds as string).split(",") : []);
+                    // if there is a navCaseId list in url
+                    const navCaseIdMatch = hash.match(/navCaseIds=([^&]*)/);
+                    if (navCaseIdMatch && navCaseIdMatch.length > 1) {
+                        const navCaseIds = navCaseIdMatch[1].split(',');
+                        patientViewPageStore.patientIdsInCohort = navCaseIds.map((entityId:string)=>{
+                            return entityId.includes(':') ? entityId : patientViewPageStore.studyId + ':' + entityId;
+                        });
+                    }
 
-                    patientViewPageStore.patientIdsInCohort = patientIdsInCohort.map(entityId=>{
-                        return entityId.includes(':') ? entityId : patientViewPageStore.studyId + ':' + entityId;
-                    });
                 } else {
                     patientViewPageStore.urlValidationError = validationResult.message;
                 }
@@ -99,39 +122,8 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
             { fireImmediately:true }
         );
 
-        this.updatePageTitleReaction = reaction(
-            () => patientViewPageStore.pageTitle,
-            (title:string) => ((window as any).document.title = title),
-            { fireImmediately:true }
-        );
-
         this.onMutationTableColumnVisibilityToggled = this.onMutationTableColumnVisibilityToggled.bind(this);
         this.onCnaTableColumnVisibilityToggled = this.onCnaTableColumnVisibilityToggled.bind(this);
-    }
-
-    public componentDidMount() {
-
-        this.exposeComponentRenderersToParentScript();
-
-    }
-
-    public componentWillUnmount(){
-
-        //dispose reaction
-        this.updatePageTitleReaction();
-
-    }
-
-    // this gives the parent (legacy) cbioportal code control to mount
-    // these components whenever and wherever it wants
-    exposeComponentRenderersToParentScript() {
-
-        // exposeComponentRenderer('renderClinicalInformationContainer', ClinicalInformationContainer,
-        //     { store:this.props.store }
-        // );
-        //
-        // exposeComponentRenderer('renderGenomicOverview', GenomicOverview);
-
     }
 
     public handleSampleClick(id: string, e: React.MouseEvent<HTMLAnchorElement>) {
@@ -145,7 +137,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
 
     private handleTabChange(id: string) {
 
-        this.props.routing.updateRoute({ tab: id });
+        this.props.routing.updateRoute({}, `patient/${id}`);
 
     }
 
@@ -190,14 +182,15 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
         return patientViewPageStore.pathologyReport.isComplete && patientViewPageStore.pathologyReport.result.length > 0;
     }
 
+    hideTissueImageTab(){
+        return patientViewPageStore.hasTissueImageIFrameUrl.isPending || patientViewPageStore.hasTissueImageIFrameUrl.isError
+            || (patientViewPageStore.hasTissueImageIFrameUrl.isComplete && !patientViewPageStore.hasTissueImageIFrameUrl.result);
+    }
 
-    private getSlideId(data:Array<ClinicalData>):string {
-        for (const row in data) {
-            if (data[row]['clinicalAttributeId'] === 'SLIDE_ID') {
-                return data[row]['value'];
-            }
-        }
-        return '';
+
+    @autobind
+    private customTabMountCallback(div:HTMLDivElement,tab:any){
+        showCustomTab(div, tab, this.props.routing.location, patientViewPageStore);
     }
 
     public render() {
@@ -213,7 +206,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
 
         if (patientViewPageStore.studyMetaData.isComplete) {
             let study = patientViewPageStore.studyMetaData.result;
-            studyName = <a href={`study?id=${study.studyId}`} className="studyMetaBar_studyName">{study.name}</a>;
+            studyName = <StudyLink study={study}/>;
         }
 
         if (patientViewPageStore.patientViewData.isComplete && patientViewPageStore.studyMetaData.isComplete) {
@@ -230,6 +223,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                     sampleManager.clinicalDataLegacyCleanAndDerived[sample.id] &&
                     sampleManager.clinicalDataLegacyCleanAndDerived[sample.id].DERIVED_NORMALIZED_CASE_TYPE === 'Xenograft'
                 );
+
                 return (
                     <div className="patientSample">
                         <span className='clinical-spans'>
@@ -240,19 +234,28 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                                         {isPDX && getMouseIcon()}
                                         {isPDX && '\u00A0'}
                                         <a
-                                            href={`case.do?#/patient?sampleId=${sample.id}&studyId=${patientViewPageStore.studyMetaData.result!.studyId}`}
+                                            href={getSampleViewUrl(patientViewPageStore.studyMetaData.result!.studyId, sample.id)}
                                             target="_blank"
                                             onClick={(e: React.MouseEvent<HTMLAnchorElement>) => this.handleSampleClick(sample.id, e)}
                                         >
                                             {sample.id}
                                         </a>
                                         {sampleManager &&
-                                         sampleManager.clinicalDataLegacyCleanAndDerived[sample.id] &&
-                                         getSpanElementsFromCleanData(sampleManager.clinicalDataLegacyCleanAndDerived[sample.id], patientViewPageStore.studyId)}
+                                        sampleManager.clinicalDataLegacyCleanAndDerived[sample.id] &&
+                                        getSpanElementsFromCleanData(sampleManager.clinicalDataLegacyCleanAndDerived[sample.id], patientViewPageStore.studyId)}
                                     </span>
                                 )
                             }
                         </span>
+                        {patientViewPageStore.hasMutationalSignatureData.result === true &&
+                        <LoadingIndicator isLoading={patientViewPageStore.mutationalSignatureData.isPending && patientViewPageStore.mutationalSignatureMetaData.isPending}/>}
+
+                        {patientViewPageStore.hasMutationalSignatureData.result === true &&
+                        patientViewPageStore.clinicalDataGroupedBySample.isComplete && patientViewPageStore.mutationalSignatureData.isComplete &&
+                        patientViewPageStore.mutationalSignatureMetaData.isComplete &&
+                        (<SignificantMutationalSignatures data={patientViewPageStore.mutationalSignatureData.result}
+                                                          metadata={patientViewPageStore.mutationalSignatureMetaData.result} uniqueSampleKey={sample.id}/>)}
+
                     </div>
                 );
             });
@@ -294,259 +297,245 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
         }
 
         return (
-            <div className="patientViewPage">
-
-                <AjaxErrorModal
-                    show={(patientViewPageStore.ajaxErrors.length > 0)}
-                    onHide={()=>{ patientViewPageStore.clearErrors() }}
-                    title={`Can't find ${patientViewPageStore.pageMode} ${patientViewPageStore.caseId} in study ${patientViewPageStore.studyId}.`}
-                    troubleshooting={["Check that your URL parameters are valid.", "Try refreshing the page.", "Make sure you are connected to the internet."]}
-                />
-
-                <div className="topBanner">
-
-                {  (patientViewPageStore.patientViewData.isComplete) && (
-                    <div className="patientPageHeader">
-                        <i className="fa fa-user-circle-o patientIcon" aria-hidden="true"></i>
-                        <div className="patientDataTable">
-                        <table>
-                            <tr>
-                                <td>Patient:</td>
-                                <td><PatientHeader
-                                    handlePatientClick={(id: string)=>this.handlePatientClick(id)}
-                                    patient={patientViewPageStore.patientViewData.result.patient}
-                                    studyId={patientViewPageStore.studyId}
-                                    darwinUrl={patientViewPageStore.darwinUrl.result}
-                                    sampleManager={sampleManager}/></td>
-                            </tr>
-                            <tr>
-                                <td>Samples:</td>
-                                <td>
-                                    <div className="patientSamples">{sampleHeader}</div>
-                                </td>
-                            </tr>
-                        </table>
-                        </div>
-                        <div className="studyMetaBar">{ studyName } <If condition={(cohortNav != null)}>{cohortNav}</If></div>
-                    </div>
-                )
+            <PageLayout noMargin={true}>
+                {
+                    (patientViewPageStore.patientViewData.isComplete) && (
+                        <Helmet>
+                            <title>{patientViewPageStore.pageTitle}</title>
+                            <meta name="description" content={patientViewPageStore.metaDescription} />
+                        </Helmet>
+                    )
                 }
-                </div>
-                <If condition={patientViewPageStore.patientViewData.isComplete}>
-                <Then>
-                <MSKTabs id="patientViewPageTabs" activeTabId={this.props.routing.location.query.tab}  onTabClick={(id:string)=>this.handleTabChange(id)} className="mainTabs">
+                <div className="patientViewPage">
 
-                        <MSKTab key={0} id="summaryTab" linkText="Summary">
+                    {/*<AjaxErrorModal*/}
+                    {/*show={(patientViewPageStore.ajaxErrors.length > 0)}*/}
+                    {/*onHide={()=>{ patientViewPageStore.clearErrors() }}*/}
+                    {/*title={`Can't find ${patientViewPageStore.pageMode} ${patientViewPageStore.caseId} in study ${patientViewPageStore.studyId}.`}*/}
+                    {/*troubleshooting={["Check that your URL parameters are valid.", "Try refreshing the page.", "Make sure you are connected to the internet."]}*/}
+                    {/*/>*/}
 
-                            <LoadingIndicator isLoading={patientViewPageStore.clinicalEvents.isPending} />
+                    <div className="topBanner">
 
-                            {
-                                (!!sampleManager && patientViewPageStore.clinicalEvents.isComplete && patientViewPageStore.clinicalEvents.result.length > 0) && (
+                        {  (patientViewPageStore.patientViewData.isComplete) && (
+                            <div className="patientPageHeader">
+                                <i className="fa fa-user-circle-o patientIcon" aria-hidden="true"></i>
+                                <div className="patientDataTable">
+                                    <table>
+                                        <tr>
+                                            <td>Patient:</td>
+                                            <td><PatientHeader
+                                                handlePatientClick={(id: string)=>this.handlePatientClick(id)}
+                                                patient={patientViewPageStore.patientViewData.result.patient}
+                                                studyId={patientViewPageStore.studyId}
+                                                darwinUrl={patientViewPageStore.darwinUrl.result}
+                                                sampleManager={sampleManager}/></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Samples:</td>
+                                            <td>
+                                                <div className="patientSamples">{sampleHeader}</div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div className="studyMetaBar">{ studyName } <If condition={(cohortNav != null)}>{cohortNav}</If></div>
+                            </div>
+                        )
+                        }
+                    </div>
+                    <If condition={patientViewPageStore.patientViewData.isComplete}>
+                        <Then>
+                            <MSKTabs id="patientViewPageTabs" activeTabId={this.props.params.tab || "summaryTab"}  onTabClick={(id:string)=>this.handleTabChange(id)} className="mainTabs">
 
-                                    <div>
-                                        <Timeline store={patientViewPageStore} getWidth={ ()=>$(window).width()-40 } sampleManager={ sampleManager } />
-                                        <hr />
-                                    </div>
-                                )
+                        <MSKTab key={0} id="summary" linkText="Summary">
 
-                            }
+                                    <LoadingIndicator isLoading={patientViewPageStore.clinicalEvents.isPending} />
 
-                            <LoadingIndicator
-                                    isLoading={patientViewPageStore.mutationData.isPending || patientViewPageStore.cnaSegments.isPending}
-                            />
+                                    {
+                                        (!!sampleManager && patientViewPageStore.clinicalEvents.isComplete && patientViewPageStore.clinicalEvents.result.length > 0) && (
 
-                            {
-                                (patientViewPageStore.mutationData.isComplete && patientViewPageStore.cnaSegments.isComplete
-                                && patientViewPageStore.sequencedSampleIdsInStudy.isComplete && sampleManager)
-                                && ( patientViewPageStore.mutationData.result.length > 0 || patientViewPageStore.cnaSegments.result.length > 0)
-                                && (
-                                    <div>
-                                        <GenomicOverview
-                                            mergedMutations={patientViewPageStore.mergedMutationData}
-                                            samples={patientViewPageStore.samples.result}
-                                            cnaSegments={patientViewPageStore.cnaSegments.result}
-                                            sampleOrder={sampleManager.sampleIndex}
-                                            sampleLabels={sampleManager.sampleLabels}
-                                            sampleColors={sampleManager.sampleColors}
-                                            sampleManager={sampleManager}
-                                            getContainerWidth={()=>$(window).width()}
-                                        />
-                                        <hr />
-                                    </div>
-                                )
-                            }
+                                            <div>
+                                                <Timeline store={patientViewPageStore} width={WindowStore.size.width-60} sampleManager={ sampleManager } />
+                                                <hr />
+                                            </div>
+                                        )
 
-                            <LoadingIndicator isLoading={patientViewPageStore.mutationData.isPending || patientViewPageStore.uncalledMutationData.isPending || patientViewPageStore.oncoKbAnnotatedGenes.isPending} />
+                                    }
 
-                            {
-                                (patientViewPageStore.oncoKbAnnotatedGenes.isComplete && patientViewPageStore.mutationData.isComplete && patientViewPageStore.uncalledMutationData.isComplete && !!sampleManager) && (
-                                    <PatientViewMutationTable
-                                        sampleManager={sampleManager}
+                                    <LoadingIndicator
+                                        isLoading={patientViewPageStore.mutationData.isPending || patientViewPageStore.cnaSegments.isPending}
+                                    />
+
+                                    {
+                                        (patientViewPageStore.mutationData.isComplete && patientViewPageStore.cnaSegments.isComplete
+                                            && patientViewPageStore.sequencedSampleIdsInStudy.isComplete && sampleManager)
+                                        && ( patientViewPageStore.mutationData.result.length > 0 || patientViewPageStore.cnaSegments.result.length > 0)
+                                        && (
+                                            <div>
+                                                <GenomicOverview
+                                                    mergedMutations={patientViewPageStore.mergedMutationData}
+                                                    samples={patientViewPageStore.samples.result}
+                                                    cnaSegments={patientViewPageStore.cnaSegments.result}
+                                                    sampleOrder={sampleManager.sampleIndex}
+                                                    sampleLabels={sampleManager.sampleLabels}
+                                                    sampleColors={sampleManager.sampleColors}
+                                                    sampleManager={sampleManager}
+                                                    containerWidth={WindowStore.size.width-20}
+                                                />
+                                                <hr />
+                                            </div>
+                                        )
+                                    }
+
+                                    <LoadingIndicator isLoading={patientViewPageStore.mutationData.isPending || patientViewPageStore.uncalledMutationData.isPending || patientViewPageStore.oncoKbAnnotatedGenes.isPending} />
+
+                                    {
+                                        (patientViewPageStore.oncoKbAnnotatedGenes.isComplete && patientViewPageStore.mutationData.isComplete && patientViewPageStore.uncalledMutationData.isComplete && !!sampleManager) && (
+                                            <PatientViewMutationTable
+                                                sampleManager={sampleManager}
+                                                sampleIds={sampleManager ? sampleManager.getSampleIdsInOrder() : []}
+                                                uniqueSampleKeyToTumorType={patientViewPageStore.uniqueSampleKeyToTumorType}
+                                                molecularProfileIdToMolecularProfile={patientViewPageStore.molecularProfileIdToMolecularProfile.result}
+                                                variantCountCache={patientViewPageStore.variantCountCache}
+                                                indexedVariantAnnotations={patientViewPageStore.indexedVariantAnnotations}
+                                                discreteCNACache={patientViewPageStore.discreteCNACache}
+                                                mrnaExprRankCache={patientViewPageStore.mrnaExprRankCache}
+                                                oncoKbEvidenceCache={patientViewPageStore.oncoKbEvidenceCache}
+                                                pubMedCache={patientViewPageStore.pubMedCache}
+                                                mrnaExprRankMolecularProfileId={patientViewPageStore.mrnaRankMolecularProfileId.result || undefined}
+                                                discreteCNAMolecularProfileId={patientViewPageStore.molecularProfileIdDiscrete.result}
+                                                data={patientViewPageStore.mergedMutationDataIncludingUncalled}
+                                                downloadDataFetcher={patientViewPageStore.downloadDataFetcher}
+                                                mutSigData={patientViewPageStore.mutSigData.result}
+                                                myCancerGenomeData={patientViewPageStore.myCancerGenomeData}
+                                                hotspotData={patientViewPageStore.indexedHotspotData}
+                                                cosmicData={patientViewPageStore.cosmicData.result}
+                                                oncoKbData={patientViewPageStore.oncoKbData}
+                                                oncoKbAnnotatedGenes={patientViewPageStore.oncoKbAnnotatedGenes.result}
+                                                civicGenes={patientViewPageStore.civicGenes}
+                                                civicVariants={patientViewPageStore.civicVariants}
+                                                userEmailAddress={ServerConfigHelpers.getUserEmailAddress()}
+                                                enableOncoKb={AppConfig.serverConfig.show_oncokb}
+                                                enableFunctionalImpact={AppConfig.serverConfig.show_genomenexus}
+                                                enableHotspot={AppConfig.serverConfig.show_hotspot}
+                                                enableMyCancerGenome={AppConfig.serverConfig.mycancergenome_show}
+                                                enableCivic={AppConfig.serverConfig.show_civic}
+                                                columnVisibility={this.mutationTableColumnVisibility}
+                                                columnVisibilityProps={{
+                                                    onColumnToggled: this.onMutationTableColumnVisibilityToggled
+                                                }}
+                                            />
+                                        )
+                                    }
+
+                                    <hr />
+
+                                    <LoadingIndicator isLoading={(this.cnaTableStatus === 'loading')} />
+
+                                    <CopyNumberTableWrapper
                                         sampleIds={sampleManager ? sampleManager.getSampleIdsInOrder() : []}
-                                        uniqueSampleKeyToTumorType={patientViewPageStore.uniqueSampleKeyToTumorType}
-                                        molecularProfileIdToMolecularProfile={patientViewPageStore.molecularProfileIdToMolecularProfile.result}
-                                        variantCountCache={patientViewPageStore.variantCountCache}
-                                        genomeNexusEnrichmentCache={patientViewPageStore.genomeNexusEnrichmentCache}
-                                        discreteCNACache={patientViewPageStore.discreteCNACache}
-                                        mrnaExprRankCache={patientViewPageStore.mrnaExprRankCache}
+                                        sampleManager={sampleManager}
+                                        cnaOncoKbData={patientViewPageStore.cnaOncoKbData}
+                                        cnaCivicGenes={patientViewPageStore.cnaCivicGenes}
+                                        cnaCivicVariants={patientViewPageStore.cnaCivicVariants}
                                         oncoKbEvidenceCache={patientViewPageStore.oncoKbEvidenceCache}
-                                        pubMedCache={patientViewPageStore.pubMedCache}
-                                        mrnaExprRankMolecularProfileId={patientViewPageStore.mrnaRankMolecularProfileId.result || undefined}
-                                        discreteCNAMolecularProfileId={patientViewPageStore.molecularProfileIdDiscrete.result}
-                                        data={patientViewPageStore.mergedMutationDataIncludingUncalled}
-                                        downloadDataFetcher={patientViewPageStore.downloadDataFetcher}
-                                        mutSigData={patientViewPageStore.mutSigData.result}
-                                        myCancerGenomeData={patientViewPageStore.myCancerGenomeData}
-                                        hotspotData={patientViewPageStore.indexedHotspotData}
-                                        cosmicData={patientViewPageStore.cosmicData.result}
-                                        oncoKbData={patientViewPageStore.oncoKbData}
                                         oncoKbAnnotatedGenes={patientViewPageStore.oncoKbAnnotatedGenes.result}
-                                        civicGenes={patientViewPageStore.civicGenes}
-                                        civicVariants={patientViewPageStore.civicVariants}
-                                        userEmailAddress={AppConfig.userEmailAddress}
-                                        enableOncoKb={AppConfig.showOncoKB}
-                                        enableFunctionalImpact={AppConfig.showGenomeNexus}
-                                        enableHotspot={AppConfig.showHotspot}
-                                        enableMyCancerGenome={AppConfig.showMyCancerGenome}
-                                        enableCivic={AppConfig.showCivic}
-                                        columnVisibility={this.mutationTableColumnVisibility}
+                                        enableOncoKb={AppConfig.serverConfig.show_oncokb}
+                                        enableCivic={AppConfig.serverConfig.show_civic}
+                                        userEmailAddress={AppConfig.serverConfig.user_email_address}
+                                        pubMedCache={patientViewPageStore.pubMedCache}
+                                        data={patientViewPageStore.mergedDiscreteCNAData}
+                                        copyNumberCountCache={patientViewPageStore.copyNumberCountCache}
+                                        mrnaExprRankCache={patientViewPageStore.mrnaExprRankCache}
+                                        gisticData={patientViewPageStore.gisticData.result}
+                                        mrnaExprRankMolecularProfileId={patientViewPageStore.mrnaRankMolecularProfileId.result || undefined}
+                                        status={this.cnaTableStatus}
+                                        columnVisibility={this.cnaTableColumnVisibility}
                                         columnVisibilityProps={{
-                                            onColumnToggled: this.onMutationTableColumnVisibilityToggled
+                                            onColumnToggled: this.onCnaTableColumnVisibilityToggled
                                         }}
                                     />
-                                )
-                            }
-
-                            <hr />
-
-                            <LoadingIndicator isLoading={(this.cnaTableStatus === 'loading')} />
-
-                            <CopyNumberTableWrapper
-                                sampleIds={sampleManager ? sampleManager.getSampleIdsInOrder() : []}
-                                sampleManager={sampleManager}
-                                cnaOncoKbData={patientViewPageStore.cnaOncoKbData}
-                                cnaCivicGenes={patientViewPageStore.cnaCivicGenes}
-                                cnaCivicVariants={patientViewPageStore.cnaCivicVariants}
-                                oncoKbEvidenceCache={patientViewPageStore.oncoKbEvidenceCache}
-                                oncoKbAnnotatedGenes={patientViewPageStore.oncoKbAnnotatedGenes.result}
-                                enableOncoKb={AppConfig.showOncoKB}
-                                enableCivic={AppConfig.showCivic}
-                                userEmailAddress={AppConfig.userEmailAddress}
-                                pubMedCache={patientViewPageStore.pubMedCache}
-                                data={patientViewPageStore.mergedDiscreteCNAData}
-                                copyNumberCountCache={patientViewPageStore.copyNumberCountCache}
-                                mrnaExprRankCache={patientViewPageStore.mrnaExprRankCache}
-                                gisticData={patientViewPageStore.gisticData.result}
-                                mrnaExprRankMolecularProfileId={patientViewPageStore.mrnaRankMolecularProfileId.result || undefined}
-                                status={this.cnaTableStatus}
-                                columnVisibility={this.cnaTableColumnVisibility}
-                                columnVisibilityProps={{
-                                    onColumnToggled: this.onCnaTableColumnVisibilityToggled
-                                }}
-                            />
-                        </MSKTab>
+                                </MSKTab>
 
                         {(patientViewPageStore.pageMode === 'patient') && (
-                        <MSKTab key={2} id="clinicalDataTab" linkText="Clinical Data">
+                        <MSKTab key={2} id="clinicalData" linkText="Clinical Data">
 
-                                    <div className="clearfix">
-                                        <FeatureTitle title="Patient"
-                                                      isLoading={ patientViewPageStore.clinicalDataPatient.isPending }
-                                                      className="pull-left"/>
-                                        { (patientViewPageStore.clinicalDataPatient.isComplete) && (
-                                            <ClinicalInformationPatientTable showTitleBar={true}
-                                                                             data={patientViewPageStore.clinicalDataPatient.result}/>
+                                        <div className="clearfix">
+                                            <FeatureTitle title="Patient"
+                                                          isLoading={patientViewPageStore.clinicalDataPatient.isPending}
+                                                          className="pull-left"/>
+                                            {(patientViewPageStore.clinicalDataPatient.isComplete) && (
+                                                <ClinicalInformationPatientTable showTitleBar={true}
+                                                                                 data={patientViewPageStore.clinicalDataPatient.result}/>
+                                            )
+                                            }
+                                        </div>
 
-                                        )
-                                        }
-                                    </div>
+                                        <br />
 
-                            <br />
-
-                            <div className="clearfix">
-                                <FeatureTitle title="Samples" isLoading={ patientViewPageStore.clinicalDataGroupedBySample.isPending } className="pull-left" />
-                                {  (patientViewPageStore.clinicalDataGroupedBySample.isComplete) && (
-                                    <ClinicalInformationSamples
-                                        samples={patientViewPageStore.clinicalDataGroupedBySample.result!}/>
-                                )
-                                }
-                            </div>
-
-
-                        </MSKTab>
-                    )}
+                                        <div className="clearfix">
+                                            <FeatureTitle title="Samples" isLoading={ patientViewPageStore.clinicalDataGroupedBySample.isPending } className="pull-left" />
+                                            {  (patientViewPageStore.clinicalDataGroupedBySample.isComplete) && (
+                                                <ClinicalInformationSamples
+                                                    samples={patientViewPageStore.clinicalDataGroupedBySample.result!}/>
+                                            )
+                                            }
+                                        </div>
 
 
-                    <MSKTab key={3} id="pathologyReportTab" linkText="Pathology Report"
+                                    </MSKTab>
+                                )}
+
+
+                    <MSKTab key={3} id="pathologyReport" linkText="Pathology Report"
                             hide={!this.shouldShowPathologyReport(patientViewPageStore)}
-                            loading={patientViewPageStore.pathologyReport.isPending}
                     >
                         <div>
                             <PathologyReport iframeStyle={{position:"absolute", top:0}} pdfs={patientViewPageStore.pathologyReport.result} />
                         </div>
                     </MSKTab>
 
-
-                    <MSKTab key={4} id="heatMapReportTab" linkText="Heatmap"
-                             hide={(patientViewPageStore.MDAndersonHeatMapAvailable.isComplete && !patientViewPageStore.MDAndersonHeatMapAvailable.result)}
-                            loading={patientViewPageStore.MDAndersonHeatMapAvailable.isPending}
-                    >
-                            <IFrameLoader height={700} url={ `//bioinformatics.mdanderson.org/TCGA/NGCHMPortal/?participant=${patientViewPageStore.patientId}` } />
-                    </MSKTab>
-
-                    <MSKTab key={5} id="tissueImageTab" linkText="Tissue Image"
-                            hide={/https/.test(window.location.protocol) // can't show this iframe if we're on https:
-                                    || (patientViewPageStore.hasTissueImageIFrameUrl.isComplete && !patientViewPageStore.hasTissueImageIFrameUrl.result)}
-                            loading={patientViewPageStore.hasTissueImageIFrameUrl.isPending}
+                    <MSKTab key={5} id="tissueImage" linkText="Tissue Image"
+                            hide={this.hideTissueImageTab()}
                     >
                         <div style={{position: "relative"}}>
-                            <IFrameLoader height={700} url={  `http://cancer.digitalslidearchive.net/index_mskcc.php?slide_name=${patientViewPageStore.patientId}` } />
+                            <IFrameLoader height={700} url={  getDigitalSlideArchiveIFrameUrl(patientViewPageStore.patientId) } />
                         </div>
                     </MSKTab>
-                    {(patientViewPageStore.pageMode === 'patient') && (
-                        <MSKTab key={6} id="radiologyDataTab" linkText="Radiology Images" hide={patientViewPageStore.studyId !== 'PSMA_Imaging'}>
 
-                            <div className="clearfix">
-                                <FeatureTitle title=""
-                                              isLoading={ patientViewPageStore.clinicalDataPatient.isPending }
-                                              className="pull-left"/>
-                                { (patientViewPageStore.clinicalDataPatient.isComplete) && (
-                                    <RadiologyReport showTitleBar={true}
-                                                     data={patientViewPageStore.clinicalDataPatient.result}
-                                                     patientId={patientViewPageStore.patientId}/>
-                                )
+                    {/*<MSKTab key={5} id="mutationalSignatures" linkText="Mutational Signature Data" hide={true}>*/}
+                        {/*<div className="clearfix">*/}
+                            {/*<FeatureTitle title="Mutational Signatures" isLoading={ patientViewPageStore.clinicalDataGroupedBySample.isPending } className="pull-left" />*/}
+                            {/*<LoadingIndicator isLoading={patientViewPageStore.mutationalSignatureData.isPending}/>*/}
+                            {/*{*/}
+                                {/*(patientViewPageStore.clinicalDataGroupedBySample.isComplete && patientViewPageStore.mutationalSignatureData.isComplete) && (*/}
+                                    {/*<ClinicalInformationMutationalSignatureTable data={patientViewPageStore.mutationalSignatureData.result} showTitleBar={true}/>*/}
+                                {/*)*/}
+                            {/*}*/}
+                        {/*</div>*/}
+
+                    {/*</MSKTab>*/}
+
+                                {
+                                    (AppConfig.serverConfig.custom_tabs) && AppConfig.serverConfig.custom_tabs.filter((tab:any)=>tab.location==="PATIENT_PAGE").map((tab:any, i:number)=>{
+                                        return (<MSKTab key={100+i} id={'customTab'+1} unmountOnHide={(tab.unmountOnHide===true)}
+                                                        onTabDidMount={(div)=>{ this.customTabMountCallback(div, tab) }} linkText={tab.title}>
+                                        </MSKTab>)
+                                    })
                                 }
-                            </div>
-                        </MSKTab>
-                    )}
-                    <MSKTab key={7} id="pathSlidesTab" linkText="Pathology Slides"
-                            hide={patientViewPageStore.clinicalDataPatient.isError ||
-                            (patientViewPageStore.clinicalDataPatient.isComplete &&
-                                this.getSlideId(patientViewPageStore.clinicalDataPatient.result)==='')}
-                    >
-                        <div style={{position: "relative"}}>
-                            <IFrameLoader height={700} url={  `https://riswtp01-ext.uhnresearch.ca/eSlideTray.php?ImageIds=${this.getSlideId(patientViewPageStore.clinicalDataPatient.result)}` } />
-                        </div>
-                    </MSKTab>
-                    <MSKTab key={8} id="IPRTab" linkText="BCGSC Integrated Pipeline Reports"
-                            hide={patientViewPageStore.clinicalDataPatient.isError ||
-                            (patientViewPageStore.clinicalDataPatient.isComplete &&
-                                patientViewPageStore.studyId !== 'COMPARISON')}
-                    >
-                        <div style={{position: "relative"}}>
-                            <IFrameLoader height={900} url={  `https://iprweb.bcgsc.ca/reports/${patientViewPageStore.patientId}` } />
-                        </div>
-                    </MSKTab>
-                    </MSKTabs>
 
-                    </Then>
-                    <Else>
-                        <ThreeBounce size={20} className="center-block text-center" />
-                    </Else>
+                            </MSKTabs>
 
-                </If>
+                        </Then>
+                        <Else>
+                            <LoadingIndicator isLoading={true} center={true} size={"big"}/>
+                        </Else>
 
-            </div>
+                    </If>
+
+                </div>
+            </PageLayout>
         );
     }
 }

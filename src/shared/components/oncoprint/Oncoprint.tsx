@@ -5,7 +5,10 @@ import {observer} from "mobx-react";
 import {computed} from "mobx";
 import {transition} from "./DeltaUtils";
 import _ from "lodash";
-import {AnnotatedMutation, ExtendedAlteration} from "../../../pages/resultsView/ResultsViewPageStore";
+import {
+    AnnotatedMutation, AnnotatedNumericGeneMolecularData,
+    ExtendedAlteration
+} from "../../../pages/resultsView/ResultsViewPageStore";
 import "./styles.scss";
 
 export type ClinicalTrackDatum = {
@@ -24,6 +27,7 @@ export type ClinicalTrackSpec = {
     label: string;
     description: string;
     data: ClinicalTrackDatum[];
+    altered_uids?:string[];
     na_legend_label?:string;
 } & ({
     datatype: "counts";
@@ -58,7 +62,7 @@ export type GeneticTrackDatum = {
     patient?:string;
     study_id:string;
     uid:string;
-    data:(ExtendedAlteration&AnnotatedMutation)[];
+    data:(ExtendedAlteration&AnnotatedMutation&AnnotatedNumericGeneMolecularData)[];
     profiled_in?: GenePanelData[];
     not_profiled_in?:GenePanelData[];
     na?: boolean;
@@ -123,6 +127,8 @@ export interface IOncoprintProps {
 
     hiddenIds?:string[];
 
+    alterationTypesInQuery?:string[];
+
     distinguishMutationType?:boolean;
     distinguishDrivers?:boolean;
 
@@ -150,7 +156,7 @@ export interface IOncoprintProps {
 @observer
 export default class Oncoprint extends React.Component<IOncoprintProps, {}> {
     private div:HTMLDivElement;
-    public oncoprint:OncoprintJS<any>;
+    public oncoprint:OncoprintJS<any>|undefined;
     private trackSpecKeyToTrackId:{[key:string]:TrackId};
     private lastTransitionProps:IOncoprintProps;
 
@@ -205,6 +211,13 @@ export default class Oncoprint extends React.Component<IOncoprintProps, {}> {
 
     componentDidMount() {
         this.refreshOncoprint(this.props);
+    }
+
+    componentWillUnmount() {
+        if (this.oncoprint) {
+            this.oncoprint.destroy();
+            this.oncoprint = undefined;
+        }
     }
 
     render() {

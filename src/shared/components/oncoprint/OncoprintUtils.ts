@@ -136,8 +136,8 @@ export function getHeatmapTrackRuleSetParams(molecularAlterationType: string) {
     if (molecularAlterationType === "METHYLATION") {
         value_range = [0,1];
         legend_label = "Methylation Heatmap";
-        value_stop_points = [0,1];
-        colors = [[0,0,0,1], [255,0,0,1]];
+        value_stop_points = [0,0.35,1];
+        colors = [[0,0,255,1], [255,255,255,1], [255,0,0,1]];
     } else {
         value_range = [-3,3];
         legend_label = "Expression Heatmap";
@@ -392,11 +392,13 @@ export function makeClinicalTracksMobxPromise(oncoprint:ResultsViewOncoprint, sa
             let ret:MobxPromise<any>[] = [
                 oncoprint.props.store.samples,
                 oncoprint.props.store.patients,
-                oncoprint.clinicalAttributesById
+                oncoprint.clinicalAttributesById,
+                oncoprint.props.store.alteredSampleKeys,
+                oncoprint.props.store.alteredPatientKeys
             ];
             if (oncoprint.clinicalAttributesById.isComplete) {
                 const attributes = oncoprint.selectedClinicalAttributeIds.keys().map(attrId=>{
-                    return oncoprint.clinicalAttributesById.result[attrId];
+                    return oncoprint.clinicalAttributesById.result![attrId];
                 }).filter(x=>!!x);
                 ret = ret.concat(oncoprint.props.store.oncoprintClinicalDataCache.getAll(attributes));
             }
@@ -411,6 +413,10 @@ export function makeClinicalTracksMobxPromise(oncoprint:ResultsViewOncoprint, sa
             }).filter(x=>!!x);
             return attributes.map((attribute:ClinicalAttribute)=>{
                 const data = oncoprint.props.store.oncoprintClinicalDataCache.get(attribute).result!;
+                let altered_uids = undefined;
+                if (oncoprint.onlyShowClinicalLegendForAlteredCases) {
+                    altered_uids = (sampleMode ? oncoprint.props.store.alteredSampleKeys.result! : oncoprint.props.store.alteredPatientKeys.result!);
+                }
                 const ret:Partial<ClinicalTrackSpec> = {
                     key: oncoprint.clinicalAttributeIdToTrackKey(attribute.clinicalAttributeId),
                     label: attribute.displayName,
@@ -420,12 +426,13 @@ export function makeClinicalTracksMobxPromise(oncoprint:ResultsViewOncoprint, sa
                         sampleMode ? oncoprint.props.store.samples.result! : oncoprint.props.store.patients.result!,
                         data
                     ),
+                    altered_uids
                 };
                 if (attribute.datatype === "NUMBER") {
                     ret.datatype = "number";
-                    if (attribute.clinicalAttributeId === SpecialAttribute.FractionGenomeAltered) {
+                    if (attribute.clinicalAttributeId === "FRACTION_GENOME_ALTERED") {
                         (ret as any).numberRange = [0,1];
-                    } else if (attribute.clinicalAttributeId === SpecialAttribute.MutationCount) {
+                    } else if (attribute.clinicalAttributeId === "MUTATION_COUNT") {
                         (ret as any).numberLogScale = true;
                     }
                 } else if (attribute.datatype === "STRING") {

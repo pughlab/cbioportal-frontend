@@ -11,7 +11,7 @@ import {MobxPromise} from "mobxpromise";
 import {computed, IObservableObject, IObservableValue, observable, ObservableMap, reaction} from "mobx";
 import _ from "lodash";
 import {OncoprintClinicalAttribute, SortMode} from "../ResultsViewOncoprint";
-import {MolecularProfile} from "shared/api/generated/CBioPortalAPI";
+import {ClinicalAttribute, MolecularProfile} from "shared/api/generated/CBioPortalAPI";
 import LoadingIndicator from "shared/components/loadingIndicator/LoadingIndicator";
 import DefaultTooltip from "shared/components/defaultTooltip/DefaultTooltip";
 import Slider from "react-rangeslider";
@@ -20,6 +20,7 @@ import EditableSpan from "shared/components/editableSpan/EditableSpan";
 import FadeInteraction from "shared/components/fadeInteraction/FadeInteraction";
 import './styles.scss';
 import ErrorIcon from "../../ErrorIcon";
+import {getPercentage} from "../../../lib/FormatUtils";
 const CheckedSelect = require("react-select-checked").CheckedSelect;
 import classNames from "classnames";
 import {SpecialAttribute} from "../../../cache/OncoprintClinicalDataCache";
@@ -29,6 +30,7 @@ export interface IOncoprintControlsHandlers {
     onSelectShowUnalteredColumns?:(unalteredColumnsShown:boolean)=>void,
     onSelectShowWhitespaceBetweenColumns?:(showWhitespace:boolean)=>void,
     onSelectShowClinicalTrackLegends?:(showLegends:boolean)=>void,
+    onSelectOnlyShowClinicalLegendForAlteredCases?:(showLegends:boolean)=>void,
     onSelectShowMinimap?:(showMinimap:boolean)=>void,
     onSelectDistinguishMutationType?:(distinguish:boolean)=>void,
     onSelectDistinguishDrivers?:(distinguish:boolean)=>void,
@@ -66,6 +68,7 @@ export interface IOncoprintControlsState {
     showUnalteredColumns?:boolean,
     showWhitespaceBetweenColumns?:boolean,
     showClinicalTrackLegends?:boolean,
+    onlyShowClinicalLegendForAlteredCases?:boolean,
     showMinimap?:boolean,
     distinguishMutationType?:boolean,
     distinguishDrivers?:boolean,
@@ -73,8 +76,10 @@ export interface IOncoprintControlsState {
     sortByDrivers?:boolean,
     sortByCaseListDisabled?:boolean,
     annotateDriversOncoKb?:boolean,
+    annotateDriversOncoKbError?:boolean;
     annotateDriversOncoKbDisabled?:boolean;
     annotateDriversHotspots?:boolean,
+    annotateDriversHotspotsError?:boolean;
     annotateDriversHotspotsDisabled?:boolean,
     annotateDriversCBioPortal?:boolean,
     annotateDriversCOSMIC?:boolean,
@@ -84,6 +89,7 @@ export interface IOncoprintControlsState {
 
     sortMode:SortMode,
     clinicalAttributesPromise?:MobxPromise<OncoprintClinicalAttribute[]>,
+    clinicalAttributeSampleCountPromise?:MobxPromise<{[clinicalAttributeId:string]:number}>,
     selectedClinicalAttributeIds?:string[],
     heatmapProfilesPromise?:MobxPromise<MolecularProfile[]>,
     selectedHeatmapProfile?:string;
@@ -102,6 +108,8 @@ export interface IOncoprintControlsState {
     columnMode?:"sample"|"patient";
 
     horzZoom:number;
+
+    sampleCount:number;
 };
 
 export interface IOncoprintControlsProps {
@@ -115,6 +123,7 @@ const EVENT_KEY = {
     showUnalteredColumns: "2",
     showWhitespaceBetweenColumns: "3",
     showClinicalTrackLegends: "4",
+    onlyShowClinicalLegendForAlteredCases: "4.1",
     distinguishMutationType: "5",
     sortByMutationType: "6",
     sortAlphabetical: "7",
@@ -146,7 +155,6 @@ const EVENT_KEY = {
 @observer
 export default class OncoprintControls extends React.Component<IOncoprintControlsProps, {}> {
     @observable horzZoomSliderState:number;
-    @observable clinicalTracksMenuFocused = false;
 
     constructor(props:IOncoprintControlsProps) {
         super(props);
@@ -171,7 +179,6 @@ export default class OncoprintControls extends React.Component<IOncoprintControl
         this.onHorzZoomSliderChange = this.onHorzZoomSliderChange.bind(this);
         this.onHorzZoomSliderSet = this.onHorzZoomSliderSet.bind(this);
         this.onSetHorzZoomTextInput = this.onSetHorzZoomTextInput.bind(this);
-        this.onClinicalTracksMenuFocus = this.onClinicalTracksMenuFocus.bind(this);
 
         this.horzZoomSliderState = props.state.horzZoom;
         reaction(()=>this.props.state.horzZoom,
@@ -225,6 +232,10 @@ export default class OncoprintControls extends React.Component<IOncoprintControl
             case EVENT_KEY.showClinicalTrackLegends:
                 this.props.handlers.onSelectShowClinicalTrackLegends &&
                 this.props.handlers.onSelectShowClinicalTrackLegends(!this.props.state.showClinicalTrackLegends);
+                break;
+            case EVENT_KEY.onlyShowClinicalLegendForAlteredCases:
+                this.props.handlers.onSelectOnlyShowClinicalLegendForAlteredCases &&
+                this.props.handlers.onSelectOnlyShowClinicalLegendForAlteredCases(!this.props.state.onlyShowClinicalLegendForAlteredCases);
                 break;
             case EVENT_KEY.columnTypeSample:
                 this.props.handlers.onSelectColumnType && this.props.handlers.onSelectColumnType("sample");
@@ -355,16 +366,32 @@ export default class OncoprintControls extends React.Component<IOncoprintControl
         }
     }
 
-    private onClinicalTracksMenuFocus() {
-        this.clinicalTracksMenuFocused = true;
-    }
-
     @computed get clinicalTrackOptions() {
-        if (this.clinicalTracksMenuFocused && this.props.state.clinicalAttributesPromise && this.props.state.clinicalAttributesPromise.result) {
-            return _.map(this.props.state.clinicalAttributesPromise.result, clinicalAttribute=>({
-                label: clinicalAttribute.displayName,
-                value: clinicalAttribute.clinicalAttributeId
-            }));
+        if (this.props.state.clinicalAttributesPromise &&
+            this.props.state.clinicalAttributesPromise.result &&
+            this.props.state.clinicalAttributeSampleCountPromise &&
+            this.props.state.clinicalAttributeSampleCountPromise.result
+        ) {
+            const clinicalAttributeIdToAvailableSampleCount = this.props.state.clinicalAttributeSampleCountPromise.result;
+            return _.reduce(this.props.state.clinicalAttributesPromise.result, (options:{label:string, value:string}[], next:ClinicalAttribute)=>{
+                let sampleCount = clinicalAttributeIdToAvailableSampleCount[next.clinicalAttributeId];
+                if (sampleCount === undefined && next.clinicalAttributeId.startsWith(SpecialAttribute.Profiled)) {
+                    // for 'Profiled In' tracks, we have data for all the samples - gene panel data
+                    // but these tracks have special, locally-constructed clinical attribute ids, and aren't placed in that map.
+                    // TODO: maybe they should be?
+                    sampleCount = this.props.state.sampleCount;
+                }
+                const newOption = {
+                    label: `${next.displayName} (${getPercentage(sampleCount/this.props.state.sampleCount, 0)})`,
+                    value: next.clinicalAttributeId,
+                    disabled: false
+                };
+                if (sampleCount === 0) {
+                    newOption.disabled = true;
+                }
+                options.push(newOption);
+                return options;
+            }, []);
         } else {
             return [];
         }
@@ -382,9 +409,10 @@ export default class OncoprintControls extends React.Component<IOncoprintControl
     }
 
     @computed get clinicalTracksMenuLoading() {
-        return this.clinicalTracksMenuFocused &&
-            this.props.state.clinicalAttributesPromise &&
-            this.props.state.clinicalAttributesPromise.isPending;
+        return ((this.props.state.clinicalAttributesPromise &&
+            this.props.state.clinicalAttributesPromise.isPending) ||
+            (this.props.state.clinicalAttributeSampleCountPromise &&
+            this.props.state.clinicalAttributeSampleCountPromise.isPending));
     }
 
     private getClinicalTracksMenu() {
@@ -394,13 +422,10 @@ export default class OncoprintControls extends React.Component<IOncoprintControl
             // TODO: pass unmodified string array as value prop when possible
             // TODO: remove labelKey specification, leave to default prop, when possible
             return (
-                <div
-                    onFocus={this.onClinicalTracksMenuFocus}
-                >
+                <div className="clinical-track-selector">
                     <CheckedSelect
-                        placeholder="Add clinical tracks.."
-                        isLoading={this.clinicalTracksMenuLoading}
-                        noResultsText={this.clinicalTracksMenuLoading ? "Loading..." : "No matching clinical tracks found"}
+                        disabled={this.clinicalTracksMenuLoading}
+                        placeholder={this.clinicalTracksMenuLoading ? "Downloading clinical tracks..." : "Add clinical tracks.."}
                         onChange={this.onChangeSelectedClinicalTracks}
                         options={this.clinicalTrackOptions}
                         value={(this.props.state.selectedClinicalAttributeIds || []).map(x=>({value:x}))}
@@ -572,49 +597,53 @@ export default class OncoprintControls extends React.Component<IOncoprintControl
                         </label>
                         </div>
                         <div style={{marginLeft: "20px"}}>
-                            <div className="checkbox"><label>
-                                <input
-                                    type="checkbox"
-                                    value={EVENT_KEY.annotateOncoKb}
-                                    checked={this.props.state.annotateDriversOncoKb}
-                                    onClick={this.onInputClick}
-                                    data-test="annotateOncoKb"
-                                    disabled={this.props.state.annotateDriversOncoKbDisabled}
-                                />
-                                {this.props.state.annotateDriversOncoKbDisabled && <ErrorIcon style={{marginRight:4}} tooltip={<span>Error loading OncoKb data. Please refresh the page or try again later.</span>}/>}
-                                <DefaultTooltip
-                                    overlay={<span>Oncogenicity from OncoKB</span>}
-                                    placement="top"
-                                >
-                                    <img
-                                        src="images/oncokb.png"
-                                        style={{maxHeight:"12px", cursor:"pointer", marginRight:"5px"}}
+                            { !this.props.state.annotateDriversOncoKbDisabled && (
+                                <div className="checkbox"><label>
+                                    <input
+                                        type="checkbox"
+                                        value={EVENT_KEY.annotateOncoKb}
+                                        checked={this.props.state.annotateDriversOncoKb}
+                                        onClick={this.onInputClick}
+                                        data-test="annotateOncoKb"
+                                        disabled={this.props.state.annotateDriversOncoKbError}
                                     />
-                                </DefaultTooltip>
-                                driver annotation
-                            </label></div>
-                            <div className="checkbox"><label>
-                                <input
-                                    type="checkbox"
-                                    value={EVENT_KEY.annotateHotspots}
-                                    checked={this.props.state.annotateDriversHotspots}
-                                    onClick={this.onInputClick}
-                                    data-test="annotateHotspots"
-                                    disabled={this.props.state.annotateDriversHotspotsDisabled}
-                                />
-                                {this.props.state.annotateDriversHotspotsDisabled && <ErrorIcon style={{marginRight:4}} tooltip={<span>Error loading Hotspots data. Please refresh the page or try again later.</span>}/>}
-                                Hotspots
-                                <DefaultTooltip
-                                    overlay={<div style={{maxWidth:"400px"}}>Identified as a recurrent hotspot (statistically significant) in a population-scale cohort of tumor samples of various cancer types using methodology based in part on <a href="http://www.ncbi.nlm.nih.gov/pubmed/26619011" target="_blank">Chang et al., Nat Biotechnol, 2016.</a>
-                                        Explore all mutations at <a href="http://www.cancerhotspots.org" target="_blank">http://cancerhotspots.org</a></div>}
-                                    placement="top"
-                                >
-                                    <img
-                                        src="images/cancer-hotspots.svg"
-                                        style={{height:"15px", width:"15px", cursor:"pointer", marginLeft:"5px"}}
+                                    {this.props.state.annotateDriversOncoKbError && <ErrorIcon style={{marginRight:4}} tooltip={<span>Error loading OncoKb data. Please refresh the page or try again later.</span>}/>}
+                                    <DefaultTooltip
+                                        overlay={<span>Oncogenicity from OncoKB</span>}
+                                        placement="top"
+                                    >
+                                        <img
+                                            src={require("../../../../rootImages/oncokb.png")}
+                                            style={{maxHeight:"12px", cursor:"pointer", marginRight:"5px"}}
+                                        />
+                                    </DefaultTooltip>
+                                    driver annotation
+                                </label></div>
+                            )}
+                            { !this.props.state.annotateDriversHotspotsDisabled && (
+                                <div className="checkbox"><label>
+                                    <input
+                                        type="checkbox"
+                                        value={EVENT_KEY.annotateHotspots}
+                                        checked={this.props.state.annotateDriversHotspots}
+                                        onClick={this.onInputClick}
+                                        data-test="annotateHotspots"
+                                        disabled={this.props.state.annotateDriversHotspotsError}
                                     />
-                                </DefaultTooltip>
-                            </label></div>
+                                    {this.props.state.annotateDriversHotspotsError && <ErrorIcon style={{marginRight:4}} tooltip={<span>Error loading Hotspots data. Please refresh the page or try again later.</span>}/>}
+                                    Hotspots
+                                    <DefaultTooltip
+                                        overlay={<div style={{maxWidth:"400px"}}>Identified as a recurrent hotspot (statistically significant) in a population-scale cohort of tumor samples of various cancer types using methodology based in part on <a href="http://www.ncbi.nlm.nih.gov/pubmed/26619011" target="_blank">Chang et al., Nat Biotechnol, 2016.</a>
+                                            Explore all mutations at <a href="http://www.cancerhotspots.org" target="_blank">http://cancerhotspots.org</a></div>}
+                                        placement="top"
+                                    >
+                                        <img
+                                            src={require("../../../../rootImages/cancer-hotspots.svg")}
+                                            style={{height:"15px", width:"15px", cursor:"pointer", marginLeft:"5px"}}
+                                        />
+                                    </DefaultTooltip>
+                                </label></div>
+                            )}
                             {this.props.handlers.onChangeAnnotateCBioPortalInputValue && (
                             <div className="checkbox">
                                 <label>
@@ -665,14 +694,14 @@ export default class OncoprintControls extends React.Component<IOncoprintControl
                                         value={EVENT_KEY.customDriverBinaryAnnotation}
                                         onClick={this.onInputClick}
                                     /> {this.props.state.customDriverAnnotationBinaryMenuLabel}
-                                    <img src="images/driver.png" alt="driver filter" style={{height:"15px", width:"15px", cursor:"pointer", marginLeft:"5px"}}/>
+                                    <img src={require("../../../../rootImages/driver.png")} alt="driver filter" style={{height:"15px", width:"15px", cursor:"pointer", marginLeft:"5px"}}/>
                                 </label></div>
                             )}
                             {!!this.props.state.customDriverAnnotationTiersMenuLabel && (
                                 <span>
                                     <span className="caret"/>&nbsp;&nbsp;
                                     <span>{this.props.state.customDriverAnnotationTiersMenuLabel}</span>&nbsp;
-                                    <img src="images/driver_tiers.png" alt="driver tiers filter" style={{height:"15px", width:"15px", cursor:"pointer", marginLeft:"5px"}}/>
+                                    <img src={require("../../../../rootImages/driver_tiers.png")} alt="driver tiers filter" style={{height:"15px", width:"15px", cursor:"pointer", marginLeft:"5px"}}/>
                                     <div style={{marginLeft:"30px"}}>
                                         {(this.props.state.customDriverAnnotationTiers || []).map((tier)=>(
                                             <div className="checkbox"><label>
@@ -751,6 +780,16 @@ export default class OncoprintControls extends React.Component<IOncoprintControl
                         checked={this.props.state.showClinicalTrackLegends}
                         onClick={this.onInputClick}
                     /> Show legends for clinical tracks
+                </label></div>
+                <div className="checkbox" style={{marginLeft:20, maxWidth: 220}}><label>
+                    <input
+                        data-test="onlyShowClinicalLegendsForAltered"
+                        type="checkbox"
+                        value={EVENT_KEY.onlyShowClinicalLegendForAlteredCases}
+                        checked={this.props.state.onlyShowClinicalLegendForAlteredCases}
+                        onClick={this.onInputClick}
+                        disabled={!this.props.state.showClinicalTrackLegends}
+                    /> Only show clinical track legends for altered {this.props.state.columnMode === "patient" ? "patients" : "samples"}.
                 </label></div>
             </CustomDropdown>
         );

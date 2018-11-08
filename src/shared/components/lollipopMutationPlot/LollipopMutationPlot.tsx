@@ -1,7 +1,7 @@
 import * as React from "react";
 import LollipopPlot from "./LollipopPlot";
 import {Mutation} from "../../api/generated/CBioPortalAPI";
-import {PfamDomain, PfamDomainRange} from "shared/api/generated/GenomeNexusAPI";
+import {PfamDomain, PfamDomainRange, EnsemblTranscript} from "shared/api/generated/GenomeNexusAPI";
 import {LollipopSpec, DomainSpec, SequenceSpec} from "./LollipopPlotNoTooltip";
 import {remoteData} from "../../api/remoteData";
 import LoadingIndicator from "shared/components/loadingIndicator/LoadingIndicator";
@@ -20,8 +20,10 @@ import ReactDOM from "react-dom";
 import fileDownload from "react-file-download";
 import styles from "./lollipopMutationPlot.module.scss";
 import Collapse from "react-collapse";
-import {MutationMapperStore} from "../../../pages/resultsView/mutation/MutationMapperStore";
+import MutationMapperStore from "shared/components/mutationMapper/MutationMapperStore";
 import EditableSpan from "../editableSpan/EditableSpan";
+import DownloadControls from "../downloadControls/DownloadControls";
+import autobind from "autobind-decorator";
 
 export interface ILollipopMutationPlotProps extends IProteinImpactTypeColors
 {
@@ -39,6 +41,7 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
     @observable private yMaxInputFocused:boolean = false;
     private plot:LollipopPlot;
     private handlers:any;
+    private divContainer:HTMLDivElement;
 
     @computed private get showControls(): boolean {
         return (this.yMaxInputFocused || this.mouseInPlot);
@@ -46,10 +49,16 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
 
     readonly mutationAlignerLinks = remoteData<{[pfamAccession:string]:string}>({
         await: ()=>[
-            this.props.store.canonicalTranscript
+            this.props.store.canonicalTranscript,
+            this.props.store.allTranscripts,
         ],
         invoke: ()=>(new Promise((resolve,reject)=>{
-            const regions = this.props.store.canonicalTranscript.result? this.props.store.canonicalTranscript.result.pfamDomains : undefined;
+            const regions = (
+                this.props.store.allTranscripts.result &&
+                this.props.store.activeTranscript &&
+                this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript]
+            ) ? this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript].pfamDomains : undefined;
+
             const responsePromises:Promise<Response>[] = [];
             for (let i=0; regions && i<regions.length; i++) {
                 // have to do a for loop because seamlessImmutable will make result of .map immutable,
@@ -112,8 +121,11 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
         for (const mutations of this.props.store.dataStore.sortedFilteredData) {
             for (const mutation of mutations) {
                 codon = mutation.proteinPosStart;
-                ret[codon] = ret[codon] || [];
-                ret[codon].push(mutation);
+
+                if (codon !== undefined && codon !== null) {
+                    ret[codon] = ret[codon] || [];
+                    ret[codon].push(mutation);
+                }
             }
         }
         return ret;
@@ -125,7 +137,10 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
         Object.keys(this.mutationsByPosition).forEach(pos => {
             const position = parseInt(pos, 10);
             // for each position multiple mutations for the same patient is counted only once
-            map[position] = countUniqueMutations(this.mutationsByPosition[position]);
+            const mutations = this.mutationsByPosition[position];
+            if (mutations) {
+                map[position] = countUniqueMutations(mutations);
+            }
         });
 
         return map;
@@ -144,14 +159,15 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
             .sort((x,y)=>(countsByPosition[x[0].proteinPosStart] < countsByPosition[y[0].proteinPosStart] ? 1 : -1));
 
         // maxCount: max number of mutations at a position
-        const maxCount = countsByPosition[positionMutations[0][0].proteinPosStart];
+        const maxCount = positionMutations && positionMutations[0] ?
+            countsByPosition[positionMutations[0][0].proteinPosStart] : 0;
 
         // numLabelCandidates: number of positions with maxCount mutations
-        let numLabelCandidates = positionMutations.findIndex(
-            mutations => (countsByPosition[mutations[0].proteinPosStart] !== maxCount));
+        let numLabelCandidates = positionMutations ? positionMutations.findIndex(
+            mutations => (countsByPosition[mutations[0].proteinPosStart] !== maxCount)) : -1;
 
         if (numLabelCandidates === -1) {
-            numLabelCandidates = positionMutations.length;
+            numLabelCandidates = positionMutations ? positionMutations.length : 0;
         }
 
         // now we decide whether we'll show a label at all
@@ -175,10 +191,12 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
 
             if (isNaN(codon) ||
                 codon < 0 ||
-                (this.props.store.canonicalTranscript.isComplete &&
-                    this.props.store.canonicalTranscript.result &&
+                (this.props.store.allTranscripts.isComplete &&
+                    this.props.store.allTranscripts.result &&
+                    this.props.store.activeTranscript &&
+                    this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript] &&
                     // we want to show the stop codon too (so we allow proteinLength +1 as well)
-                    (codon > this.props.store.canonicalTranscript.result.proteinLength + 1)))
+                    (codon > this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript].proteinLength + 1)))
             {
                 // invalid position
                 continue;
@@ -232,13 +250,16 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
         if (!this.props.store.pfamDomainData.isComplete ||
             !this.props.store.pfamDomainData.result ||
             this.props.store.pfamDomainData.result.length === 0 ||
-            !this.props.store.canonicalTranscript.isComplete ||
-            !this.props.store.canonicalTranscript.result ||
-            this.props.store.canonicalTranscript.result.pfamDomains.length === 0)
+            !this.props.store.allTranscripts.isComplete ||
+            !this.props.store.allTranscripts.result ||
+            !this.props.store.activeTranscript ||
+            !this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript] ||
+            !this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript].pfamDomains ||
+            this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript].pfamDomains.length === 0)
         {
             return [];
         } else {
-            return this.props.store.canonicalTranscript.result.pfamDomains.map((range:PfamDomainRange)=>{
+            return this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript].pfamDomains.map((range:PfamDomainRange)=>{
                 const domain = this.domainMap[range.pfamDomainId];
                 return {
                     startCodon: range.pfamDomainStart,
@@ -253,11 +274,13 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
 
     @computed private get domainColorMap(): {[pfamAccession:string]: string}
     {
-        if (!this.props.store.canonicalTranscript.isPending && 
-            this.props.store.canonicalTranscript.result && 
-            this.props.store.canonicalTranscript.result.pfamDomains && 
-            this.props.store.canonicalTranscript.result.pfamDomains.length > 0) {
-            return generatePfamDomainColorMap(this.props.store.canonicalTranscript.result.pfamDomains);
+        if (!this.props.store.allTranscripts.isPending &&
+            this.props.store.allTranscripts.result &&
+            this.props.store.activeTranscript &&
+            this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript] &&
+            this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript].pfamDomains && 
+            this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript].pfamDomains.length > 0) {
+            return generatePfamDomainColorMap(this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript].pfamDomains);
         }
         else {
             return {};
@@ -296,32 +319,10 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
         };
     }
 
-    public toSVGDOMNode():Element {
-        if (this.plot) {
-            // Get result of plot
-            const plotSvg = this.plot.toSVGDOMNode();
-            // Add label to top left
-            const label =(
-                <text
-                    fill="#2E3436"
-                    textAnchor="start"
-                    dy="1em"
-                    x="2"
-                    y="2"
-                    style={{fontFamily:"verdana", fontSize:"12px", fontWeight:"bold"}}
-                >
-                    {this.hugoGeneSymbol}
-                </text>
-            );
-            const labelGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-            ReactDOM.render(label, labelGroup);
-            plotSvg.appendChild(labelGroup);
-
-            return plotSvg;
-        } else {
-            return document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        }
-        // Add label to top
+    @autobind
+    private getSVG(){
+            var svg:SVGElement = $(this.divContainer).find(".lollipop-svgnode")[0] as any;
+            return svg;
     }
 
     @computed get hugoGeneSymbol() {
@@ -359,12 +360,6 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
                 const value = parseInt(inputValue, 10);
                 this._yMaxInput = value < this.countRange[0] ? this.countRange[0] : value;
             }),
-            handleSVGClick:()=>{
-                fileDownload((new XMLSerializer()).serializeToString(this.toSVGDOMNode()), `${this.hugoGeneSymbol}_lollipop.svg`);
-            },
-            handlePDFClick:()=>{
-                svgToPdfDownload(`${this.hugoGeneSymbol}_lollipop.pdf`, this.toSVGDOMNode());
-            },
             onYMaxInputFocused:()=>{
                 this.yMaxInputFocused = true;
             },
@@ -438,23 +433,11 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
         return (
             <div className={ classnames((this.showControls ? styles["fade-in"] : styles["fade-out"])) }>
                 <span>
-                        <div role="group" className="btn-group">
-                            <button className="btn btn-default btn-xs" onClick={this.handlers.handleSVGClick}>
-                                SVG <i className="fa fa-cloud-download" aria-hidden="true"></i>
-                            </button>
-
-
-                            <button className="btn btn-default btn-xs" onClick={this.handlers.handlePDFClick}>
-                                PDF <i className="fa fa-cloud-download" aria-hidden="true"></i>
-                            </button>
-
-
+                        <div style={{display:"flex", alignItems:"center"}}>
                             <button className="btn btn-default btn-xs" onClick={this.handlers.handleToggleLegend}>
                                 Legend <i className="fa fa-eye" aria-hidden="true"></i>
                             </button>
-                        </div>
-
-                        <div className="small" style={{float:'right',display:'flex', alignItems:'center'}}>
+                            <div className="small" style={{display:'flex', alignItems:'center', marginLeft:7}}>
                                 <span>Y-Axis Max:</span>
                                     <input
                                         style={{display:"inline-block", padding:0, width:200, marginLeft:10, marginRight:10}}
@@ -473,6 +456,14 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
                                         onFocus={this.handlers.onYMaxInputFocused}
                                         onBlur={this.handlers.onYMaxInputBlurred}
                                     />
+                            </div>
+                            <DownloadControls
+                                getSvg={this.getSVG}
+                                filename={`${this.hugoGeneSymbol}_lollipop.svg`}
+                                dontFade={true}
+                                collapse={true}
+                                style={{marginLeft:"auto"}}
+                            />
                         </div>
                         {'  '}
                 </span>
@@ -483,7 +474,7 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
     render() {
         if (this.props.store.pfamDomainData.isComplete && this.props.store.pfamDomainData.result) {
             return (
-                <div style={{display: "inline-block"}} onMouseEnter={this.handlers.onMouseEnterPlot} onMouseLeave={this.handlers.onMouseLeavePlot}>
+                <div style={{display: "inline-block"}} ref={(div:HTMLDivElement)=>this.divContainer=div} onMouseEnter={this.handlers.onMouseEnterPlot} onMouseLeave={this.handlers.onMouseLeavePlot}>
                     {this.controls}
                     <Collapse isOpened={this.legendShown}>
                         {this.legend}
@@ -496,10 +487,13 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
                         dataStore={this.props.store.dataStore}
                         vizWidth={this.props.geneWidth}
                         vizHeight={130}
+                        hugoGeneSymbol={this.hugoGeneSymbol}
                         xMax={
-                            (this.props.store.canonicalTranscript.result &&
-                                this.props.store.canonicalTranscript.result.proteinLength) ||
-                            (this.props.store.gene.length / 3)
+                            (this.props.store.allTranscripts.result &&
+                             this.props.store.activeTranscript &&
+                             this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript] &&
+                             this.props.store.transcriptsByTranscriptId[this.props.store.activeTranscript].proteinLength) ||
+                            Math.round(this.props.store.gene.length / 3)
                         }
                         yMax={this.yMaxInput}
                         onXAxisOffset={this.props.onXAxisOffset}

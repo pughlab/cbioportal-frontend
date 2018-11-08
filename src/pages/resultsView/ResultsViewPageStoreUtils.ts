@@ -101,10 +101,12 @@ export function annotateMutationPutativeDriver(
 export function computePutativeDriverAnnotatedMutations(
     mutations: Mutation[],
     getPutativeDriverInfo:(mutation:Mutation)=>{oncoKb:string, hotspots:boolean, cbioportalCount:boolean, cosmicCount:boolean, customDriverBinary:boolean, customDriverTier?:string},
+    entrezGeneIdToGene:{[entrezGeneId:number]:Gene},
     ignoreUnknown:boolean
 ):AnnotatedMutation[] {
     return mutations.reduce((annotated:AnnotatedMutation[], mutation:Mutation)=>{
         const annotatedMutation = annotateMutationPutativeDriver(mutation, getPutativeDriverInfo(mutation)); // annotate
+        annotatedMutation.hugoGeneSymbol = entrezGeneIdToGene[mutation.entrezGeneId].hugoGeneSymbol;
         if (annotatedMutation.putativeDriver || !ignoreUnknown) {
             annotated.push(annotatedMutation);
         }
@@ -208,8 +210,10 @@ export function computeGenePanelInformation(
 export function annotateMolecularDatum(
     molecularDatum:NumericGeneMolecularData,
     getOncoKbCnaAnnotationForOncoprint:(datum:NumericGeneMolecularData)=>IndicatorQueryResp|undefined,
-    molecularProfileIdToMolecularProfile:{[molecularProfileId:string]:MolecularProfile}
+    molecularProfileIdToMolecularProfile:{[molecularProfileId:string]:MolecularProfile},
+    entrezGeneIdToGene:{[entrezGeneId:number]:Gene}
 ):AnnotatedNumericGeneMolecularData {
+    const hugoGeneSymbol = entrezGeneIdToGene[molecularDatum.entrezGeneId].hugoGeneSymbol;
     let oncogenic = "";
     if (molecularProfileIdToMolecularProfile[molecularDatum.molecularProfileId].molecularAlterationType
         === "COPY_NUMBER_ALTERATION") {
@@ -218,7 +222,7 @@ export function annotateMolecularDatum(
             oncogenic = getOncoKbOncogenic(oncoKbDatum);
         }
     }
-    return Object.assign({oncoKbOncogenic: oncogenic}, molecularDatum);
+    return Object.assign({oncoKbOncogenic: oncogenic, hugoGeneSymbol}, molecularDatum);
 }
 
 export async function fetchQueriedStudies(filteredPhysicalStudies:{[id:string]:CancerStudy},queriedIds:string[]):Promise<CancerStudy[]>{
@@ -311,5 +315,85 @@ export function filterSubQueryData(
         return queryStructure.list.map(
             innerLine => filterDataForLine(innerLine.oql_line)
         );
+    }
+}
+
+
+export function isRNASeqProfile(profileId:string, version:number): boolean {
+    const ver = (version === 2) ? 'v2_' : '';
+    // note that pan can only has v2 expression data, so don't worry about v1
+    return RegExp(`rna_seq_${ver}mrna$|pan_can_atlas_2018_rna_seq_${ver}mrna_median$`).test(profileId);
+}
+
+export function isTCGAPubStudy(studyId:string){
+    return /tcga_pub$/.test(studyId);
+}
+
+export function isTCGAProvStudy(studyId:string){
+    return /tcga$/.test(studyId);
+}
+
+export function isPanCanStudy(studyId:string){
+    return /tcga_pan_can_atlas/.test(studyId);
+}
+
+export function buildResultsViewPageTitle(genes:string[], studies:CancerStudy[]){
+
+    const arr = ["cBioPortal for Cancer Genomics: "];
+
+    if (genes.length) {
+        arr.push(genes[0]);
+        if (genes.length > 1) {
+            arr.push(", ");
+            arr.push(genes[1]);
+        }
+        if (genes.length > 2) {
+            arr.push(" and ");
+            arr.push((genes.length - 2).toString());
+            arr.push(" other ");
+            arr.push(((genes.length - 2) > 1) ? "genes" : "gene");
+        }
+        if (studies.length){
+            arr.push(" in ");
+            arr.push(studies[0].shortName);
+            if (studies.length > 1) {
+                arr.push(" and ");
+                arr.push((studies.length - 1).toString());
+                arr.push (" other ");
+                arr.push(((studies.length - 1) > 1) ? "studies" : "study");
+            }
+        }
+    }
+    return arr.join("");
+}
+
+export function getMolecularProfiles(query:any){
+    //if there's only one study, we read profiles from query params and filter out undefined
+    let molecularProfiles = [
+        query.genetic_profile_ids_PROFILE_MUTATION_EXTENDED,
+        query.genetic_profile_ids_PROFILE_COPY_NUMBER_ALTERATION,
+        query.genetic_profile_ids_PROFILE_MRNA_EXPRESSION,
+        query.genetic_profile_ids_PROFILE_PROTEIN_EXPRESSION,
+        query.genetic_profile_ids_PROFILE_GENESET_SCORE
+    ].filter((profile:string|undefined)=>!!profile);
+
+    // append 'genetic_profile_ids' which is sometimes in use
+    molecularProfiles = molecularProfiles.concat(query.genetic_profile_ids || []);
+
+    // filter out duplicates
+    molecularProfiles = _.uniq(molecularProfiles);
+
+    return molecularProfiles;
+}
+
+export function doesQueryHaveCNSegmentData(
+    detailedSamples:Sample[]
+) {
+    if (detailedSamples.length === 0) {
+        return false;
+    } else if (!("copyNumberSegmentPresent" in detailedSamples[0])) {
+        throw "Passed non-detailed sample projection when detailed expected.";
+    } else {
+        return _.some(detailedSamples, s=>!!s.copyNumberSegmentPresent);
     }
 }

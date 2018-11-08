@@ -4,7 +4,7 @@ import Response = request.Response;
 import {
     default as CBioPortalAPI, MolecularProfile, Mutation, MutationFilter, DiscreteCopyNumberData,
     DiscreteCopyNumberFilter, ClinicalData, Sample, CancerStudy, CopyNumberCountIdentifier,
-    ClinicalDataSingleStudyFilter, ClinicalDataMultiStudyFilter, NumericGeneMolecularData, SampleFilter
+    ClinicalDataSingleStudyFilter, ClinicalDataMultiStudyFilter, NumericGeneMolecularData, SampleFilter, Gene
 } from "shared/api/generated/CBioPortalAPI";
 import { EnsemblFilter, EnsemblTranscript } from "shared/api/generated/GenomeNexusAPI";
 import {getMyGeneUrl, getUniprotIdUrl} from "shared/api/urls";
@@ -25,7 +25,7 @@ import {
 import {
     getCivicVariants, getCivicGenes
 } from "shared/lib/CivicUtils";
-import {Query, default as OncoKbAPI, Gene} from "shared/api/generated/OncoKbAPI";
+import {Query, default as OncoKbAPI, Gene as OncoKbGene} from "shared/api/generated/OncoKbAPI";
 import {getAlterationString} from "shared/lib/CopyNumberUtils";
 import {MobxPromise} from "mobxpromise";
 import {keywordToCosmic, geneToMyCancerGenome} from "shared/lib/AnnotationUtils";
@@ -34,10 +34,12 @@ import {IOncoKbData} from "shared/model/OncoKB";
 import {IGisticData} from "shared/model/Gistic";
 import {IMutSigData} from "shared/model/MutSig";
 import {IMyCancerGenomeData, IMyCancerGenome} from "shared/model/MyCancerGenome";
+import {IMutationalSignature, IMutationalSignatureMeta} from "shared/model/MutationalSignature";
 import {ICivicGeneData, ICivicVariant, ICivicGene} from "shared/model/Civic.ts";
 import {MOLECULAR_PROFILE_MUTATIONS_SUFFIX, MOLECULAR_PROFILE_UNCALLED_MUTATIONS_SUFFIX} from "shared/constants";
 import GenomeNexusAPI from "shared/api/generated/GenomeNexusAPI";
 import {AlterationTypeConstants} from "../../pages/resultsView/ResultsViewPageStore";
+import {stringListToIndexSet} from "./StringUtils";
 
 export const ONCOKB_DEFAULT: IOncoKbData = {
     uniqueSampleKeyToTumorType : {},
@@ -66,13 +68,29 @@ export async function fetchMutationData(mutationFilter:MutationFilter,
     }
 }
 
-export async function fetchPdbAlignmentData(uniprotId: string,
+
+export async function fetchGenes(hugoGeneSymbols?: string[],
+                                 client: CBioPortalAPI = defaultClient)
+{
+    if (hugoGeneSymbols && hugoGeneSymbols.length) {
+        const order = stringListToIndexSet(hugoGeneSymbols);
+        return _.sortBy(await client.fetchGenesUsingPOST({
+            geneIdType: "HUGO_GENE_SYMBOL",
+            geneIds: hugoGeneSymbols.slice(),
+            projection: "SUMMARY"
+        }), (gene: Gene) => order[gene.hugoGeneSymbol]);
+    } else {
+        return [];
+    }
+}
+
+export async function fetchPdbAlignmentData(ensemblId: string,
                                             client:Genome2StructureAPI = g2sClient)
 {
-    if (uniprotId) {
+    if (ensemblId) {
         return await client.getAlignmentUsingGET({
-            idType: "uniprot",
-            id: uniprotId
+            idType: "ensembl",
+            id: ensemblId
         });
     } else {
         return [];
@@ -108,7 +126,7 @@ export async function fetchCanonicalTranscriptWithFallback(hugoSymbol:string,
                                                            allTranscripts: EnsemblTranscript[] | undefined,
                                                            client:GenomeNexusAPI =  genomeNexusClient)
 {
-    return fetchCanonicalTranscript(hugoSymbol, isoformOverrideSource).catch(() => {
+    return fetchCanonicalTranscript(hugoSymbol, isoformOverrideSource, client).catch(() => {
         // get transcript with max protein length in given list of all transcripts
         const transcript = _.maxBy(allTranscripts, (t:EnsemblTranscript) => t.proteinLength);
         return transcript? transcript : undefined;
@@ -122,6 +140,32 @@ export async function fetchCanonicalTranscript(hugoSymbol: string,
     return await client.fetchCanonicalEnsemblTranscriptByHugoSymbolGET({
         hugoSymbol, isoformOverrideSource
     });
+}
+
+export async function fetchCanonicalTranscripts(hugoSymbols: string[],
+                                                isoformOverrideSource: string,
+                                                client:GenomeNexusAPI = genomeNexusClient)
+{
+    return await client.fetchCanonicalEnsemblTranscriptsByHugoSymbolsPOST({
+        hugoSymbols, isoformOverrideSource
+    });
+}
+
+export async function getCanonicalTranscriptsByHugoSymbol(hugoSymbols: string[],
+                                                          isoformOverrideSource: string,
+                                                          client:GenomeNexusAPI = genomeNexusClient)
+{
+    const transcripts = await fetchCanonicalTranscripts(hugoSymbols, isoformOverrideSource, client);
+    return transcripts? _.zipObject(hugoSymbols, transcripts) : undefined;
+}
+
+export async function fetchCanonicalEnsemblGeneIds(hugoSymbols: string[],
+                                                   isoformOverrideSource: string,
+                                                   client:GenomeNexusAPI = genomeNexusClient)
+{
+    // TODO: this endpoint should accept isoformOverrideSource
+    return await client.fetchCanonicalEnsemblGeneIdByHugoSymbolsPOST({
+        hugoSymbols});
 }
 
 export async function fetchEnsemblTranscriptsByEnsemblFilter(ensemblFilter: Partial<EnsemblFilter>,
@@ -365,12 +409,11 @@ export async function fetchStudiesForSamplesWithoutCancerTypeClinicalData(sample
 {
     let studies: CancerStudy[] = [];
 
-    if (samplesWithoutClinicalData.result) {
+    if (samplesWithoutClinicalData.result && samplesWithoutClinicalData.result.length > 0) {
         const studyIdsForSamplesWithoutClinicalData = _.uniq(samplesWithoutClinicalData.result.map(
             (sample: Sample) => sample.studyId));
 
-        const promises = studyIdsForSamplesWithoutClinicalData.map(studyId => client.getStudyUsingGET({studyId}));
-        studies = await Promise.all(promises);
+        studies = await client.fetchStudiesUsingPOST({studyIds:studyIdsForSamplesWithoutClinicalData, projection:"DETAILED"});
     }
 
     return studies;
@@ -475,9 +518,18 @@ export function fetchMyCancerGenomeData(): IMyCancerGenomeData
     return geneToMyCancerGenome(data);
 }
 
+export function fetchMutationalSignatureData(): IMutationalSignature[]
+{
+    return require('../../../resources/samplemutsigdata.json');
+}
+
+export function fetchMutationalSignatureMetaData(): IMutationalSignatureMeta[]{
+    return require('../../../resources/mutsigmetadata.json');
+}
+
 export async function fetchOncoKbAnnotatedGenes(client: OncoKbAPI = oncokbClient): Promise<{[entrezGeneId:number]:boolean}>
 {
-    return _.reduce(await client.genesGetUsingGET({}), (map:{[entrezGeneId:number]:boolean}, next:Gene)=>{
+    return _.reduce(await client.genesGetUsingGET({}), (map:{[entrezGeneId:number]:boolean}, next:OncoKbGene)=>{
             map[next.entrezGeneId] = true;
             return map;
         }, {});
@@ -577,12 +629,12 @@ export async function queryOncoKbData(queryVariants: Query[],
                                       uniqueSampleKeyToTumorType: {[sampleId: string]: string},
                                       client: OncoKbAPI = oncokbClient)
 {
-    const onkokbSearch = await client.searchPostUsingPOST(
-        {body: generateEvidenceQuery(queryVariants)});
+    const oncokbSearch = await client.searchPostUsingPOST(
+        {body: generateEvidenceQuery(queryVariants, '')});
 
     const oncoKbData: IOncoKbData = {
         uniqueSampleKeyToTumorType: uniqueSampleKeyToTumorType,
-        indicatorMap: generateIdToIndicatorMap(onkokbSearch)
+        indicatorMap: generateIdToIndicatorMap(oncokbSearch)
     };
 
     return oncoKbData;
@@ -597,15 +649,13 @@ export async function fetchCivicGenes(mutationData?:MobxPromise<Mutation[]>,
         return {};
     }
 
-    let queryHugoSymbols: Set<string> = new Set([]);
+    let entrezGeneSymbols: Set<number> = new Set([]);
 
     mutationDataResult.forEach(function(mutation: Mutation) {
-        queryHugoSymbols.add(mutation.gene.hugoGeneSymbol);
+        entrezGeneSymbols.add(mutation.gene.entrezGeneId);
     });
-    
-    let querySymbols: Array<string> = Array.from(queryHugoSymbols);
 
-    let civicGenes: ICivicGene = await getCivicGenes(querySymbols);
+    let civicGenes: ICivicGene = await getCivicGenes(Array.from(entrezGeneSymbols));
 
     return civicGenes;
 }
@@ -613,13 +663,13 @@ export async function fetchCivicGenes(mutationData?:MobxPromise<Mutation[]>,
 export async function fetchCnaCivicGenes(discreteCNAData:MobxPromise<DiscreteCopyNumberData[]>)
 {
     if (discreteCNAData.result && discreteCNAData.result.length > 0) {
-        let queryHugoSymbols: Set<string> = new Set([]);
+        let entrezGeneSymbols: Set<number> = new Set([]);
         
         discreteCNAData.result.forEach(function(cna: DiscreteCopyNumberData) {
-            queryHugoSymbols.add(cna.gene.hugoGeneSymbol);
+            entrezGeneSymbols.add(cna.gene.entrezGeneId);
         });
         
-        let querySymbols: Array<string> = Array.from(queryHugoSymbols);
+        let querySymbols: Array<number> = Array.from(entrezGeneSymbols);
     
         let civicGenes: ICivicGene = (await getCivicGenes(querySymbols));
     

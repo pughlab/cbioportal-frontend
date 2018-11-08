@@ -5,15 +5,15 @@ import {computed, observable} from "mobx";
 import {observer} from "mobx-react";
 import Slider from 'react-rangeslider';
 import {FormGroup, ControlLabel, FormControl} from 'react-bootstrap';
-import jsPDF from 'jspdf';
 import {If, Then, Else} from 'react-if';
 import classnames from 'classnames';
-import SvgSaver from 'svgsaver';
 
 import 'react-select/dist/react-select.css';
 import 'react-rangeslider/lib/index.css';
 
 import { CancerSummaryChart } from "./CancerSummaryChart";
+import autobind from "autobind-decorator";
+import DownloadControls from "shared/components/downloadControls/DownloadControls"
 
 export const OrderedAlterationLabelMap: Record<keyof IAlterationCountMap, string> = {
     multiple: "Multiple Alterations",
@@ -110,7 +110,7 @@ export class CancerSummaryContent extends React.Component<ICancerSummaryContentP
     @observable private tempTotalCasesInputValue = 0;
     @observable private pngAnchor = '';
     @observable private pdf: { anchor: string; width: number; height: number } = {anchor: '', width: 0, height: 0};
-    @observable private showControls = false;
+    @observable private showControls = true; // 9/2018 we will always show controls
     @observable private hideGenomicAlterations = false;
     @observable public yAxis: 'alt-freq' | 'abs-count' = 'alt-freq';
     @observable private xAxis: 'y-axis' | 'x-axis' = 'y-axis';
@@ -134,13 +134,9 @@ export class CancerSummaryContent extends React.Component<ICancerSummaryContentP
         this.handleAltInputKeyPress = this.handleAltInputKeyPress.bind(this);
         this.handleTotalInputChange = this.handleTotalInputChange.bind(this);
         this.handleTotalInputKeyPress = this.handleTotalInputKeyPress.bind(this);
-        this.toggleShowControls = this.toggleShowControls.bind(this);
+        //this.toggleShowControls = this.toggleShowControls.bind(this);
         this.setPngAnchor = this.setPngAnchor.bind(this);
-        this.downloadSvg = this.downloadSvg.bind(this);
-        this.downloadPng = this.downloadPng.bind(this);
     }
-
-    private svgsaver = new SvgSaver();
 
     private chartComponent:any;
 
@@ -216,8 +212,8 @@ export class CancerSummaryContent extends React.Component<ICancerSummaryContentP
 
                 // if we don't meet the threshold set by the user in the custom controls, don't put data in (default 0)
                 if (meetsAlterationThreshold && meetsSampleTotalThreshold) {
-
                     // now we push label into collection
+
                     if (this.props.labelTransformer) {
                         labels.push(this.props.labelTransformer(groupKey))
                     } else {
@@ -239,13 +235,14 @@ export class CancerSummaryContent extends React.Component<ICancerSummaryContentP
 
                     memo.push({
                         alterationType: alterationKey,
-                        x: groupKey,
+                        x: (this.props.labelTransformer) ? this.props.labelTransformer(groupKey) : groupKey,
+                        xKey: groupKey,
                         y: this.getYValue(alterationCount, alterationData.sampleTotal)
                     });
                 }
 
                 return memo;
-            }, [] as { x: string, y: number, alterationType: string }[]);
+            }, [] as { x: string, y: number, xKey:string, alterationType: string }[]);
         });
 
         return { labels:_.uniq(labels), data: retData, representedAlterations, maxPercentage , maxAbsoluteCount, maxSampleCount };
@@ -347,20 +344,12 @@ export class CancerSummaryContent extends React.Component<ICancerSummaryContentP
         this.totalCasesValue = this.tempTotalCasesValue;
     }
 
-    private toggleShowControls() {
-        this.showControls = !this.showControls;
-    }
+    // private toggleShowControls() {
+    //     this.showControls = !this.showControls;
+    // }
 
     public setPngAnchor(href: string) {
         this.pngAnchor = href;
-    }
-
-    private downloadSvg() {
-        this.svgsaver.asSvg(this.chartComponent.svgContainer.firstChild, 'cancer_types_summary' + '.svg');
-    }
-
-    private downloadPng() {
-        this.svgsaver.asPng(this.chartComponent.svgContainer.firstChild, 'cancer_types_summary' + '.png');
     }
 
     @computed public get controls(){
@@ -369,80 +358,84 @@ export class CancerSummaryContent extends React.Component<ICancerSummaryContentP
 
         return (
 
-            <div style={{display: 'flex'}} className="cancer-summary--form-controls">
+            <div className="cancer-summary--form-controls">
 
-                <div>
-                    <FormGroup>
-                        <ControlLabel>Y-Axis Value:</ControlLabel>
-                        <FormControl componentClass="select" data-test="cancerSummaryYAxisSelect" onChange={this.handleYAxisChange}
-                                     ref={(el: any) => this.inputYAxisEl = el}>
-                            <option value="alt-freq">Alteration Frequency</option>
-                            <option value="abs-count">Absolute Counts</option>
-                        </FormControl>
-                    </FormGroup>
-                    <FormGroup>
-                        <ControlLabel>Sort X-Axis By:</ControlLabel>
-                        <FormControl componentClass="select" data-test="cancerSummaryXAxisSelect" onChange={this.handleXAxisChange}
-                                     ref={(el: any) => this.inputXAxisEl = el}>
-                            <option value="y-axis">Y-Axis Values</option>
-                            <option value="x-axis">Alphabetically</option>
-                        </FormControl>
-                    </FormGroup>
-                </div>
-
-                <div style={{width: 400}}>
-                    <div className="slider-holder">
-                        <FormGroup>
+                <table>
+                    <tr>
+                        <td>
+                            <ControlLabel>Y-Axis Value:</ControlLabel>
+                        </td>
+                        <td className="dashed-border-right">
+                            <FormControl componentClass="select" data-test="cancerSummaryYAxisSelect" onChange={this.handleYAxisChange}
+                                         ref={(el: any) => this.inputYAxisEl = el}>
+                                <option value="alt-freq">Alteration Frequency</option>
+                                <option value="abs-count">Absolute Counts</option>
+                            </FormControl>
+                        </td>
+                        <td>
                             <ControlLabel>Min. # Total Cases:</ControlLabel>
-                            <div className='slider custom-labels'>
-                                <Slider
-                                    min={0}
-                                    max={this.totalCasesMax}
-                                    value={this.tempTotalCasesValue}
-                                    labels={{0: 0, [this.totalCasesMax]: this.totalCasesMax}}
-                                    onChange={this.handleTotalSliderChange}
-                                    onChangeComplete={this.handleTotalSliderChangeComplete}
-                                />
+                        </td>
+                        <td>
+                            <div className="slider-holder">
+                                <div className='slider custom-labels'>
+                                    <Slider
+                                        min={0}
+                                        max={this.totalCasesMax}
+                                        value={this.tempTotalCasesValue}
+                                        labels={{0: 0, [this.totalCasesMax]: this.totalCasesMax}}
+                                        onChange={this.handleTotalSliderChange}
+                                        onChangeComplete={this.handleTotalSliderChangeComplete}
+                                    />
+                                </div>
                             </div>
-                        </FormGroup>
-                        <FormGroup>
-                            <ControlLabel className="invisible">Hidden</ControlLabel>
+                        </td>
+                        <td className="dashed-border-right slider-input">
                             <FormControl type="text" value={this.tempTotalCasesInputValue}
                                          data-test="sampleTotalThresholdInput"
                                          onChange={this.handleTotalInputChange}
                                          onKeyPress={this.handleTotalInputKeyPress}/>
-                        </FormGroup>
-                    </div>
-                    <div className="slider-holder">
-                        <FormGroup>
+                        </td>
+                        <td>
+                            <Checkbox checked={!this.hideGenomicAlterations} onChange={this.handleGenomicCheckboxChange}>
+                                Show Genomic Alteration Types
+                            </Checkbox>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><ControlLabel>Sort X-Axis By:</ControlLabel></td>
+                        <td className="dashed-border-right">
+                            <FormControl componentClass="select" data-test="cancerSummaryXAxisSelect" onChange={this.handleXAxisChange}
+                                         ref={(el: any) => this.inputXAxisEl = el}>
+                                <option value="y-axis">Y-Axis Values</option>
+                                <option value="x-axis">Alphabetically</option>
+                            </FormControl>
+                        </td>
+                        <td>
                             <ControlLabel>{`Min. ${this.yAxis === 'alt-freq' ? '%' : '#'} Altered Cases:`}</ControlLabel>
-                            <div className='slider custom-labels'>
-                                <Slider
-                                    min={0}
-                                    max={this.altCasesMax}
-                                    value={this.tempAltCasesValue}
-                                    labels={{0: 0 + symbol, [this.altCasesMax]: Math.ceil(this.altCasesMax) + symbol}}
-                                    format={(val: string) => val + symbol}
-                                    onChange={this.handleAltSliderChange}
-                                    onChangeComplete={this.handleAltSliderChangeComplete}
-                                />
+                        </td>
+                        <td>
+                            <div className="slider-holder">
+                                <div className='slider custom-labels'>
+                                    <Slider
+                                        min={0}
+                                        max={this.altCasesMax}
+                                        value={this.tempAltCasesValue}
+                                        labels={{0: 0 + symbol, [this.altCasesMax]: Math.ceil(this.altCasesMax) + symbol}}
+                                        format={(val: string) => val + symbol}
+                                        onChange={this.handleAltSliderChange}
+                                        onChangeComplete={this.handleAltSliderChangeComplete}
+                                    />
+                                </div>
                             </div>
-                        </FormGroup>
-                        <FormGroup>
-                            <ControlLabel className="invisible">Hidden</ControlLabel>
+                        </td>
+                        <td className="dashed-border-right slider-input">
                             <FormControl type="text" value={this.tempAltCasesInputValue + symbol}
                                          onChange={this.handleAltInputChange}
                                          data-test="alterationThresholdInput"
                                          onKeyPress={this.handleAltInputKeyPress}/>
-                        </FormGroup>
-                    </div>
-                </div>
-
-                <div>
-                    <Checkbox checked={!this.hideGenomicAlterations} onChange={this.handleGenomicCheckboxChange}>
-                        Show Genomic Alteration Types
-                    </Checkbox>
-                </div>
+                        </td>
+                    </tr>
+                </table>
             </div>)
     }
 
@@ -450,7 +443,7 @@ export class CancerSummaryContent extends React.Component<ICancerSummaryContentP
         return (
             <If condition={this.hasAlterations}>
                 <Then>
-                    <div>
+                    <div data-test="cancerTypesSummaryDiv">
 
                         <div className={'cancer-summary--main-options'}>
 
@@ -470,22 +463,15 @@ export class CancerSummaryContent extends React.Component<ICancerSummaryContentP
                             </ButtonGroup>
                         </div>
 
-                        <div role="group" className="btn-group cancer-summary--chart-buttons">
-                            <button onClick={this.toggleShowControls} className="btn btn-default btn-xs">Customize <i
-                                className="fa fa-cog" aria-hidden="true"></i></button>
-                            <button className={`btn btn-default btn-xs`} onClick={this.downloadPng}>
-                                PNG <i className="fa fa-cloud-download" aria-hidden="true"></i>
-                            </button>
-                            <button className={`btn btn-default btn-xs`}
-                               onClick={this.downloadSvg}>
-                                SVG <i className="fa fa-cloud-download" aria-hidden="true"></i>
-                            </button>
-                        </div>
+                        {/*<div role="group" className="hidden btn-group cancer-summary--chart-buttons">*/}
+                            {/*<button onClick={this.toggleShowControls} className="btn btn-default btn-xs">Customize <i*/}
+                                {/*className="fa fa-cog" aria-hidden="true"></i></button>*/}
+                        {/*</div>*/}
 
-                        <Panel className={classnames({hidden: !this.showControls}, 'cancer-summary-secondary-options')}>
-                            <button type="button" onClick={this.toggleShowControls} className="close">×</button>
+                        <div className={classnames("inlineBlock",{hidden: !this.showControls}, 'cancer-summary-secondary-options')}>
+                            {/*<button type="button" onClick={this.toggleShowControls} className="close">×</button>*/}
                             {this.controls}
-                        </Panel>
+                        </div>
 
                         <CancerSummaryChart key={Date.now()}
                                         data={this.chartData.data}
@@ -497,6 +483,7 @@ export class CancerSummaryContent extends React.Component<ICancerSummaryContentP
                                         colors={alterationToColor}
                                         hideGenomicAlterations={this.hideGenomicAlterations}
                                         xLabels={this.chartData.labels}/>
+
                     </div>
                 </Then>
                 <Else>

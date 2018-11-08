@@ -1,6 +1,7 @@
 import {IHotspotIndex} from "shared/model/CancerHotspots";
 import { assert } from 'chai';
-import {indexHotspots} from "./CancerHotspotsUtils";
+import {indexHotspots, isHotspot} from "./CancerHotspotsUtils";
+import {Mutation} from "../api/generated/CBioPortalAPI";
 
 describe('CancerHotspotsUtils', () => {
 
@@ -20,6 +21,10 @@ describe('CancerHotspotsUtils', () => {
                     transcriptId: "ENST00002",
                     tumorCount: 1,
                     tumorTypeCount: 1,
+                    inframeCount: 0,
+                    missenseCount: 1,
+                    spliceCount: 0,
+                    truncatingCount: 0,
                     hugoSymbol: "TP53",
                     residue: "R273",
                     aminoAcidPosition: {
@@ -43,6 +48,10 @@ describe('CancerHotspotsUtils', () => {
                     type: "in-frame indel",
                     tumorCount: 1,
                     tumorTypeCount: 1,
+                    inframeCount: 1,
+                    missenseCount: 0,
+                    spliceCount: 0,
+                    truncatingCount: 0,
                     transcriptId: "ENST00003",
                     hugoSymbol: "PIK3CA",
                     residue: "38-40",
@@ -67,6 +76,10 @@ describe('CancerHotspotsUtils', () => {
                     type: "3d",
                     tumorCount: 1,
                     tumorTypeCount: 1,
+                    inframeCount: 0,
+                    missenseCount: 1,
+                    spliceCount: 0,
+                    truncatingCount: 0,
                     transcriptId: "ENST00005",
                     hugoSymbol: "SMURF1",
                     residue: "R101",
@@ -76,7 +89,18 @@ describe('CancerHotspotsUtils', () => {
                     }
                 }
             ]
-        }
+        },
+        {
+            genomicLocation: {
+                chromosome: "1",
+                start: 2,
+                end: 2,
+                referenceAllele: "A",
+                variantAllele: "T"
+            },
+            variant: "1:g.2>T",
+            hotspots: []
+        },
     ];
 
 
@@ -95,6 +119,12 @@ describe('CancerHotspotsUtils', () => {
 
         assert.equal(hotspotIndex["4,111,111,T,C"].hotspots.length, 1,
             "Only one SMURF1 3d hotspot mutation should be indexed.");
+    });
+
+    it("isHotspot works correctly", ()=>{
+        assert.isFalse(isHotspot({gene:{chromosome:"1"}, startPosition:2, endPosition:2, referenceAllele:"A", variantAllele:"T"} as Mutation, hotspotIndex));
+        assert.isTrue(isHotspot({gene:{chromosome:"4"}, startPosition:111, endPosition:111, referenceAllele:"T", variantAllele:"C"} as Mutation, hotspotIndex));
+        assert.isFalse(isHotspot({gene:{chromosome:"asdkfjpaosid"}, startPosition:-1, endPosition:-1, referenceAllele:"A", variantAllele:"T"} as Mutation, hotspotIndex));
     });
 
     after(() => {

@@ -1,12 +1,13 @@
 import * as React from 'react';
 import { observer } from "mobx-react";
-import { VictoryChart, VictorySelectionContainer, VictoryTheme, VictoryAxis, VictoryLabel, VictoryScatter, VictoryLine } from 'victory';
-import { observable } from 'mobx';
+import { VictoryChart, VictorySelectionContainer, VictoryAxis, VictoryLabel, VictoryScatter } from 'victory';
+import { observable, action } from 'mobx';
 import { Popover } from 'react-bootstrap';
-import styles from "./styles.module.scss";
-import CBIOPORTAL_VICTORY_THEME, {axisLabelStyles, baseLabelStyles} from "../../../shared/theme/cBioPoralTheme";
-import { formatLogOddsRatio } from "./EnrichmentsUtil";
+import CBIOPORTAL_VICTORY_THEME, {axisLabelStyles} from "../../../shared/theme/cBioPoralTheme";
+import { formatLogOddsRatio } from "shared/lib/FormatUtils";
 import { toConditionalPrecision, } from 'shared/lib/NumberUtils';
+import DownloadControls from 'shared/components/downloadControls/DownloadControls';
+import autobind from 'autobind-decorator';
 
 export interface IMiniScatterChartProps {
     data: any[];
@@ -23,6 +24,12 @@ export interface IMiniScatterChartProps {
 export default class MiniScatterChart extends React.Component<IMiniScatterChartProps, {}> {
 
     @observable tooltipModel: any;
+    @observable private svgContainer: any;
+    
+    @autobind
+    @action private svgRef(svgContainer:SVGElement|null) {
+        this.svgContainer = (svgContainer && svgContainer.children) ? svgContainer.children[0] : null;
+    }
 
     private handleSelection(points: any, bounds: any, props: any) {
         this.props.onSelection(points[0].data.map((d:any) => d.hugoGeneSymbol));
@@ -71,9 +78,9 @@ export default class MiniScatterChart extends React.Component<IMiniScatterChartP
 
         return (
             <div className="posRelative">
-                <div className="borderedChart inlineBlock">
-                    <VictoryChart containerComponent={<VictorySelectionContainer responsive={false}
-                        onSelection={(points: any, bounds: any, props: any) => this.handleSelection(points, bounds, props)} 
+                <div className="borderedChart inlineBlock" style={{position:"relative"}}>
+                    <VictoryChart containerComponent={<VictorySelectionContainer containerRef={this.svgRef}
+                        onSelection={(points: any, bounds: any, props: any) => this.handleSelection(points, bounds, props)} responsive={false}
                         onSelectionCleared={(props:any) => this.handleSelectionCleared(props)}/>} theme={CBIOPORTAL_VICTORY_THEME}
                         domainPadding={{ y: [0, 20] }} height={350} width={350} padding={{ top: 40, bottom: 60, left: 60, right: 40 }}>
                         <VictoryAxis tickValues={this.props.xAxisTickValues} domain={[-this.props.xAxisDomain, this.props.xAxisDomain]} 
@@ -94,6 +101,13 @@ export default class MiniScatterChart extends React.Component<IMiniScatterChartP
                             d.qValue < 0.05 ? "#58ACFA" : "#D3D3D3", fillOpacity: 0.4 } }} 
                             data={this.props.data} symbol="circle" size={(d: any) => d.hovered ? 10 : 3} events={events} />
                     </VictoryChart>
+                    <DownloadControls
+                        getSvg={() => this.svgContainer}
+                        filename="enrichments-volcano"
+                        dontFade={true}
+                        collapse={true}
+                        style={{position:"absolute", top:10, right:10}}
+                    />
                 </div>
                 {this.tooltipModel &&
                     <Popover className={"cbioTooltip"} positionLeft={this.tooltipModel.x + 15}

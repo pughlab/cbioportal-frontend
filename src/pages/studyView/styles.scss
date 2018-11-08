@@ -1,0 +1,60 @@
+$selectHeight: 30px;
+$selectHeightInner: $selectHeight - 2px;
+
+.studyViewSummaryHeader{
+    .Select {
+        font-size: 14px;
+        width: 220px;
+        height: $selectHeight;
+
+        .Select-control {
+            height:$selectHeightInner;
+        }
+
+        .Select-input {
+            height:$selectHeightInner;
+            input {
+                padding: 0px 5px;
+                line-height: $selectHeightInner;
+            }
+        }
+
+        .Select-value {
+          line-height: $selectHeightInner !important;
+
+          .Select-value-label {
+            line-height: $selectHeightInner;
+          }
+        }
+
+        .Select-menu-outer {
+            width: 300px;
+            max-height: 400px;
+            z-index: 100;
+        }
+
+        .Select-placeholder {
+            line-height: $selectHeightInner;
+        }
+
+        .Select-menu {
+            max-height: 398px; // needs to be 2 less than Select-menu-outer height to not hide border. Irrelevant
+                              //    as long as & > div > div:nth-child(2) max-height is less
+            overflow:hidden;
+
+            & > div > div:nth-child(2){
+                max-height:350px !important;
+                overflow-x:hidden !important;
+                overflow-y:scroll !important;
+            }
+        }
+
+        .Select-option {
+            line-height: 1.25;
+        }
+    }
+}
+
+.react-grid-item:hover {
+    z-index: 1;
+}

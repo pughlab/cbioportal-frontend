@@ -1,6 +1,29 @@
 .chart {
-    width:190px;
-    height: 200px;
     border: 1px solid #d3d3d3;
-    margin: 5px;
+    flex-direction: column;
+    position: relative;
+    flex-direction: column;
+    display: flex;
+    height: 100%;
+    border-radius:$border-radius-base;
+
+    &.analysisTarget {
+        border: 2px solid #e5e076;
+    }
+}
+
+.chartHeightOne {
+    height: 195px;
+}
+
+.chartHeightTwo {
+    height: 400px;
+}
+
+.chartWidthOne {
+    width:195px;
+}
+
+.chartWidthTwo {
+    width:400px;
 }

@@ -4,7 +4,8 @@ import LazyMobXTable, { Column } from "../../../shared/components/lazyMobXTable/
 import { observer } from "mobx-react";
 import { observable } from "mobx";
 import { Badge, Checkbox } from 'react-bootstrap';
-import { calculateExpressionTendency, formatValueWithStyle, formatLogOddsRatio } from "./EnrichmentsUtil";
+import { calculateExpressionTendency } from "./EnrichmentsUtil";
+import { formatLogOddsRatio, formatSignificanceValueWithStyle } from "shared/lib/FormatUtils";
 import { toConditionalPrecision, } from 'shared/lib/NumberUtils';
 import styles from "./styles.module.scss";
 import { ExpressionEnrichmentRow } from 'shared/model/ExpressionEnrichmentRow';
@@ -147,14 +148,14 @@ export default class ExpressionEnrichmentTable extends React.Component<IExpressi
         columns[ExpressionEnrichmentTableColumnType.P_VALUE] = {
             name: "p-Value",
             render: (d: ExpressionEnrichmentRow) => <span style={{whiteSpace: 'nowrap'}}>{toConditionalPrecision(d.pValue, 3, 0.01)}</span>,
-            tooltip: <span>Derived from Fisher Exact Test</span>,
+            tooltip: <span>Derived from Student's t-test</span>,
             sortBy: (d: ExpressionEnrichmentRow) => d.pValue,
             download: (d: ExpressionEnrichmentRow) => toConditionalPrecision(d.pValue, 3, 0.01)
         };
 
         columns[ExpressionEnrichmentTableColumnType.Q_VALUE] = {
             name: "q-Value",
-            render: (d: ExpressionEnrichmentRow) => <span style={{whiteSpace: 'nowrap'}}>{formatValueWithStyle(d.qValue)}</span>,
+            render: (d: ExpressionEnrichmentRow) => <span style={{whiteSpace: 'nowrap'}}>{formatSignificanceValueWithStyle(d.qValue)}</span>,
             tooltip: <span>Derived from Benjamini-Hochberg procedure</span>,
             sortBy: (d: ExpressionEnrichmentRow) => d.qValue,
             download: (d: ExpressionEnrichmentRow) => toConditionalPrecision(d.qValue, 3, 0.01)

@@ -31,6 +31,10 @@
       "description": "The genes API"
     },
     {
+      "name": "info-api-controller",
+      "description": "This includes all OncoKB general information"
+    },
+    {
       "name": "search-api-controller",
       "description": "The search API"
     },
@@ -647,6 +651,29 @@
         }
       }
     },
+    "/info": {
+      "get": {
+        "tags": [
+          "Info"
+        ],
+        "summary": "infoGet",
+        "operationId": "infoGetUsingGET",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/OncoKBInfo"
+            }
+          }
+        }
+      }
+    },
     "/levels": {
       "get": {
         "tags": [
@@ -1042,7 +1069,7 @@
           "Utils"
         ],
         "summary": "utilsCancerGeneListGet",
-        "description": "Get cancer gene list in text file.",
+        "description": "Get cancer gene list",
         "operationId": "utilsCancerGeneListGetUsingGET",
         "consumes": [
           "application/json"
@@ -1058,6 +1085,30 @@
               "items": {
                 "$ref": "#/definitions/CancerGene"
               }
+            }
+          }
+        }
+      }
+    },
+    "/utils/cancerGeneList.txt": {
+      "get": {
+        "tags": [
+          "Utils"
+        ],
+        "summary": "utilsCancerGeneListTxtGet",
+        "description": "Get cancer gene list in text file.",
+        "operationId": "utilsCancerGeneListTxtGetUsingGET",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "*/*"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "string"
             }
           }
         }
@@ -1408,6 +1459,9 @@
         "oncogenicity": {
           "type": "string"
         },
+        "proteinChange": {
+          "type": "string"
+        },
         "refSeq": {
           "type": "string"
         },
@@ -1522,6 +1576,17 @@
         "tissue": {
           "type": "string",
           "description": "The tissue this tumor type belongs to."
+        }
+      }
+    },
+    "Version": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
         }
       }
     },
@@ -1661,13 +1726,13 @@
             "LEVEL_R1",
             "LEVEL_R2",
             "LEVEL_R3",
-            "LEVEL_P1",
-            "LEVEL_P2",
-            "LEVEL_P3",
-            "LEVEL_P4",
-            "LEVEL_D1",
-            "LEVEL_D2",
-            "LEVEL_D3"
+            "LEVEL_Px1",
+            "LEVEL_Px2",
+            "LEVEL_Px3",
+            "LEVEL_Px4",
+            "LEVEL_Dx1",
+            "LEVEL_Dx2",
+            "LEVEL_Dx3"
           ]
         },
         "oncoTreeType": {
@@ -1716,13 +1781,13 @@
             "LEVEL_R1",
             "LEVEL_R2",
             "LEVEL_R3",
-            "LEVEL_P1",
-            "LEVEL_P2",
-            "LEVEL_P3",
-            "LEVEL_P4",
-            "LEVEL_D1",
-            "LEVEL_D2",
-            "LEVEL_D3"
+            "LEVEL_Px1",
+            "LEVEL_Px2",
+            "LEVEL_Px3",
+            "LEVEL_Px4",
+            "LEVEL_Dx1",
+            "LEVEL_Dx2",
+            "LEVEL_Dx3"
           ]
         },
         "highestSensitiveLevel": {
@@ -1739,13 +1804,13 @@
             "LEVEL_R1",
             "LEVEL_R2",
             "LEVEL_R3",
-            "LEVEL_P1",
-            "LEVEL_P2",
-            "LEVEL_P3",
-            "LEVEL_P4",
-            "LEVEL_D1",
-            "LEVEL_D2",
-            "LEVEL_D3"
+            "LEVEL_Px1",
+            "LEVEL_Px2",
+            "LEVEL_Px3",
+            "LEVEL_Px4",
+            "LEVEL_Dx1",
+            "LEVEL_Dx2",
+            "LEVEL_Dx3"
           ]
         },
         "hotspot": {
@@ -1776,13 +1841,13 @@
               "LEVEL_R1",
               "LEVEL_R2",
               "LEVEL_R3",
-              "LEVEL_P1",
-              "LEVEL_P2",
-              "LEVEL_P3",
-              "LEVEL_P4",
-              "LEVEL_D1",
-              "LEVEL_D2",
-              "LEVEL_D3"
+              "LEVEL_Px1",
+              "LEVEL_Px2",
+              "LEVEL_Px3",
+              "LEVEL_Px4",
+              "LEVEL_Dx1",
+              "LEVEL_Dx2",
+              "LEVEL_Dx3"
             ]
           }
         },
@@ -1802,13 +1867,13 @@
               "LEVEL_R1",
               "LEVEL_R2",
               "LEVEL_R3",
-              "LEVEL_P1",
-              "LEVEL_P2",
-              "LEVEL_P3",
-              "LEVEL_P4",
-              "LEVEL_D1",
-              "LEVEL_D2",
-              "LEVEL_D3"
+              "LEVEL_Px1",
+              "LEVEL_Px2",
+              "LEVEL_Px3",
+              "LEVEL_Px4",
+              "LEVEL_Dx1",
+              "LEVEL_Dx2",
+              "LEVEL_Dx3"
             ]
           }
         },
@@ -1861,6 +1926,9 @@
           "type": "string"
         },
         "pmids": {
+          "type": "string"
+        },
+        "proteinChange": {
           "type": "string"
         },
         "refSeq": {
@@ -1945,13 +2013,13 @@
               "LEVEL_R1",
               "LEVEL_R2",
               "LEVEL_R3",
-              "LEVEL_P1",
-              "LEVEL_P2",
-              "LEVEL_P3",
-              "LEVEL_P4",
-              "LEVEL_D1",
-              "LEVEL_D2",
-              "LEVEL_D3"
+              "LEVEL_Px1",
+              "LEVEL_Px2",
+              "LEVEL_Px3",
+              "LEVEL_Px4",
+              "LEVEL_Dx1",
+              "LEVEL_Dx2",
+              "LEVEL_Dx3"
             ]
           }
         },
@@ -2017,6 +2085,17 @@
       },
       "description": "General tumor type category."
     },
+    "OncoKBInfo": {
+      "type": "object",
+      "properties": {
+        "dataVersion": {
+          "$ref": "#/definitions/Version"
+        },
+        "oncoTreeVersion": {
+          "type": "string"
+        }
+      }
+    },
     "VariantConsequence": {
       "type": "object",
       "properties": {
@@ -2069,13 +2148,13 @@
             "LEVEL_R1",
             "LEVEL_R2",
             "LEVEL_R3",
-            "LEVEL_P1",
-            "LEVEL_P2",
-            "LEVEL_P3",
-            "LEVEL_P4",
-            "LEVEL_D1",
-            "LEVEL_D2",
-            "LEVEL_D3"
+            "LEVEL_Px1",
+            "LEVEL_Px2",
+            "LEVEL_Px3",
+            "LEVEL_Px4",
+            "LEVEL_Dx1",
+            "LEVEL_Dx2",
+            "LEVEL_Dx3"
           ]
         },
         "pmids": {
@@ -2146,7 +2225,6 @@
             "428",
             "429",
             "431",
-            "451",
             "500",
             "501",
             "502",
@@ -2160,10 +2238,6 @@
             "510",
             "511"
           ]
-        },
-        "statusCodeValue": {
-          "type": "integer",
-          "format": "int32"
         }
       }
     },
@@ -2213,13 +2287,13 @@
               "LEVEL_R1",
               "LEVEL_R2",
               "LEVEL_R3",
-              "LEVEL_P1",
-              "LEVEL_P2",
-              "LEVEL_P3",
-              "LEVEL_P4",
-              "LEVEL_D1",
-              "LEVEL_D2",
-              "LEVEL_D3"
+              "LEVEL_Px1",
+              "LEVEL_Px2",
+              "LEVEL_Px3",
+              "LEVEL_Px4",
+              "LEVEL_Dx1",
+              "LEVEL_Dx2",
+              "LEVEL_Dx3"
             ]
           }
         },

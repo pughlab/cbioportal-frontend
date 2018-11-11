@@ -100,13 +100,6 @@ let redirecting = false;
 superagent.Request.prototype.end = function (callback) {
     return end.call(this, (error, response) => {
 
-        if (error) {
-
-            Raven.captureException(((response && response.error) || error),{
-                tags: { network:true }
-            });
-        }
-
         if (redirecting) {
             return;
         }

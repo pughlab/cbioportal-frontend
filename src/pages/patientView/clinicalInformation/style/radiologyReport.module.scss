@@ -3,14 +3,13 @@
   border-collapse: collapse;
   margin: 1px;
   padding: 1px;
-  width: 100%;
 }
 
 .report-table tr:nth-child(odd) {
-  background-color: #eee;
+  background-color: #fff;
 }
 .report-table tr:nth-child(even) {
-  background-color: #fff;
+  background-color: #ccc;
 }
 .report-table th {
   color: white;
@@ -23,16 +22,13 @@
   display: table-cell;
   vertical-align: top;
   text-align: left;
-  border: 1px solid #ccc;
+  border: 1px solid #FCFCFC;
 }
 
 .report-table img{
   display:block;
   width:100%;
   height:auto;
-}
-.report-table tr:hover {
-  background-color: #fcfcfc;
 }
 
 .report-child-table {

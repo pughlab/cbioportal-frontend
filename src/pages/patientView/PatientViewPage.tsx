@@ -43,6 +43,7 @@ import {showCustomTab} from "../../shared/lib/customTabs";
 import {StudyLink} from "../../shared/components/StudyLink/StudyLink";
 import WindowStore from "shared/components/window/WindowStore";
 import {QueryParams} from "url";
+import RadioImageReport from "./radioImageReport/RadioImageReport";
 
 const patientViewPageStore = new PatientViewPageStore();
 
@@ -524,6 +525,20 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                                         </MSKTab>)
                                     })
                                 }
+                                {(patientViewPageStore.pageMode === 'patient') && (
+                                    <MSKTab key={6} id="radiologyDataTab" linkText="Radiology Images" hide={patientViewPageStore.studyId !== 'PSMA_Imaging'}>
+
+                                        <div className="clearfix">
+                                            <FeatureTitle title=""
+                                                          isLoading={ patientViewPageStore.clinicalDataPatient.isPending }
+                                                          className="pull-left"/>
+                                            { (patientViewPageStore.clinicalDataPatient.isComplete) && (
+                                                <RadioImageReport patientId={patientViewPageStore.patientId}/>
+                                            )
+                                            }
+                                        </div>
+                                    </MSKTab>
+                                )}
 
                             </MSKTabs>
 

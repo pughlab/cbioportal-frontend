@@ -5,51 +5,17 @@
   padding: 1px;
 }
 
-.report-table tr:nth-child(odd) {
-  background-color: #fff;
-}
-.report-table tr:nth-child(even) {
-  background-color: #ccc;
-}
-.report-table th {
-  color: white;
-  background-color: #6495ED;
-  text-align: left;
-  border: 1px solid #1E90FF;
+.report-table td {
+  border: 1px solid #CCC;
+  /*border-bottom: 1px solid #ccc;*/
 }
 
-.report-table td {
-  display: table-cell;
-  vertical-align: top;
-  text-align: left;
-  border: 1px solid #FCFCFC;
+.report-table tr:nth-child(1) td {
+  border: none;                   /* remove all borders on first row */
 }
 
 .report-table img{
   display:block;
   width:100%;
-  height:auto;
-}
-
-.report-child-table {
-  border-collapse: collapse;
-  margin: 1px;
-  padding: 1px;
-  vertical-align: inherit;
-  text-align: left;
-  width: 100%;
-}
-
-.report-child-table th {
-  color: white;
-  background-color: #ADD8E6;
-  text-align: left;
-  border: 1px solid #ccc;
-}
-
-.report-child-table td {
-  display: table-cell;
-  vertical-align: top;
-  text-align: left;
-  border: 1px solid #ccc;
+  height: auto;
 }

@@ -404,6 +404,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                                                 mrnaExprRankCache={patientViewPageStore.mrnaExprRankCache}
                                                 oncoKbEvidenceCache={patientViewPageStore.oncoKbEvidenceCache}
                                                 pubMedCache={patientViewPageStore.pubMedCache}
+                                                genomeNexusCache={patientViewPageStore.genomeNexusCache}
                                                 mrnaExprRankMolecularProfileId={patientViewPageStore.mrnaRankMolecularProfileId.result || undefined}
                                                 discreteCNAMolecularProfileId={patientViewPageStore.molecularProfileIdDiscrete.result}
                                                 data={patientViewPageStore.mergedMutationDataIncludingUncalled}

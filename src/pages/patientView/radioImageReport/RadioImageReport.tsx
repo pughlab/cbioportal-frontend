@@ -4,66 +4,11 @@ import DefaultTooltip from "../../../shared/components/defaultTooltip/DefaultToo
 import Plot from "react-plotly.js";
 import * as plotly from 'plotly.js';
 import Select from 'react-select';
+import {LAYOUT, ImageROIData, STATSOPTIONS, ImageAnalysisData, MODOPTIONS} from './RadioImageMeta';
 
 export interface IPatientRadioImageProps {
     patientId: string;
 }
-
-export type ImageAnalysisData = {
-    studyInstanceUid: string,
-    seriesDescription: string,
-    modality: string,
-    acquisitionDate: string,
-    sex: string,
-    size: number,
-    weight: number,
-    initialNoRois: number,
-    radiologicalFinding: any,
-    images: any,
-    ROI: ImageROIData[],
-    [propName: string]: any
-};
-
-export type ImageROIData = {
-    contourLabel: string,
-    max: number,
-    min: number,
-    volume: number,
-    activeMean: number,
-    matv: number,
-    tla: number,
-    [propName: string]: any
-};
-
-const modOptions = [
-    { value: 'PETCT', label: 'PET/CT' },
-    { value: 'PETMR', label: 'PET/MR' },
-];
-
-const statsOptions = [
-    { value: 'max', label: 'Max[SUVbw]' },
-    { value: 'mean', label: 'Mean[SUVbw]' },
-    { value: 'min', label: 'Min[SUVbw]' },
-    { value: 'volume', label: 'Volume[ml]'},
-    { value: 'activeMean', label: 'Standard Deviation[SUVbw]'},
-    { value: 'matv', label:'SUV Peak[SUVbw]'},
-    { value: 'tla', label:'RECIST Long[cm]'}
-];
-
-const layout = {
-    plotBackground: '#f3f6fa',
-    margin: {t:30, r: 0, l: 40, b: 30, pad: 5},
-    title:'Standard Uptake Value (as Calculated using Body Weight)',
-    titlefont: {
-        "size": 12,
-    },
-    hovermode: 'closest',
-    autosize: false,
-    width: 500,
-    height: 360,
-};
-
-const docFile = '/cbioportal/images/PSMA_Berlin/MIPs/DCFPYL-1-21-NWI/DCFPYL-1-21-NWI.json';
 
 export default class RadioImageReport extends React.Component<IPatientRadioImageProps,
                     {[propName: string]: any}> {
@@ -72,7 +17,7 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
         super(props);
         this.state = {
             analysisData: [],
-            layout: layout,
+            layout: LAYOUT,
             selectedModOption: { value: 'PETCT', label: 'PET/CT' },
             selectedOption: { value: 'max', label: 'Max[SUVbw]' },
             selectedDateOption: {},
@@ -85,6 +30,7 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
     }
 
     componentDidMount() {
+        const docFile = '/cbioportal/images/PSMA_Berlin/MIPs/DCFPYL-1-21-NWI/DCFPYL-1-21-NWI.json';
         fetch(window.location.origin + docFile)
             .then(response => response.json())
             .then(data => {
@@ -102,17 +48,19 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
                         ROI: row.ROI.map((roi: ImageROIData) => roi)
                     };
                 });
+
                 this.setState({
                     analysisData: result,
                     img: result[0].images[8],
                     imgROI: result[0].images[0],
-                    timePoints: [{value:result[0].acquisitionDate, label:result[0].acquisitionDate},
-                                {value:result[2].acquisitionDate, label:result[2].acquisitionDate}],
+                    timePoints: result.slice(1,3).map((d:ImageAnalysisData)=> {
+                        return ({value:d.acquisitionDate, label:d.acquisitionDate});
+                    }),
                     selectedDateOption: { value: result[0].acquisitionDate, label: result[0].acquisitionDate},
                     imgToolTip: {StudyInstanceUid: result[0].studyInstanceUid,
                         SeriesDescription:result[0].seriesDescription,
                         InitialNoRois: result[0].initialNoRois},
-                    plotData: this.getPlotData("max")
+                    plotData: this.getPlotData("max", result[0], result[2])
                 });
         });
     }
@@ -130,27 +78,28 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
         this.setState({ selectedOption: selectedOption,
                         img: this.state.analysisData[2].images[8],
                         imgROI: this.state.analysisData[2].images[0]});
+        const data = this.state.analysisData;
         switch (selectedOption.value) {
             case 'min':
-                this.setState({plotData: this.getPlotData("min")});
+                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
                 break;
             case 'max':
-                this.setState({plotData: this.getPlotData("max")});
+                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
                 break;
             case 'volume':
-                this.setState({plotData: this.getPlotData("volume")});
+                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
                 break;
             case 'activeMean':
-                this.setState({plotData: this.getPlotData("mean")});
+                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
                 break;
             case 'matv':
-                this.setState({plotData: this.getPlotData("matv")});
+                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
                 break;
             case 'tla':
-                this.setState({plotData: this.getPlotData("tla")});
+                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
                 break;
             default:
-                this.setState({plotData: this.getPlotData("max")});
+                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
                 break;
         }
     }
@@ -188,7 +137,7 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
                             style={{width:  150}}
                             value={this.state.selectedModOption}
                             onChange={this.handleModChange}
-                            options={modOptions}
+                            options={MODOPTIONS}
                         />
                         </td>
                         <td>
@@ -197,7 +146,7 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
                             style={{width: 150}}
                             value={this.state.selectedOption}
                             onChange={this.handleChange}
-                            options={statsOptions}
+                            options={STATSOPTIONS}
                         />
                         </td>
                         <td>
@@ -250,52 +199,107 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
         );
     }
 
-    private getPlotData(type:string) {
-        return (
-            [{
-                x: ['2017-05-26','2017-10-20'],
-                y: [11.3985738754,12.00828552],
+    private makePlotData(x: string[], y: number[], contour: string, color: string,
+                         stats: string, modality: string): {} {
+        return ({
+                x: x,
+                y: y,
                 type: 'lines+markers',
                 marker: {
-                    color: 'Tomato',
-                    symbol: 'circle',
-                    size: 16,
-                },
-                name: 'Liver',
-                text: ['Max: 11.3985738754<br />ContourLabel: Liver<br />Baseline: 2017-05-26<br />Modality:PET/MR',
-                    'Max: 12.00828552<br />ContourLabel: Liver<br />Followup: 2017-10-20<br />Modality:PET/MR'],
-                hoverinfo: 'text',
+                color: color,
+                symbol: 'circle',
+                size: 16,
             },
-                {
-                    x: ['2017-05-26','2017-10-20'],
-                    y: [1.2762573957,1.351804495],
-                    type: 'lines+markers',
-                    marker: {
-                        color: 'DodgerBlue',
-                        symbol: 'circle',
-                        size: 16,
-                    },
-                    name: 'LV',
-                    text: ['Max: 1.2762573957<br />ContourLabel: LV<br />Baseline: 2017-05-26<br />Modality:PET/MR',
-                        'Max: 1.351804495<br />ContourLabel: LV<br />Followup: 2017-10-20<br />Modality:PET/MR'],
-                    hoverinfo: 'text'
-                },
-                {
-                    x: ['2017-05-26','2017-10-20'],
-                    y: [22.47808266,23.832901],
-                    type: 'lines+markers',
-                    marker: {
-                        color: 'MediumSeaGreen',
-                        symbol: 'circle',
-                        size: 16,
-                    },
-                    name: 'Parotid',
-                    text: ['Max: 22.47808266<br />ContourLabel: Parotid<br />Baseline: 2017-05-26<br />Modality:PET/MR',
-                        'Max: 23.832901<br />ContourLabel: Parotid<br />Followup: 2017-10-20<br />Modality:PET/MR'],
-                    hoverinfo: 'text',
-                }
-            ]
-        );
+            name: contour,
+            text: [stats +': '+ y[0] +'<br />ContourLabel: '+contour+'<br />Baseline: '+x[0] +'<br />Modality: '+
+                    modality, stats + y[1] +'<br />ContourLabel: '+ contour + ' <br />Followup: ' + x[1]
+                   + '<br />Modality: ' + modality],
+            hoverinfo: 'text',
+        });
+    }
+
+    private getStatsValue(r: ImageROIData, type: string): number {
+            let val: number;
+            switch (type) {
+                case 'max':
+                    val = r.max;
+                    break;
+                case 'min':
+                    val = r.min;
+                    break;
+                case 'volume':
+                    val = r.volume
+                    break;
+                case 'activeMean':
+                    val = r.activeMean
+                    break;
+                case 'matv':
+                    val = r.matv;
+                    break;
+                case 'tla':
+                    val = r.tla;
+                    break;
+                default:
+                    val = r.activeMean;
+                    break;
+            }
+            return val;
+    }
+
+    private getContourROI(l: string, d: ImageAnalysisData): ImageROIData|undefined {
+        for (const r of d.ROI) {
+            if (r.contourLabel === l) {
+                return r;
+            }
+        }
+    }
+
+    private getColor(l:string): string {
+        let color = '';
+        switch(l) {
+            case 'Liver':
+                color = "Tomato";
+                break;
+            case 'LV':
+                color = "DodgerBlue";
+                break;
+            case 'Parotid':
+                color = "MediumSeaGreen";
+                break;
+            case 'LTgroin1':
+                color = "Maroon";
+                break;
+            case 'LTgroin2':
+                color = "Purple";
+                break;
+            case 'LTgroin3':
+                color = "Fuchsia";
+                break;
+            case 'LTiliacsup':
+                color = "Olive";
+                break;
+            default:
+                color = "Orange";
+                break;
+        }
+        return color;
+    }
+
+    private getPlotData(type:string, d1:ImageAnalysisData, d2:ImageAnalysisData): any  {
+        if (d1 && d2) {
+            const contours = d1.ROI.map((r:ImageROIData) => r.contourLabel);
+            return (
+                contours.map((l:string) => {
+                    const r1 = this.getContourROI(l, d1);
+                    const y1 = (r1 !== undefined)? this.getStatsValue(r1, type): undefined;
+                    const r2 = this.getContourROI(l, d2);
+                    const y2 = (r2 !== undefined)? this.getStatsValue(r2, type): undefined;
+                    const y = (y1 && y2)? [y1, y2]: []
+                    const x = [d1.acquisitionDate, d2.acquisitionDate];
+                    return this.makePlotData(x, y, l, this.getColor(l), type, d1.modality);
+                })
+            );
+        }
     }
 }
 

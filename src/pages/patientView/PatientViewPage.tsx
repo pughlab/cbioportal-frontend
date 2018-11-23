@@ -43,6 +43,7 @@ import {showCustomTab} from "../../shared/lib/customTabs";
 import {StudyLink} from "../../shared/components/StudyLink/StudyLink";
 import WindowStore from "shared/components/window/WindowStore";
 import {QueryParams} from "url";
+import RadioImageReport from "./radioImageReport/RadioImageReport";
 
 const patientViewPageStore = new PatientViewPageStore();
 
@@ -182,16 +183,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
         return patientViewPageStore.pathologyReport.isComplete && patientViewPageStore.pathologyReport.result.length > 0;
     }
 
-    private getSlideId(data:Array<ClinicalData>):string {
-        for (const row in data) {
-            if (data[row]['clinicalAttributeId'] === 'SLIDE_ID') {
-                return data[row]['value'];
-            }
-        }
-        return '';
-    }
-
-    private hideTissueImageTab(){
+    hideTissueImageTab(){
         return patientViewPageStore.hasTissueImageIFrameUrl.isPending || patientViewPageStore.hasTissueImageIFrameUrl.isError
             || (patientViewPageStore.hasTissueImageIFrameUrl.isComplete && !patientViewPageStore.hasTissueImageIFrameUrl.result);
     }
@@ -559,6 +551,25 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                         </div>
                     </MSKTab>
                     </MSKTabs>
+                                        </MSKTab>)
+                                    })
+                                }
+                                {(patientViewPageStore.pageMode === 'patient') && (
+                                    <MSKTab key={6} id="radiologyDataTab" linkText="Radiology Images" hide={patientViewPageStore.studyId !== 'PSMA_Imaging'}>
+
+                                        <div className="clearfix">
+                                            <FeatureTitle title=""
+                                                          isLoading={ patientViewPageStore.clinicalDataPatient.isPending }
+                                                          className="pull-left"/>
+                                            { (patientViewPageStore.clinicalDataPatient.isComplete) && (
+                                                <RadioImageReport patientId={patientViewPageStore.patientId}/>
+                                            )
+                                            }
+                                        </div>
+                                    </MSKTab>
+                                )}
+
+                            </MSKTabs>
 
                         </Then>
                         <Else>

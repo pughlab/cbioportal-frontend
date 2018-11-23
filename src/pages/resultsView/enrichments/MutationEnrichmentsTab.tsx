@@ -10,7 +10,7 @@ import autobind from 'autobind-decorator';
 import ErrorMessage from "../../../shared/components/ErrorMessage";
 
 export interface IMutationEnrichmentsTabProps {
-    store: ResultsViewPageStore
+    store: ResultsViewPageStore;
 }
 
 @observer

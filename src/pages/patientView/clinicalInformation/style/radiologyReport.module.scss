@@ -1,0 +1,21 @@
+
+.report-table {
+  border-collapse: collapse;
+  margin: 1px;
+  padding: 1px;
+}
+
+.report-table td {
+  border: 1px solid #CCC;
+  /*border-bottom: 1px solid #ccc;*/
+}
+
+.report-table tr:nth-child(1) td {
+  border: none;                   /* remove all borders on first row */
+}
+
+.report-table img{
+  display:block;
+  width:100%;
+  height: auto;
+}

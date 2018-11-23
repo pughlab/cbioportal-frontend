@@ -20,7 +20,8 @@ import {
     CNA_COLOR_HOMDEL,
     DEFAULT_GREY,
     MUT_COLOR_FUSION, MUT_COLOR_INFRAME, MUT_COLOR_INFRAME_PASSENGER,
-    MUT_COLOR_MISSENSE, MUT_COLOR_MISSENSE_PASSENGER, MUT_COLOR_PROMOTER, MUT_COLOR_TRUNC, MUT_COLOR_TRUNC_PASSENGER
+    MUT_COLOR_MISSENSE, MUT_COLOR_MISSENSE_PASSENGER, MUT_COLOR_OTHER, MUT_COLOR_PROMOTER, MUT_COLOR_TRUNC,
+    MUT_COLOR_TRUNC_PASSENGER
 } from "../../../shared/components/oncoprint/geneticrules";
 import {CoverageInformation} from "../ResultsViewPageStoreUtils";
 import {IBoxScatterPlotData} from "../../../shared/components/plots/BoxScatterPlot";
@@ -30,6 +31,7 @@ import {getJitterForCase} from "../../../shared/components/plots/PlotUtils";
 import {isSampleProfiled} from "../../../shared/lib/isSampleProfiled";
 import GenesetMolecularDataCache from "../../../shared/cache/GenesetMolecularDataCache";
 import {GenesetMolecularData} from "../../../shared/api/generated/CBioPortalAPIInternal";
+import {MUTATION_COUNT} from "../../studyView/StudyViewPageStore";
 
 export const CLIN_ATTR_DATA_TYPE = "clinical_attribute";
 export const GENESET_DATA_TYPE = "GENESET_SCORE";
@@ -48,7 +50,8 @@ export const mutationTypeToDisplayName:{[oncoprintMutationType:string]:string} =
     "inframe":"Inframe",
     "fusion":"Fusion",
     "promoter":"Promoter",
-    "trunc":"Truncating"
+    "trunc":"Truncating",
+    "other":"Other"
 };
 
 export const dataTypeDisplayOrder = [
@@ -763,6 +766,13 @@ export const oncoprintMutationTypeToAppearanceDrivers:{[mutType:string]:{symbol:
         stroke: "#000000",
         strokeOpacity:NON_CNA_STROKE_OPACITY,
         legendLabel: "Promoter"
+    },
+    "other":{
+        symbol: "circle",
+        fill: MUT_COLOR_OTHER,
+        stroke: "#000000",
+        strokeOpacity:NON_CNA_STROKE_OPACITY,
+        legendLabel: "Other"
     }
 };
 
@@ -802,6 +812,13 @@ export const oncoprintMutationTypeToAppearanceDefault:{[mutType:string]:{symbol:
         stroke: "#000000",
         strokeOpacity:NON_CNA_STROKE_OPACITY,
         legendLabel: "Promoter"
+    },
+    "other":{
+        symbol: "circle",
+        fill: MUT_COLOR_OTHER,
+        stroke: "#000000",
+        strokeOpacity:NON_CNA_STROKE_OPACITY,
+        legendLabel: "Other"
     }
 };
 
@@ -817,11 +834,11 @@ export const mutationLegendOrder = [
     "promoter.driver", "promoter",
     "trunc.driver", "trunc",
     "inframe.driver", "inframe",
-    "missense.driver", "missense"
+    "missense.driver", "missense", "other"
 ];
 export const mutationRenderPriority = stringListToIndexSet([
     "fusion", "promoter.driver", "trunc.driver", "inframe.driver", "missense.driver",
-    "promoter", "trunc", "inframe", "missense", MUTATION_TYPE_NOT_MUTATED, MUTATION_TYPE_NOT_PROFILED
+    "promoter", "trunc", "inframe", "missense", "other", MUTATION_TYPE_NOT_MUTATED, MUTATION_TYPE_NOT_PROFILED
 ]);
 
 export const noMutationAppearance = {
@@ -894,6 +911,7 @@ export const mutTypeCategoryOrder = [
     mutationTypeToDisplayName.trunc,
     mutationTypeToDisplayName.fusion,
     mutationTypeToDisplayName.promoter,
+    mutationTypeToDisplayName.other,
     MUT_PROFILE_COUNT_MULTIPLE,
     MUT_PROFILE_COUNT_NOT_MUTATED, MUT_PROFILE_COUNT_NOT_PROFILED
 ];
@@ -1074,10 +1092,18 @@ export function boxPlotTooltip(
 export function logScalePossible(
     axisSelection: AxisMenuSelection
 ) {
-    return !!(axisSelection.dataType !== CLIN_ATTR_DATA_TYPE &&
-         axisSelection.dataSourceId &&
-        !(/zscore/i.test(axisSelection.dataSourceId)) &&
-        /rna_seq/i.test(axisSelection.dataSourceId));
+    if (axisSelection.dataType !== CLIN_ATTR_DATA_TYPE) {
+        // molecular profile
+        return !!(
+            axisSelection.dataSourceId &&
+            !(/zscore/i.test(axisSelection.dataSourceId)) &&
+            /rna_seq/i.test(axisSelection.dataSourceId)
+        );
+    } else {
+        // clinical attribute
+        return axisSelection.dataSourceId === MUTATION_COUNT;
+    }
+
 }
 
 export function makeBoxScatterPlotData(
@@ -1178,7 +1204,7 @@ export function makeScatterPlotData(
                 _.chain(sampleMutations)
                 .groupBy(mutation=>{
                     const mutationType = getOncoprintMutationType(mutation);
-                    const driverSuffix = (mutationType !== "fusion" && mutationType !== "promoter" && mutation.putativeDriver) ? ".driver" : "";
+                    const driverSuffix = (mutationType !== "fusion" && mutationType !== "promoter" && mutationType !== "other" && mutation.putativeDriver) ? ".driver" : "";
                     return `${mutationType}${driverSuffix}`;
                 })
                 .mapValues(muts=>muts.length)

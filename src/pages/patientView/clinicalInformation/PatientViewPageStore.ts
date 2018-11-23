@@ -16,9 +16,14 @@ import {labelMobxPromises, cached} from "mobxpromise";
 import MrnaExprRankCache from 'shared/cache/MrnaExprRankCache';
 import request from 'superagent';
 import DiscreteCNACache from "shared/cache/DiscreteCNACache";
-import { getDarwinUrl, getDigitalSlideArchiveMetaUrl} from "../../../shared/api/urls";
+import {
+    getDarwinUrl,
+    getMDAndersonHeatmapPatientUrl,
+    getMDAndersonHeatMapMetaUrl, getDigitalSlideArchiveMetaUrl
+} from "../../../shared/api/urls";
 import OncoKbEvidenceCache from "shared/cache/OncoKbEvidenceCache";
 import PubMedCache from "shared/cache/PubMedCache";
+import GenomeNexusCache from "shared/cache/GenomeNexusCache";
 import {IOncoKbData} from "shared/model/OncoKB";
 import {IHotspotIndex} from "shared/model/CancerHotspots";
 import {IMutSigData} from "shared/model/MutSig";
@@ -40,10 +45,8 @@ import {
     fetchCnaTrialMatchGenes, fetchCivicGenes, fetchCnaCivicGenes, fetchCivicVariants, groupBySampleId,
     findSamplesWithoutCancerTypeClinicalData, fetchStudiesForSamplesWithoutCancerTypeClinicalData, fetchOncoKbAnnotatedGenesSuppressErrors
 } from "shared/lib/StoreUtils";
-import {IMutationalSignature} from "../../../shared/model/MutationalSignature";
 import {indexHotspotsData, fetchHotspotsData} from "shared/lib/CancerHotspotsUtils";
 import {stringListToSet} from "../../../shared/lib/StringUtils";
-import {Gene as OncoKbGene} from "../../../shared/api/generated/OncoKbAPI";
 import {MutationTableDownloadDataFetcher} from "shared/lib/MutationTableDownloadDataFetcher";
 import { VariantAnnotation } from 'shared/api/generated/GenomeNexusAPI';
 import { fetchVariantAnnotationsIndexedByGenomicLocation } from 'shared/lib/MutationAnnotator';
@@ -314,11 +317,10 @@ export class PatientViewPageStore {
         }
     });
 
-
     readonly MDAndersonHeatMapAvailable = remoteData({
         await: () => [this.derivedPatientId],
         invoke: async() => {
-            const fileContent: string[] = await getHeatmapMeta(`//bioinformatics.mdanderson.org/participant2maps?participant=${this.patientId}`);
+            const fileContent: string[] = await getHeatmapMeta(getMDAndersonHeatMapMetaUrl(this.patientId));
             return fileContent.length > 0;
         },
         onError: () => {
@@ -327,7 +329,6 @@ export class PatientViewPageStore {
     }, false);
 
 
-    //
     readonly clinicalDataForSamples = remoteData({
         await: () => [
             this.samples
@@ -535,7 +536,7 @@ export class PatientViewPageStore {
         ],
         invoke: () => {
             if (AppConfig.serverConfig.show_oncokb) {
-                return fetchOncoKbData(this.uniqueSampleKeyToTumorType, this.oncoKbAnnotatedGenes.result || {}, this.mutationData, this.uncalledMutationData);
+                return fetchOncoKbData(this.uniqueSampleKeyToTumorType, this.oncoKbAnnotatedGenes.result || {}, this.mutationData, undefined, this.uncalledMutationData);
             } else {
                 return Promise.resolve({indicatorMap: null, uniqueSampleKeyToTumorType: null});
             }
@@ -741,6 +742,10 @@ export class PatientViewPageStore {
 
     @cached get oncoKbEvidenceCache() {
         return new OncoKbEvidenceCache();
+    }
+
+    @cached get genomeNexusCache() {
+        return new GenomeNexusCache();
     }
 
     @cached get pubMedCache() {

@@ -553,6 +553,7 @@ export async function fetchOncoKbAnnotatedGenesSuppressErrors(client: OncoKbAPI 
 export async function fetchOncoKbData(uniqueSampleKeyToTumorType:{[uniqueSampleKey: string]: string},
                                       annotatedGenes:{[entrezGeneId:number]:boolean}|Error,
                                       mutationData:MobxPromise<Mutation[]>,
+                                      evidenceTypes?: string,
                                       uncalledMutationData?:MobxPromise<Mutation[]>,
                                       client: OncoKbAPI = oncokbClient)
 {
@@ -574,7 +575,7 @@ export async function fetchOncoKbData(uniqueSampleKeyToTumorType:{[uniqueSampleK
             mutation.proteinPosStart,
             mutation.proteinPosEnd);
     }), "id");
-    return queryOncoKbData(queryVariants, uniqueSampleKeyToTumorType, client);
+    return queryOncoKbData(queryVariants, uniqueSampleKeyToTumorType, client, evidenceTypes);
 }
 
 export async function fetchCnaOncoKbData(uniqueSampleKeyToTumorType:{[uniqueSampleKey: string]: string},
@@ -593,7 +594,7 @@ export async function fetchCnaOncoKbData(uniqueSampleKeyToTumorType:{[uniqueSamp
                 cancerTypeForOncoKb(copyNumberData.uniqueSampleKey, uniqueSampleKeyToTumorType),
                 getAlterationString(copyNumberData.alteration));
         }), "id");
-        return queryOncoKbData(queryVariants, uniqueSampleKeyToTumorType, client);
+        return queryOncoKbData(queryVariants, uniqueSampleKeyToTumorType, client, undefined);
     }
 }
 
@@ -601,6 +602,7 @@ export async function fetchCnaOncoKbDataWithNumericGeneMolecularData(uniqueSampl
                                          annotatedGenes:{[entrezGeneId:number]:boolean},
                                          geneMolecularData:MobxPromise<NumericGeneMolecularData[]>,
                                           molecularProfileIdToMolecularProfile:{[molecularProfileId:string]:MolecularProfile},
+                                         evidenceTypes?: string,
                                          client: OncoKbAPI = oncokbClient)
 {
     if (!geneMolecularData.result || geneMolecularData.result.length === 0) {
@@ -617,7 +619,7 @@ export async function fetchCnaOncoKbDataWithNumericGeneMolecularData(uniqueSampl
                 cancerTypeForOncoKb(datum.uniqueSampleKey, uniqueSampleKeyToTumorType),
                 getAlterationString(datum.value));
         }), (query:Query)=>query.id);
-        return queryOncoKbData(queryVariants, uniqueSampleKeyToTumorType, client);
+        return queryOncoKbData(queryVariants, uniqueSampleKeyToTumorType, client, evidenceTypes);
     }
 }
 
@@ -631,10 +633,11 @@ export function cancerTypeForOncoKb(uniqueSampleKey: string,
 
 export async function queryOncoKbData(queryVariants: Query[],
                                       uniqueSampleKeyToTumorType: {[sampleId: string]: string},
-                                      client: OncoKbAPI = oncokbClient)
+                                      client: OncoKbAPI = oncokbClient,
+                                      evidenceTypes?:string)
 {
     const oncokbSearch = await client.searchPostUsingPOST(
-        {body: generateEvidenceQuery(queryVariants, '')});
+        {body: generateEvidenceQuery(queryVariants, evidenceTypes)});
 
     const oncoKbData: IOncoKbData = {
         uniqueSampleKeyToTumorType: uniqueSampleKeyToTumorType,

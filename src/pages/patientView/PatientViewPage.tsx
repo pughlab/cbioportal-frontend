@@ -42,6 +42,7 @@ import autobind from "autobind-decorator";
 import {showCustomTab} from "../../shared/lib/customTabs";
 import {StudyLink} from "../../shared/components/StudyLink/StudyLink";
 import WindowStore from "shared/components/window/WindowStore";
+import {QueryParams} from "url";
 
 const patientViewPageStore = new PatientViewPageStore();
 
@@ -59,6 +60,12 @@ export interface IPatientViewPageProps {
         clinicalData: ClinicalData[]
     };
     clinicalDataStatus?: RequestStatus;
+}
+
+export interface PatientViewUrlParams extends QueryParams{
+    studyId:string;
+    caseId?:string;
+    sampleId?:string;
 }
 
 @inject('routing')
@@ -262,7 +269,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                 );
             });
 
-            if (sampleHeader && sampleHeader.length > 0 && patientViewPageStore.pageMode === 'sample' && patientViewPageStore.patientId) {
+            if (sampleHeader && sampleHeader.length > 0 && patientViewPageStore.pageMode === 'sample' && patientViewPageStore.patientId && patientViewPageStore.samples.result.length > 1) {
                 sampleHeader.push(
                     <button className="btn btn-default btn-xs" onClick={()=>this.handlePatientClick(patientViewPageStore.patientId)}>Show all samples</button>
                 );
@@ -405,6 +412,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                                                 mrnaExprRankCache={patientViewPageStore.mrnaExprRankCache}
                                                 oncoKbEvidenceCache={patientViewPageStore.oncoKbEvidenceCache}
                                                 pubMedCache={patientViewPageStore.pubMedCache}
+                                                genomeNexusCache={patientViewPageStore.genomeNexusCache}
                                                 mrnaExprRankMolecularProfileId={patientViewPageStore.mrnaRankMolecularProfileId.result || undefined}
                                                 discreteCNAMolecularProfileId={patientViewPageStore.molecularProfileIdDiscrete.result}
                                                 data={patientViewPageStore.mergedMutationDataIncludingUncalled}

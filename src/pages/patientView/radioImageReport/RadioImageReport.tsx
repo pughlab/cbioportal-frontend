@@ -30,9 +30,6 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
             timePoints: [],
             plotData: []
         };
-        this.handleModChange = this.handleModChange.bind(this);
-        this.handleChange = this.handleChange.bind(this);
-        this.handleDateChange = this.handleDateChange.bind(this);
     }
 
     componentDidMount() {
@@ -80,6 +77,14 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
         });
     }
 
+    componentDidUpdate(prevProps: any, prevState: any) {
+        const {img, imgROI} = this.state;
+        if(img !== prevState.img || imgROI !== prevState.imgROI){
+            this.setState({oldImg: img, oldImgROI: imgROI});
+        }
+
+    }
+
     handleModChange = (selectedModOption:any ) => {
         this.setState({ selectedModOption: selectedModOption });
         this.updatePlotImageData();
@@ -100,9 +105,7 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
         const d = event.points[0].x;
         if (d) {
             const imgPath = this.getImagePath(d.toString(), this.getModality(), event.points[0].data.name);
-            const oldImgPath = [this.state.img, this.state.imgROI];
-            this.setState({img: imgPath[0], imgROI: imgPath[1],
-                           oldImg: oldImgPath[0], oldImgROI: oldImgPath[1]});
+            this.setState({img: imgPath[0], imgROI: imgPath[1]});
         }
     }
 
@@ -113,6 +116,7 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
 
     handleClick = (event: plotly.PlotMouseEvent) => {
         const imgKey = this.state.selectedOption.value + "_" + event.points[0].x + "_" + event.points[0].data.name;
+        //this.updatePlotImageData();
     }
 
     public render() {
@@ -127,7 +131,7 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
                             clearable={false}
                             style={{width:  250}}
                             value={this.state.selectedModOption}
-                            onChange={this.handleModChange}
+                            onChange={this.handleModChange.bind(this)}
                             options={MODOPTIONS}
                             multi={true}
                         />
@@ -137,7 +141,7 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
                             clearable={false}
                             style={{width: 250}}
                             value={this.state.selectedOption}
-                            onChange={this.handleChange}
+                            onChange={this.handleChange.bind(this)}
                             options={this.state.statOptions}
                         />
                         </td>
@@ -146,7 +150,7 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
                             clearable={false}
                             style={{width: 150}}
                             value={this.state.selectedDateOption}
-                            onChange={this.handleDateChange}
+                            onChange={this.handleDateChange.bind(this)}
                             options={this.state.timePoints} />
                         </td>
                     </tr>

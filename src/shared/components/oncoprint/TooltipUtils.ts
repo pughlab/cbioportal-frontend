@@ -81,6 +81,9 @@ export function makeClinicalTrackTooltip(track:ClinicalTrackSpec, link_id?:boole
                 ret += track.label+': <b>' + displayVal + '</b><br>';
             }
         }
+        if (d.na && track.na_tooltip_value) {
+            ret += `${track.label}: <b>${track.na_tooltip_value}</b><br/>`;
+        }
         ret += '<span>'+(d.sample ? "Sample" : "Patient")+": ";
         ret += (link_id ? (d.sample? sampleViewAnchorTag(d.study_id, d.sample) : patientViewAnchorTag(d.study_id, d.patient))
             : (d.sample ? d.sample : d.patient));
@@ -175,7 +178,7 @@ export function makeGeneticTrackTooltip(
                 ret.append(`<img src="${require("../../../rootImages/cancer-hotspots.svg")}" title="Hotspot" style="height:11px; width:11px; margin-left:3px"/>`);
             }
             if (d.oncokb_oncogenic) {
-                ret.append(`<img src="${require("../../../rootImages/oncokb-oncogenic-1.svg")}" title="'+d.oncokb_oncogenic+'" style="height:11px; width:11px;margin-left:3px"/>`);
+                ret.append(`<img src="${require("../../../rootImages/oncokb-oncogenic-1.svg")}" title="${d.oncokb_oncogenic}" style="height:11px; width:11px;margin-left:3px"/>`);
             }
             //If we have data for the binary custom driver annotations, append an icon to the tooltip with the annotation information
             if (d.driver_filter && d.driver_filter === "Putative_Driver") {
@@ -193,7 +196,7 @@ export function makeGeneticTrackTooltip(
             var ret = $('<span>');
             ret.append(`<b>${d.hugo_gene_symbol} ${d.cna}</b>`);
             if (d.oncokb_oncogenic) {
-                ret.append(`<img src=${require("../../../rootImages/oncokb-oncogenic-1.svg")} title="'+d.oncokb_oncogenic+'" style="height:11px; width:11px;margin-left:3px"/>`);
+                ret.append(`<img src=${require("../../../rootImages/oncokb-oncogenic-1.svg")} title="${d.oncokb_oncogenic}" style="height:11px; width:11px;margin-left:3px"/>`);
             }
             return ret;
         });

@@ -4,7 +4,7 @@ import DefaultTooltip from "../../../shared/components/defaultTooltip/DefaultToo
 import Plot from "react-plotly.js";
 import * as plotly from 'plotly.js';
 import Select from 'react-select';
-import {LAYOUT, ImageROIData, STATSOPTIONS, ImageAnalysisData, MODOPTIONS} from './RadioImageMeta';
+import {LAYOUT, ImageROIData, ImageAnalysisData, ImageUnitData, MODOPTIONS} from './RadioImageMeta';
 
 export interface IPatientRadioImageProps {
     patientId: string;
@@ -18,19 +18,26 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
         this.state = {
             analysisData: [],
             layout: LAYOUT,
-            selectedModOption: { value: 'PETCT', label: 'PET/CT' },
+            selectedModOption: [{ value: 'PETCT', label: 'PET/CT' }],
             selectedOption: { value: 'max', label: 'Max[SUVbw]' },
             selectedDateOption: {},
             img: '',
             imgROI: '',
+            oldImg: '',
+            oldImgROI: '',
             imgToolTip: {},
+            statOptions: [],
             timePoints: [],
             plotData: []
         };
+        this.handleModChange = this.handleModChange.bind(this);
+        this.handleChange = this.handleChange.bind(this);
+        this.handleDateChange = this.handleDateChange.bind(this);
     }
 
     componentDidMount() {
-        const docFile = '/cbioportal/images/PSMA_Berlin/MIPs/DCFPYL-1-21-NWI/DCFPYL-1-21-NWI.json';
+        const docFile = '/cbioportal/images/PSMA_Berlin/MIPs/'+
+                        this.props.patientId + "/" + this.props.patientId + ".json";
         fetch(window.location.origin + docFile)
             .then(response => response.json())
             .then(data => {
@@ -44,84 +51,68 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
                         weight: row.weight,
                         initialNoRois: row.initialNoRois,
                         radiologicalFinding: row.radiologicalFinding,
+                        statsNameUnits: row.statsNameUnits.map( (u: ImageUnitData) => u),
                         images: row.images,
                         ROI: row.ROI.map((roi: ImageROIData) => roi)
                     };
                 });
-
+                const imagePaths = this.getImagePath(this.state.selectedDateOption.value, this.getModality(),
+                                                     result[0].ROI[0].contourLabel);
                 this.setState({
                     analysisData: result,
-                    img: result[0].images[8],
-                    imgROI: result[0].images[0],
+                    img: imagePaths[0],
+                    imgROI: imagePaths[1],
+                    statOptions: result[0].statsNameUnits,
                     timePoints: result.slice(1,3).map((d:ImageAnalysisData)=> {
                         return ({value:d.acquisitionDate, label:d.acquisitionDate});
                     }),
                     selectedDateOption: { value: result[0].acquisitionDate, label: result[0].acquisitionDate},
+                    selectedModOption: [{ value: result[0].modality.replace("/",""), label: result[0].modality}],
+                    modality: result[0].modality,
                     imgToolTip: {StudyInstanceUid: result[0].studyInstanceUid,
                         SeriesDescription:result[0].seriesDescription,
-                        InitialNoRois: result[0].initialNoRois},
-                    plotData: this.getPlotData("max", result[0], result[2])
+                        InitialNoRois: result[0].initialNoRois,
+                        Modality: result[0].modality,
+                        Acquisition: result[0].acquisitionDate
+                    },
+                    plotData: this.getPlotData(this.state.selectedOption.value, result[0], result[2])
                 });
         });
     }
 
-    handleModChange = (selectedModOption:{value:string, label:string} ) => {
-        //alert(this.state.analysisData[2].ROI[0].contourLabel);
-        this.setState({ selectedModOption: selectedModOption});
+    handleModChange = (selectedModOption:any ) => {
+        this.setState({ selectedModOption: selectedModOption });
+        this.updatePlotImageData();
     }
 
     handleDateChange = (selectedDateOption:{value:string, label:string} ) => {
         this.setState({ selectedDateOption: selectedDateOption });
+        this.updatePlotImageData();
     }
 
     handleChange = (selectedOption: {value:string, label:string}) => {
-        this.setState({ selectedOption: selectedOption,
-                        img: this.state.analysisData[2].images[8],
-                        imgROI: this.state.analysisData[2].images[0]});
-        const data = this.state.analysisData;
-        switch (selectedOption.value) {
-            case 'min':
-                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
-                break;
-            case 'max':
-                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
-                break;
-            case 'volume':
-                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
-                break;
-            case 'activeMean':
-                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
-                break;
-            case 'matv':
-                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
-                break;
-            case 'tla':
-                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
-                break;
-            default:
-                this.setState({plotData: this.getPlotData("min", data[0], data[2])});
-                break;
-        }
+        this.setState({ selectedOption: selectedOption});
+        this.updatePlotImageData();
     }
 
     handleHover = (event: plotly.PlotMouseEvent) => {
         const imgKey = this.state.selectedOption.value + "_" + event.points[0].x + "_" + event.points[0].data.name;
-        this.setState({img: this.state.analysisData[1].images[8]});
-        this.setState({imgROI: this.state.analysisData[1].images[0]});
+        const d = event.points[0].x;
+        if (d) {
+            const imgPath = this.getImagePath(d.toString(), this.getModality(), event.points[0].data.name);
+            const oldImgPath = [this.state.img, this.state.imgROI];
+            this.setState({img: imgPath[0], imgROI: imgPath[1],
+                           oldImg: oldImgPath[0], oldImgROI: oldImgPath[1]});
+        }
     }
 
     handleUnHover = (event: plotly.PlotMouseEvent) => {
         const imgKey = this.state.selectedOption.value + "_" + event.points[0].x + "_" + event.points[0].data.name;
-        this.setState({img: this.state.analysisData[0].images[8]})
-        this.setState({imgROI: this.state.analysisData[0].images[0]});
+        this.setState({img: this.state.oldImg, imgROI: this.state.oldImgROI});
     }
 
     handleClick = (event: plotly.PlotMouseEvent) => {
         const imgKey = this.state.selectedOption.value + "_" + event.points[0].x + "_" + event.points[0].data.name;
-        //event.points[0].data.marker.color = "#9624fa"
-        //event.points[0].data.marker.symbol = "diamond-open"
-        this.setState({img: this.state.analysisData[1].images[8]});
-        this.setState({imgROI: this.state.analysisData[1].images[0]});
     }
 
     public render() {
@@ -134,19 +125,20 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
                         <td>
                             Modality:  <Select
                             clearable={false}
-                            style={{width:  150}}
+                            style={{width:  250}}
                             value={this.state.selectedModOption}
                             onChange={this.handleModChange}
                             options={MODOPTIONS}
+                            multi={true}
                         />
                         </td>
                         <td>
                             Statistics: <Select
                             clearable={false}
-                            style={{width: 150}}
+                            style={{width: 250}}
                             value={this.state.selectedOption}
                             onChange={this.handleChange}
-                            options={STATSOPTIONS}
+                            options={this.state.statOptions}
                         />
                         </td>
                         <td>
@@ -157,25 +149,9 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
                             onChange={this.handleDateChange}
                             options={this.state.timePoints} />
                         </td>
-                        <td style={{align:"right"}}>
-                            <span>
-                                <DefaultTooltip
-                                    mouseEnterDelay={0}
-                                    placement="top"
-                                    overlay={<span>Study Instance Uid:&nbsp;{this.state.imgToolTip.StudyInstanceUid}<br />
-                                                    Series Description:&nbsp;{this.state.imgToolTip.SeriesDescription}<br />
-                                                    InitialNoRois:&nbsp;{this.state.imgToolTip.InitialNoRois}<br />
-                                                    Modality:&nbsp;{this.state.selectedModOption.label}<br />
-                                                    Acqusition Date:&nbsp;{this.state.selectedDateOption.value}
-                                             </span>}
-                                >
-                                <i className="fa fa-info-circle fa-2x "></i>
-                                </DefaultTooltip>
-                            </span>
-                        </td>
                     </tr>
                     <tr>
-                        <td colSpan={2}>
+                        <td>
                             <Plot
                                   data={this.state.plotData}
                                   layout={this.state.layout}
@@ -186,16 +162,46 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
                             />
                         </td>
                         <td colSpan={2}>
-                            <img src={window.location.origin + this.state.img} />
+                            <span>
+                                <DefaultTooltip
+                                    mouseEnterDelay={0}
+                                    placement="top"
+                                    overlay={<span>Study Instance Uid:&nbsp;{this.state.imgToolTip.StudyInstanceUid}<br />
+                                                    Series Description:&nbsp;{this.state.imgToolTip.SeriesDescription}<br />
+                                                    InitialNoRois:&nbsp;{this.state.imgToolTip.InitialNoRois}<br />
+                                                    Modality:&nbsp;{this.getModality() }<br />
+                                                    Acqusition Date:&nbsp;{this.state.selectedDateOption.value}
+                                             </span>}
+                                >
+                                <img src={window.location.origin + this.state.img} />
+                                </DefaultTooltip>
+                            </span>
                         </td>
                     </tr>
                     <tr>
-                        <td colSpan={4}>
+                        <td colSpan={3}>
                             <img src={window.location.origin + this.state.imgROI} />
                         </td>
                     </tr>
                 </table>
             </div>
+        );
+    }
+
+    private getImagePath(acquisition:string, modality:string, contour: string): string[] {
+        const root = '/cbioportal/images/PSMA_Berlin/MIPs/';
+        const patientId = this.props.patientId;
+        const pid = patientId.split("-")[2];
+        const dates = this.state.timePoints.keys();
+        let timePointStr = '';
+        if (acquisition === dates[0]) {
+            timePointStr = 'BL';
+        } else {
+            timePointStr = 'FU';
+        }
+        return (
+            [root+patientId+"/pt"+pid+"_"+timePointStr+"_"+modality+"/MIP_"+contour+'.png',
+             root+patientId+"/pt"+pid+"_"+timePointStr+"_"+modality+"/outline_"+contour+'.png']
         );
     }
 
@@ -212,7 +218,7 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
             },
             name: contour,
             text: [stats +': '+ y[0] +'<br />ContourLabel: '+contour+'<br />Baseline: '+x[0] +'<br />Modality: '+
-                    modality, stats + y[1] +'<br />ContourLabel: '+ contour + ' <br />Followup: ' + x[1]
+                    modality, stats + ": " + y[1] +'<br />ContourLabel: '+ contour + ' <br />Followup: ' + x[1]
                    + '<br />Modality: ' + modality],
             hoverinfo: 'text',
         });
@@ -254,40 +260,17 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
         }
     }
 
-    private getColor(l:string): string {
-        let color = '';
-        switch(l) {
-            case 'Liver':
-                color = "Tomato";
-                break;
-            case 'LV':
-                color = "DodgerBlue";
-                break;
-            case 'Parotid':
-                color = "MediumSeaGreen";
-                break;
-            case 'LTgroin1':
-                color = "Maroon";
-                break;
-            case 'LTgroin2':
-                color = "Purple";
-                break;
-            case 'LTgroin3':
-                color = "Fuchsia";
-                break;
-            case 'LTiliacsup':
-                color = "Olive";
-                break;
-            default:
-                color = "Orange";
-                break;
-        }
-        return color;
+    private getAnalysisData(modality: string): ImageAnalysisData {
+        return this.state.analysisData.map((d: ImageAnalysisData) => {
+            if (d.modality === modality) {
+                return d;
+            }
+        });
     }
 
     private getPlotData(type:string, d1:ImageAnalysisData, d2:ImageAnalysisData): any  {
         if (d1 && d2) {
-            const contours = d1.ROI.map((r:ImageROIData) => r.contourLabel);
+            const contours = d1.ROI.map((r: ImageROIData) => r.contourLabel);
             return (
                 contours.map((l:string) => {
                     const r1 = this.getContourROI(l, d1);
@@ -296,9 +279,49 @@ export default class RadioImageReport extends React.Component<IPatientRadioImage
                     const y2 = (r2 !== undefined)? this.getStatsValue(r2, type): undefined;
                     const y = (y1 && y2)? [y1, y2]: []
                     const x = [d1.acquisitionDate, d2.acquisitionDate];
-                    return this.makePlotData(x, y, l, this.getColor(l), type, d1.modality);
+                    return this.makePlotData(x, y, l, (r1 !== undefined)? r1.color.replace(" ","")
+                                  :'Tomato', type, d1.modality);
                 })
             );
+        }
+    }
+
+    private getModality(): string {
+        const option = this.state.selectModOption;
+        if (option) {
+            return option.map((opt: { value: string, label: string }) => opt.value)[0].replace("/","");
+        } else {
+            return 'PETCT';
+        }
+    }
+
+    private updatePlotImageData() {
+        const mods = this.state.selectedModOption.map((opt: {value:string, label:string}) => opt.value);
+        let data: any;
+        let imgPath: any;
+        let plotData: any;
+        if (mods.length === 2) {
+            data = this.state.analysisData;
+            const contours = data[0].ROI.map((r: ImageROIData) => r.contourLabel);
+            imgPath = this.getImagePath(this.state.selectedDateOption.value, this.getModality(), contours[0]);
+            const plotData1 = this.getPlotData(this.state.selectedOption.value, data[0], data[2]);
+            const plotData2 = this.getPlotData(this.state.selectedOption.value, data[1], data[3]);
+            plotData = [...plotData1, ...plotData2];
+
+        } else {
+            data = this.getAnalysisData(mods[0]);
+            if (data !== undefined && data.length === 2) {
+                const contours = data[0].ROI.map((r: ImageROIData) => r.contourLabel);
+                imgPath = this.getImagePath(this.state.selectedDateOption.value, this.getModality(), contours[0]);
+                plotData = this.getPlotData(this.state.selectedOption.value, data[0], data[1]);
+            }
+        }
+        if (imgPath && plotData) {
+            this.setState({
+                img: imgPath[0],
+                imgROI: imgPath[1],
+                plotData: plotData
+            });
         }
     }
 }

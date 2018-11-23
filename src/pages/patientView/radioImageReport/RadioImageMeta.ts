@@ -8,6 +8,7 @@ export type ImageAnalysisData = {
     weight: number,
     initialNoRois: number,
     radiologicalFinding: any,
+    statsNameUnits: ImageUnitData[]
     images: any,
     ROI: ImageROIData[],
     [propName: string]: any
@@ -21,7 +22,13 @@ export type ImageROIData = {
     activeMean: number,
     matv: number,
     tla: number,
+    color: string,
     [propName: string]: any
+};
+
+export type ImageUnitData = {
+    value: string,
+    label: string,
 };
 
 export const MODOPTIONS = [

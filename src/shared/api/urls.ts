@@ -213,3 +213,7 @@ export function getDocsUrl(sourceUrl:string,docsBaseUrl?:string): string {
         return docsBaseUrl + "/" + sourceUrl;
     }
 }
+
+export function getImageUrl(patientId:string) {
+    return `http://externalClient:diz2018@technavm02.rmpuhn.ca:8080/cip_server/qa/externalRetrieve/clinicType/TF4CN/chartId/qipcm/study/QIMIM_Prostate_Cancer/mrn/${patientId}`;
+}

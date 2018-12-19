@@ -1,23 +1,22 @@
-import * as React from 'react';
-import * as _ from 'lodash';
-import $ from 'jquery';
-import {observer, inject, Observer} from "mobx-react";
-import {reaction, computed, observable, runInAction} from "mobx";
+import * as React from "react";
+import * as _ from "lodash";
+import $ from "jquery";
+import {inject, observer} from "mobx-react";
+import {computed, reaction, runInAction} from "mobx";
 import {ResultsViewPageStore, SamplesSpecificationElement} from "./ResultsViewPageStore";
 import CancerSummaryContainer from "pages/resultsView/cancerSummary/CancerSummaryContainer";
 import Mutations from "./mutation/Mutations";
 import MutualExclusivityTab from "./mutualExclusivity/MutualExclusivityTab";
 import SurvivalTab from "./survival/SurvivalTab";
 import DownloadTab from "./download/DownloadTab";
-import AppConfig from 'appConfig';
+import AppConfig from "appConfig";
 import CNSegments from "./cnSegments/CNSegments";
-import './styles.scss';
-import {genes, parseOQLQuery} from "shared/lib/oql/oqlfilter.js";
+import "./styles.scss";
 import Network from "./network/Network";
 import ResultsViewOncoprint from "shared/components/oncoprint/ResultsViewOncoprint";
 import QuerySummary from "./querySummary/QuerySummary";
 import ExpressionWrapper from "./expression/ExpressionWrapper";
-import EnrichmentsTab from 'pages/resultsView/enrichments/EnrichmentsTab';
+import EnrichmentsTab from "pages/resultsView/enrichments/EnrichmentsTab";
 import PlotsTab from "./plots/PlotsTab";
 import {MSKTab, MSKTabs} from "../../shared/components/MSKTabs/MSKTabs";
 import {PageLayout} from "../../shared/components/PageLayout/PageLayout";
@@ -27,12 +26,11 @@ import getBrowserWindow from "../../shared/lib/getBrowserWindow";
 import CoExpressionTab from "./coExpression/CoExpressionTab";
 import Helmet from "react-helmet";
 import {showCustomTab} from "../../shared/lib/customTabs";
-import {
-    getTabId, parseConfigDisabledTabs, ResultsViewTab,
-    updateStoreFromQuery
-} from "./ResultsViewPageHelpers";
+import {getTabId, parseConfigDisabledTabs, ResultsViewTab} from "./ResultsViewPageHelpers";
 import {buildResultsViewPageTitle, doesQueryHaveCNSegmentData} from "./ResultsViewPageStoreUtils";
 import {AppStore} from "../../AppStore";
+import {bind} from "bind-decorator";
+import {updateResultsViewQuery} from "./ResultsViewQuery";
 import {trackQuery} from "../../shared/lib/tracking";
 import {onMobxPromise} from "../../shared/lib/onMobxPromise";
 
@@ -119,7 +117,10 @@ function initStore() {
                             throw("INVALID QUERY");
                         }
 
-                        updateStoreFromQuery(resultsViewPageStore, query, samplesSpecification, cancerStudyIds, oql, cancerStudyIds);
+                        const changes = updateResultsViewQuery(resultsViewPageStore.rvQuery, query, samplesSpecification, cancerStudyIds, oql);
+                        if (changes.cohortIdsList) {
+                            resultsViewPageStore.initMutationAnnotationSettings();
+                        }
 
                         onMobxPromise(resultsViewPageStore.studyIds, ()=>{
                             try {
@@ -176,13 +177,13 @@ export default class ResultsViewPage extends React.Component<IResultsViewPagePro
         getBrowserWindow().resultsViewPageStore = this.resultsViewPageStore;
     }
 
-    private handleTabChange(id: string) {
-        this.props.routing.updateRoute({},`results/${id}`);
+    private handleTabChange(id: string, replace?:boolean) {
+        this.props.routing.updateRoute({},`results/${id}`, false, replace);
     }
 
     @autobind
-    private customTabMountCallback(div:HTMLDivElement,tab:any){
-        showCustomTab(div, tab, this.props.routing.location, this.resultsViewPageStore);
+    private customTabCallback(div:HTMLDivElement,tab:any, isUnmount = false){
+        showCustomTab(div, tab, this.props.routing.location, this.resultsViewPageStore, isUnmount);
     }
 
     componentWillUnmount(){
@@ -343,9 +344,9 @@ export default class ResultsViewPage extends React.Component<IResultsViewPagePro
                         {
                             (store.studies.isComplete && store.sampleLists.isComplete && store.samples.isComplete) &&
                             (<Network genes={store.genes.result!}
-                                      profileIds={store.selectedMolecularProfileIds}
+                                      profileIds={store.rvQuery.selectedMolecularProfileIds}
                                       cancerStudyId={store.studies.result[0].studyId}
-                                      zScoreThreshold={store.zScoreThreshold}
+                                      zScoreThreshold={store.rvQuery.zScoreThreshold}
                                       caseSetId={(store.sampleLists.result!.length > 0) ? store.sampleLists.result![0].sampleListId : "-1"}
                                       sampleIds={store.samples.result.map((sample)=>sample.sampleId)}
                                       caseIdsKey={""}
@@ -408,7 +409,10 @@ export default class ResultsViewPage extends React.Component<IResultsViewPagePro
             const customResultsTabs = AppConfig.serverConfig.custom_tabs.filter((tab: any) => tab.location === "RESULTS_PAGE").map((tab: any, i: number) => {
                 return (<MSKTab key={100 + i} id={'customTab' + i} unmountOnHide={(tab.unmountOnHide === true)}
                                 onTabDidMount={(div) => {
-                                    this.customTabMountCallback(div, tab)
+                                    this.customTabCallback(div, tab);
+                                }}
+                                onTabUnmount={(div) => {
+                                    this.customTabCallback(div, tab, true);
                                 }}
                                 linkText={tab.title}
                     />
@@ -465,7 +469,7 @@ export default class ResultsViewPage extends React.Component<IResultsViewPagePro
                             <QuerySummary routingStore={this.props.routing} store={this.resultsViewPageStore}/>
                         </div>
 
-                        <MSKTabs key={this.resultsViewPageStore.queryHash} activeTabId={this.currentTab(this.resultsViewPageStore.tabId)} unmountOnHide={false}
+                        <MSKTabs key={this.resultsViewPageStore.rvQuery.hash} activeTabId={this.currentTab(this.resultsViewPageStore.tabId)} unmountOnHide={false}
                                  onTabClick={(id: string) => this.handleTabChange(id)} className="mainTabs">
                             {
                                 this.tabs
@@ -479,22 +483,20 @@ export default class ResultsViewPage extends React.Component<IResultsViewPagePro
     }
 
     public render() {
-
         if (this.resultsViewPageStore.studies.isComplete && !this.resultsViewPageStore.tabId) {
             setTimeout(()=>{
-                this.handleTabChange(this.currentTab(this.resultsViewPageStore.tabId));
+                this.handleTabChange(this.currentTab(this.resultsViewPageStore.tabId), true);
             });
             return null;
         } else {
             return (
-                <PageLayout noMargin={true}>
+                <PageLayout noMargin={true} hideFooter={true} className={"subhead-dark"}>
                     {
                         this.pageContent
                     }
                 </PageLayout>
             )
         }
-
     }
 
 

@@ -23,12 +23,23 @@ class ClinicalDataTabTableComponent extends LazyMobXTable<{ [id: string]: string
 @observer
 export class ClinicalDataTab extends React.Component<IClinicalDataTabTable, {}> {
 
-    getDefaultColumnConfig(key: string) {
+    getDefaultColumnConfig(key: string, columnName:string, isNumber?: boolean) {
         return {
-            name: '',
-            render: (data: { [id: string]: string }) => <span>{data[key]}</span>,
+            name: columnName || '',
+            headerRender: (data: string) => <span data-test={data}>{data}</span>,
+            render: (data: { [id: string]: string }) => <span data-test={data[key]}>{data[key]}</span>,
             download: (data: { [id: string]: string }) => data[key] || '',
-            sortBy: (data: { [id: string]: string }) => data[key],
+            sortBy: (data: { [id: string]: any }) => {
+                if (data[key]) {
+                    if (isNumber) {
+                        return parseFloat(data[key]);
+                    }
+                    else {
+                        return data[key];
+                    }
+                }
+                return null;
+            },
             filter: (data: { [id: string]: string }, filterString: string, filterStringUpper: string) => (data[key] || '').toUpperCase().includes(filterStringUpper)
         };
     }
@@ -36,30 +47,26 @@ export class ClinicalDataTab extends React.Component<IClinicalDataTabTable, {}> 
     readonly columns = remoteData({
         invoke: async () => {
             let defaultColumns: Column<{ [id: string]: string }>[] = [{
-                ...this.getDefaultColumnConfig('patientId'),
+                ...this.getDefaultColumnConfig('patientId', 'Patient ID'),
                 render: (data: { [id: string]: string }) => {
                     return <a href={getPatientViewUrl(data.studyId, data.patientId)}
                               target='_blank'>{data.patientId}</a>
-                },
-                name: 'Patient ID'
+                }
             }, {
-                ...this.getDefaultColumnConfig('sampleId'),
+                ...this.getDefaultColumnConfig('sampleId', 'Sample ID'),
                 render: (data: { [id: string]: string }) => {
                     return <a href={getSampleViewUrl(data.studyId, data.sampleId)} target='_blank'>{data.sampleId}</a>
-                },
-                name: 'Sample ID'
+                }
             }, {
-                ...this.getDefaultColumnConfig('studyId'),
-                name: 'Cancer Study'
+                ...this.getDefaultColumnConfig('studyId', 'Cancer Study')
             }];
             // Descent sort priority then ascent sort by display name
             return _.reduce(this.props.store.visibleAttributes,
                 (acc: Column<{ [id: string]: string }>[], chartMeta: ChartMeta, index: number) => {
                     if (chartMeta.clinicalAttribute !== undefined) {
                         acc.push({
-                            ...this.getDefaultColumnConfig(getClinicalAttributeUniqueKey(chartMeta.clinicalAttribute)),
-                            tooltip: getClinicalAttributeOverlay(chartMeta.clinicalAttribute.displayName, chartMeta.description ? chartMeta.description : ''),
-                            name: chartMeta.clinicalAttribute.displayName
+                            ...this.getDefaultColumnConfig(getClinicalAttributeUniqueKey(chartMeta.clinicalAttribute), chartMeta.clinicalAttribute.displayName, chartMeta.clinicalAttribute.datatype === "NUMBER"),
+                            tooltip: getClinicalAttributeOverlay(chartMeta.clinicalAttribute.displayName, chartMeta.description ? chartMeta.description : '')
                         });
                     }
                     return acc;
@@ -78,6 +85,7 @@ export class ClinicalDataTab extends React.Component<IClinicalDataTabTable, {}> 
 
     public render() {
         return (
+            <span data-test="clinical-data-tab-content">
             <WindowWidthBox offset={60}>
                 <If condition={this.columns.isPending || this.props.store.getDataForClinicalDataTab.isPending}>
                     <Then>
@@ -103,6 +111,7 @@ export class ClinicalDataTab extends React.Component<IClinicalDataTabTable, {}> 
                     </Else>
                 </If>
             </WindowWidthBox>
+            </span>
         );
     }
 }

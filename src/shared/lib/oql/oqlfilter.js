@@ -206,8 +206,8 @@ export function unparseOQLQueryLine(parsed_oql_query_line) {
     ret += gene;
     if (alterations.length > 0) {
         ret += ": " + alterations.map(parsedOQLAlterationToSourceOQL).join(" ");
+        ret += ";";
     }
-    ret += ";";
     return ret;
 };
 
@@ -757,7 +757,7 @@ export function filterCBioPortalWebServiceDataByUnflattenedOQLLine(oql_query, da
 // }
 
 
-export function genes(oql_query) {
+export function uniqueGenesInOQLQuery(oql_query) {
     var parse_result = parseOQLQuery(oql_query);
     var genes = parse_result.filter(function (q_line) {
         return q_line.gene.toLowerCase() !== "datatypes";

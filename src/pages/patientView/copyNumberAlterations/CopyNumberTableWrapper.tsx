@@ -128,9 +128,9 @@ export default class CopyNumberTableWrapper extends React.Component<ICopyNumberT
 
         columns.push({
             name: "Cytoband",
-            render: (d:DiscreteCopyNumberData[])=><span>{d[0].gene.cytoband}</span>,
-            download: (d:DiscreteCopyNumberData[])=>d[0].gene.cytoband,
-            sortBy: (d:DiscreteCopyNumberData[])=>d[0].gene.cytoband,
+            render: (d:DiscreteCopyNumberData[])=><span>{d[0].cytoband}</span>,
+            download: (d:DiscreteCopyNumberData[])=>d[0].cytoband,
+            sortBy: (d:DiscreteCopyNumberData[])=>d[0].cytoband,
             visible: true,
             order: 60
         });

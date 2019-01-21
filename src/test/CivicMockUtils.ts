@@ -75,7 +75,7 @@ export function getCnaData(): Array<DiscreteCopyNumberData>
 {
     return [{alteration: 2, entrezGeneId: 5894, gene: {chromosome: "3", cytoband:"3p25", entrezGeneId: 5894, hugoGeneSymbol: "RAF1", length: 7847, 
            type: "protein-coding"}, molecularProfileId: "ccle_gistic", sampleId: "NCIH508_LARGE_INTESTINE", patientId:"PATIENT1", studyId: "STUDY1",
-           uniquePatientKey: "", uniqueSampleKey: ""}];
+           uniquePatientKey: "", uniqueSampleKey: "", cytoband:"3p25"}];
 }
 
 export function getMutationData(): Mutation
@@ -88,7 +88,7 @@ export function getMutationData(): Mutation
        proteinPosStart: 545, referenceAllele: "G", refseqMrnaId: "NM_006218.2", sampleId: "NCIH508_LARGE_INTESTINE", patientId: "PATIENT1",
        studyId: "STUDY1", uniquePatientKey: "", uniqueSampleKey: "", startPosition: 178936091, tumorAltCount: -1, tumorRefCount: -1,
        validationStatus: "NA", variantAllele: "A", variantType: "SNP", aminoAcidChange: "", driverFilter: "", driverFilterAnnotation: "", driverTiersFilter: "",
-       driverTiersFilterAnnotation: "", /*wildType:false,
+       driverTiersFilterAnnotation: "", chr: "3"/*wildType:false,
         sequenced:true*/
    };
 }

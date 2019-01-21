@@ -27,7 +27,8 @@ describe('CohortColumnFormatter', () => {
             patientId: "PATIENT1",
             studyId: "STUDY1",
             uniquePatientKey: "",
-            uniqueSampleKey: ""
+            uniqueSampleKey: "",
+            cytoband: ""
         },
         {
             alteration: 2,
@@ -45,7 +46,8 @@ describe('CohortColumnFormatter', () => {
             patientId: "PATIENT1",
             studyId: "STUDY1",
             uniquePatientKey: "",
-            uniqueSampleKey: ""
+            uniqueSampleKey: "",
+            cytoband: ""
         }
     ];
 

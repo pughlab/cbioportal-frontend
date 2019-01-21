@@ -46,6 +46,8 @@ export type CancerStudy = {
 
         'studyId': string
 
+        'referenceGenome': string
+
 };
 export type ClinicalAttribute = {
     'clinicalAttributeId': string
@@ -193,6 +195,8 @@ export type DiscreteCopyNumberData = {
         'uniquePatientKey': string
 
         'uniqueSampleKey': string
+
+        'cytoband': string
 
 };
 export type DiscreteCopyNumberFilter = {
@@ -373,6 +377,8 @@ export type Mutation = {
         'variantAllele': string
 
         'variantType': string
+
+        'chr': string
 
 };
 export type MutationCountByPosition = {

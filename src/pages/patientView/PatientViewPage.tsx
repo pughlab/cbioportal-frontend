@@ -183,7 +183,16 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
         return patientViewPageStore.pathologyReport.isComplete && patientViewPageStore.pathologyReport.result.length > 0;
     }
 
-    hideTissueImageTab(){
+    private getSlideId(data:Array<ClinicalData>):string {
+        for (const row in data) {
+            if (data[row]['clinicalAttributeId'] === 'SLIDE_ID') {
+                return data[row]['value'];
+            }
+        }
+        return '';
+    }
+
+    private hideTissueImageTab(){
         return patientViewPageStore.hasTissueImageIFrameUrl.isPending || patientViewPageStore.hasTissueImageIFrameUrl.isError
             || (patientViewPageStore.hasTissueImageIFrameUrl.isComplete && !patientViewPageStore.hasTissueImageIFrameUrl.result);
     }
@@ -538,11 +547,23 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                     {
                         (AppConfig.serverConfig.custom_tabs) && AppConfig.serverConfig.custom_tabs.filter((tab:any)=>tab.location==="PATIENT_PAGE").map((tab:any, i:number)=>{
                                 return (<MSKTab key={100+i} id={'customTab'+1} unmountOnHide={(tab.unmountOnHide===true)}
-                                                        onTabDidMount={(div)=>{ this.customTabMountCallback(div, tab) }} linkText={tab.title}>
+                                                        onTabDidMount={(div)=>{ this.customTabMountCallback(div, tab); }} linkText={tab.title}>
 
                                 </MSKTab>);
                         })
                     }
+                    <MSKTab key={6} id="radiologyDataTab" linkText="Radiology Images" hide={!['PSMA_Imaging'].includes(patientViewPageStore.studyId)
+                            || !['DCFPYL-1-21-NWI'].includes(patientViewPageStore.patientId)}>
+                            <div className="clearfix">
+                                <FeatureTitle title=""
+                                              isLoading={ patientViewPageStore.clinicalDataPatient.isPending }
+                                              className="pull-left"/>
+                                { (patientViewPageStore.clinicalDataPatient.isComplete) && (
+                                    <RadioImageReport patientId={patientViewPageStore.patientId} studyId={patientViewPageStore.studyId}/>
+                                )
+                                }
+                            </div>
+                    </MSKTab>
                     <MSKTab key={7} id="pathSlidesTab" linkText="Pathology Slides"
                             hide={patientViewPageStore.clinicalDataPatient.isError ||
                             (patientViewPageStore.clinicalDataPatient.isComplete &&
@@ -562,26 +583,6 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                         </div>
                     </MSKTab>
                     </MSKTabs>
-                                        </MSKTab>)
-                                    })
-                                }
-                                {(patientViewPageStore.pageMode === 'patient') && (
-                                    <MSKTab key={6} id="radiologyDataTab" linkText="Radiology Images" hide={patientViewPageStore.studyId !== 'PSMA_Imaging'}>
-
-                                        <div className="clearfix">
-                                            <FeatureTitle title=""
-                                                          isLoading={ patientViewPageStore.clinicalDataPatient.isPending }
-                                                          className="pull-left"/>
-                                            { (patientViewPageStore.clinicalDataPatient.isComplete) && (
-                                                <RadioImageReport patientId={patientViewPageStore.patientId}/>
-                                            )
-                                            }
-                                        </div>
-                                    </MSKTab>
-                                )}
-
-                            </MSKTabs>
-
                         </Then>
                         <Else>
                             <LoadingIndicator isLoading={true} center={true} size={"big"}/>

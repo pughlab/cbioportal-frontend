@@ -13,7 +13,8 @@ import {buildCBioPortalPageUrl, getLegacyCopyNumberUrl} from '../../../shared/ap
 interface CNSegmentsIframeProps {
     sampleIds:string[];
     studyId:string;
-    gene:Gene
+    gene:Gene;
+    genome:string;
 }
 
 class CNASegmentIframe extends React.Component<CNSegmentsIframeProps,{}>{
@@ -42,10 +43,12 @@ class CNASegmentIframe extends React.Component<CNSegmentsIframeProps,{}>{
 
 
         var bodyContent1 = '<body style="margin:0"><div id="igvDiv" style="padding-top: 10px;padding-bottom: 10px;"></div><script type="text/javascript">  $(document).ready(function () {    var div = $("#igvDiv"),   options = {'
-            + 'divId: "igvDiv", showNavigation: true, showRuler: true, genome: "hg19", divId: "igvDiv", locus: "' + this.props.gene.hugoGeneSymbol + '", tracks: [  { url:"'+getLegacyCopyNumberUrl()+'" , indexed: false, isLog: true, contentType: "application/x-www-form-urlencoded", name: "Alt click to sort", type:"seg", json: true, method: "POST", ';
+            + 'divId: "igvDiv", showNavigation: true, showRuler: true, genome:"' + this.props.genome + '", locus: "' + this.props.gene.hugoGeneSymbol + '", tracks: [  { url:"'+getLegacyCopyNumberUrl()+'" , indexed: false, isLog: true, contentType: "application/x-www-form-urlencoded", name: "Alt click to sort", type:"seg", json: true, method: "POST", ';
 
-        var bodyContent2 = 'height: ' + segmentTrackHeight + ', sendData: "cancerStudyId=' + this.props.studyId + '&chromosomes=' + this.props.gene.chromosome +'&sampleIds=' + this.props.sampleIds.join(',') + '"},{name: "Genes", url: "https://s3.amazonaws.com/igv.broadinstitute.org/annotations/hg19/genes/gencode.v18.collapsed.bed", order: Number.MAX_VALUE,  displayMode: "EXPANDED"}]};igv.createBrowser(div, options);});<\/script><\/body>';
-
+        var bodyContent2 = 'height: ' + segmentTrackHeight + ', sendData: "cancerStudyId=' + this.props.studyId + '&chromosomes=' + this.props.gene.chromosome +'&sampleIds=' + this.props.sampleIds.join(',') + '"},{name: "Gencode v18", url: "https://s3.amazonaws.com/igv.broadinstitute.org/annotations/hg19/genes/gencode.v18.collapsed.bed", order: Number.MAX_VALUE,  displayMode: "EXPANDED"}]};igv.createBrowser(div, options);});<\/script><\/body>';
+        if (this.props.genome === 'hg38') {
+            bodyContent2 = 'height: ' + segmentTrackHeight + ', sendData: "cancerStudyId=' + this.props.studyId + '&chromosomes=' + this.props.gene.chromosome +'&sampleIds=' + this.props.sampleIds.join(',') + '"},{name: "Gencode v24", url: "https://s3.amazonaws.com/igv.broadinstitute.org/data/hg38/gencode.v24.annotation.sorted.gtf.gz", indexURL:"https://s3.amazonaws.com/igv.broadinstitute.org/data/hg38/gencode.v24.annotation.sorted.gtf.gz.tbi", visibilityWindow: 10000000, order: Number.MAX_VALUE,  displayMode: "EXPANDED", format: "gtf",}]};igv.createBrowser(div, options);});<\/script><\/body>';
+        }
         return headerContent + bodyContent1 + bodyContent2;
         
     }
@@ -101,7 +104,7 @@ class CNASegmentIframe extends React.Component<CNSegmentsIframeProps,{}>{
                     &nbsp;<button onClick={this.downloadSegmentData} className="btn btn-default btn-sm">Download</button>
                 </p>
             </div>
-        )
+        );
         
     }
     
@@ -124,13 +127,14 @@ export default class CNSegments extends React.Component<{ store: ResultsViewPage
                             <CNASegmentIframe studyId={this.props.store.studyIds.result![0]}
                                               sampleIds={this.props.store.samples.result!.map((sample:Sample)=>sample.sampleId)}
                                               gene={gene}
+                                              genome={this.props.store.studies.result[0].referenceGenome}
                             />
-                        </MSKTab>
+                        </MSKTab>;
                     })
                 }
             </MSKTabs>);
         } else {
-            return null
+            return null;
         }
 
 

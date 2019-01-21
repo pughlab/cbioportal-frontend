@@ -43,18 +43,19 @@ export const STATSOPTIONS = [
     { value: 'volume', label: 'Volume[ml]'},
     { value: 'activeMean', label: 'Standard Deviation[SUVbw]'},
     { value: 'matv', label:'SUV Peak[SUVbw]'},
-    { value: 'tla', label:'RECIST Long[cm]'}
+    { value: 'tla', label:'RECIST Long[mm]'}
 ];
 
 export const LAYOUT = {
     plotBackground: '#f3f6fa',
     margin: {t:30, r: 0, l: 40, b: 30, pad: 5},
-    title:'Standard Uptake Value (as Calculated using Body Weight)',
-    titlefont: {
-        "size": 12,
-    },
     hovermode: 'closest',
     autosize: false,
-    width: 500,
+    width: 600,
     height: 360,
+    showlegend: true,
+    legend: {
+        x: 1,
+        y: 1
+    }
 };

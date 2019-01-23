@@ -233,7 +233,8 @@
     "webpack": "^3.10.0",
     "webpack-fail-plugin": "^1.0.5",
     "webpack-raphael": "^2.1.4",
-    "word-wrap": "^1.2.3"
+    "word-wrap": "^1.2.3",
+    "yarn": "^1.13.0"
   },
   "devDependencies": {
     "@types/plotly.js": "^1.38.13",

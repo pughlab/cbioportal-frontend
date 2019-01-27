@@ -209,6 +209,9 @@ export function getDocsUrl(sourceUrl:string,docsBaseUrl?:string): string {
     }
 }
 
+export function getWholeSlideViewerUrl(ids: string[], userName: string): string {
+    return ids.length > 1 ? `https://slides-res.mskcc.org/cbioportal?ids=${ids.join(';')}&user=${userName}&annotation=off` : ids.length === 1 ? `https://slides-res.mskcc.org/cbioportal?ids=${ids.join(';')}&user=${userName}&annotation=off&filetree=off` : "";
+}
 export function getImageUrl(patientId:string) {
     return `http://externalClient:diz2018@technavm02.rmpuhn.ca:8080/cip_server/qa/externalRetrieve/clinicType/TF4CN/chartId/qipcm/study/QIMIM_Prostate_Cancer/mrn/${patientId}`;
 }

@@ -21,7 +21,7 @@ export default class TumorAlleleFreqColumnFormatter
                 arrowContent={<div className="rc-tooltip-arrow-inner"/>}
                 destroyTooltipOnHide={true}
             >
-                <span>{frequency.toFixed(2)}</span>
+                <span>{frequency.toFixed(3)}</span>
             </DefaultTooltip>
         );
     }

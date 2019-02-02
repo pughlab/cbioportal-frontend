@@ -271,7 +271,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                                     <span style={{display:'inline-flex'}}>
                                         {'\u00A0'}
                                         {(isPDX && getMouseIcon()) || (isCfDNA && getcfDNAIcon())}
-                                        {(isPDX && '\u00A0') || (isCfDNA && '\u00A0')}
+                                        {(isPDX && '\u00A0') || (isCfDNA )}
                                         <a
                                             href={getSampleViewUrl(patientViewPageStore.studyMetaData.result!.studyId, sample.id)}
                                             target="_blank"

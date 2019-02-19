@@ -276,8 +276,8 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
 
     @computed private get domainMap(): {[pfamAccession:string]: PfamDomain}
     {
-        if (!this.props.store.pfamDomainData.isPending && 
-            this.props.store.pfamDomainData.result && 
+        if (!this.props.store.pfamDomainData.isPending &&
+            this.props.store.pfamDomainData.result &&
             this.props.store.pfamDomainData.result.length > 0) {
             return _.keyBy(this.props.store.pfamDomainData.result, 'pfamAccession');
         }
@@ -355,12 +355,6 @@ export default class LollipopMutationPlot extends React.Component<ILollipopMutat
                 const value = parseInt(inputValue, 10);
                 this._yMaxInput = value < this.countRange[0] ? this.countRange[0] : value;
             }),
-            onYMaxInputFocused:()=>{
-                this.yMaxInputFocused = true;
-            },
-            onYMaxInputBlurred:()=>{
-                this.yMaxInputFocused = false;
-            },
             onYMaxInputFocused:()=>{
                 this.yMaxInputFocused = true;
             },

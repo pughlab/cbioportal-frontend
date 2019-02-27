@@ -9,7 +9,7 @@ import _ from "lodash";
 import {MSKTab, MSKTabs} from "../../../shared/components/MSKTabs/MSKTabs";
 import CoExpressionViz from "./CoExpressionViz";
 import LoadingIndicator from "shared/components/loadingIndicator/LoadingIndicator";
-import {filterAndSortProfiles} from "./CoExpressionTabUtils";
+import {CoExpressionWithQ, filterAndSortProfiles} from "./CoExpressionTabUtils";
 import MobxPromiseCache from "../../../shared/lib/MobxPromiseCache";
 import {ICoExpressionPlotProps} from "./CoExpressionPlot";
 import {bind} from "bind-decorator";
@@ -48,7 +48,8 @@ export default class CoExpressionTab extends React.Component<ICoExpressionTabPro
 
     @observable private plotState = {
         plotLogScale: false,
-        plotShowMutations: true
+        plotShowMutations: true,
+        plotShowRegressionLine: false
     };
 
     private plotHandlers: ICoExpressionPlotProps["handlers"];
@@ -64,6 +65,9 @@ export default class CoExpressionTab extends React.Component<ICoExpressionTabPro
             }),
             onClickShowMutations: action(()=>{
                 this.plotState.plotShowMutations = !this.plotState.plotShowMutations;
+            }),
+            onClickShowRegressionLine: action(()=>{
+                this.plotState.plotShowRegressionLine = !this.plotState.plotShowRegressionLine;
             })
         };
     }

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as _ from "lodash";
-import {DiscreteCopyNumberData} from "shared/api/generated/CBioPortalAPI";
+import {CancerStudy, DiscreteCopyNumberData} from "shared/api/generated/CBioPortalAPI";
 import {
     IAnnotation, IAnnotationColumnProps, default as DefaultAnnotationColumnFormatter
 } from "shared/components/mutationTable/column/AnnotationColumnFormatter";
@@ -10,8 +10,7 @@ import Civic from "shared/components/annotation/Civic";
 import {generateQueryVariantId, generateQueryVariant} from "shared/lib/OncoKbUtils";
 import {IndicatorQueryResp, Query} from "shared/api/generated/OncoKbAPI";
 import {getAlterationString} from "shared/lib/CopyNumberUtils";
-import {ICivicVariant, ICivicGene, ICivicEntry, ICivicVariantData, ICivicGeneData,
-        ICivicGeneDataWrapper, ICivicVariantDataWrapper} from "shared/model/Civic.ts";
+import {ICivicVariant, ICivicGene, ICivicEntry, ICivicVariantData, ICivicGeneData, ICivicGeneDataWrapper, ICivicVariantDataWrapper} from "shared/model/Civic.ts";
 import {buildCivicEntry, getCivicCNAVariants} from "shared/lib/CivicUtils";
 import {ITrialMatchVariant, ITrialMatchGene, ITrialMatchEntry, ITrialMatchVariantData, ITrialMatchGeneData,
         ITrialMatchGeneDataWrapper, ITrialMatchVariantDataWrapper} from "shared/model/TrialMatch.ts";
@@ -27,6 +26,8 @@ export default class AnnotationColumnFormatter
                           oncoKbAnnotatedGenes:{[entrezGeneId:number]:boolean}|Error,
                           oncoKbData?: IOncoKbDataWrapper,
                           civicGenes?: ICivicGeneDataWrapper,
+                          civicVariants?: ICivicVariantDataWrapper,
+                          studyIdToStudy?: {[studyId:string]:CancerStudy})
                           civicVariants?: ICivicVariantDataWrapper,
                           trialMatchGenes?: ITrialMatchGeneDataWrapper,
                           trialMatchVariants?: ITrialMatchVariantDataWrapper,)
@@ -52,7 +53,7 @@ export default class AnnotationColumnFormatter
                     !(oncoKbData.result instanceof Error) &&
                     oncoKbData.status === "complete")
                 {
-                    oncoKbIndicator = AnnotationColumnFormatter.getIndicatorData(copyNumberData, oncoKbData.result);
+                    oncoKbIndicator = AnnotationColumnFormatter.getIndicatorData(copyNumberData, oncoKbData.result, studyIdToStudy);
                 }
                 oncoKbStatus = oncoKbData ? oncoKbData.status : "pending";
             }
@@ -92,32 +93,31 @@ export default class AnnotationColumnFormatter
     * Returns an ICivicEntry if the civicGenes and civicVariants have information about the gene and the mutation (variant) specified. Otherwise it returns
     * an empty object.
     */
+    public static getCivicEntry(copyNumberData:DiscreteCopyNumberData[], civicGenes:ICivicGene,
+                                civicVariants:ICivicVariant): ICivicEntry | null
+    {
+        let civicEntry = null;
+        let geneSymbol: string = copyNumberData[0].gene.hugoGeneSymbol;
+        let geneVariants:{[name: string]: ICivicVariantData} = getCivicCNAVariants(copyNumberData, geneSymbol, civicVariants);
+        let geneEntry: ICivicGeneData = civicGenes[geneSymbol];
+        //Only return data for genes with variants or it has a description provided by the Civic API
+        if (!_.isEmpty(geneVariants) || geneEntry && geneEntry.description !== "") {
+            civicEntry = buildCivicEntry(geneEntry, geneVariants);
+        }
 
-   public static getCivicEntry(copyNumberData:DiscreteCopyNumberData[], civicGenes:ICivicGene,
-                               civicVariants:ICivicVariant): ICivicEntry | null
-   {
-       let civicEntry = null;
-       let geneSymbol: string = copyNumberData[0].gene.hugoGeneSymbol;
-       let geneVariants:{[name: string]: ICivicVariantData} = getCivicCNAVariants(copyNumberData, geneSymbol, civicVariants);
-       let geneEntry: ICivicGeneData = civicGenes[geneSymbol];
-       //Only return data for genes with variants or it has a description provided by the Civic API
-       if (!_.isEmpty(geneVariants) || geneEntry && geneEntry.description !== "") {
-           civicEntry = buildCivicEntry(geneEntry, geneVariants);
-       }
-
-       return civicEntry;
-   }
+        return civicEntry;
+    }
 
     public static getCivicStatus(civicGenesStatus:"pending" | "error" | "complete", civicVariantsStatus:"pending" | "error" | "complete"): "pending" | "error" | "complete"
     {
-        if (civicGenesStatus === "error" || civicVariantsStatus === "error") {
-            return "error";
-        }
-        if (civicGenesStatus === "complete" && civicVariantsStatus === "complete") {
-            return "complete";
-        }
+    if (civicGenesStatus === "error" || civicVariantsStatus === "error") {
+        return "error";
+    }
+    if (civicGenesStatus === "complete" && civicVariantsStatus === "complete") {
+        return "complete";
+    }
 
-        return "pending";
+    return "pending";
     }
 
     public static hasCivicVariants (copyNumberData:DiscreteCopyNumberData[], civicGenes:ICivicGene, civicVariants:ICivicVariant): boolean
@@ -173,7 +173,7 @@ export default class AnnotationColumnFormatter
         return true;
     }
 
-    public static getIndicatorData(copyNumberData:DiscreteCopyNumberData[], oncoKbData:IOncoKbData): IndicatorQueryResp|undefined
+    public static getIndicatorData(copyNumberData:DiscreteCopyNumberData[], oncoKbData:IOncoKbData, studyIdToStudy?: {[studyId:string]:CancerStudy}): IndicatorQueryResp|undefined
     {
         if (oncoKbData.uniqueSampleKeyToTumorType === null || oncoKbData.indicatorMap === null) {
             return undefined;
@@ -183,7 +183,14 @@ export default class AnnotationColumnFormatter
             oncoKbData.uniqueSampleKeyToTumorType[copyNumberData[0].uniqueSampleKey],
             getAlterationString(copyNumberData[0].alteration));
 
-        return oncoKbData.indicatorMap[id];
+        let indicator = oncoKbData.indicatorMap[id];
+        if (indicator.query.tumorType === null && studyIdToStudy) {
+            const studyMetaData = studyIdToStudy[copyNumberData[0].studyId];
+            if (studyMetaData.cancerTypeId !== "mixed") {
+                indicator.query.tumorType = studyMetaData.cancerType.name;
+            }
+        }
+        return indicator;
     }
 
     public static getEvidenceQuery(copyNumberData:DiscreteCopyNumberData[], oncoKbData:IOncoKbData): Query|undefined
@@ -210,6 +217,7 @@ export default class AnnotationColumnFormatter
 
     public static renderFunction(data:DiscreteCopyNumberData[], columnProps:IAnnotationColumnProps)
     {
+        const annotation:IAnnotation = AnnotationColumnFormatter.getData(data, columnProps.oncoKbAnnotatedGenes, columnProps.oncoKbData, columnProps.civicGenes, columnProps.civicVariants, columnProps.studyIdToStudy);
         const annotation:IAnnotation = AnnotationColumnFormatter.getData(data, columnProps.oncoKbAnnotatedGenes,
             columnProps.oncoKbData, columnProps.civicGenes, columnProps.civicVariants, columnProps.trialMatchGenes, columnProps.trialMatchVariants);
 

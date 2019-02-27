@@ -1,8 +1,8 @@
 import {
     Gene, NumericGeneMolecularData, GenePanel, GenePanelData, MolecularProfile,
-    Mutation, Patient, Sample, CancerStudy
+    Mutation, Patient, Sample, CancerStudy, ClinicalAttribute
 } from "../../shared/api/generated/CBioPortalAPI";
-import {action} from "mobx";
+import {action, computed} from "mobx";
 import AccessorsForOqlFilter, {getSimplifiedMutationType} from "../../shared/lib/oql/AccessorsForOqlFilter";
 import {
     OQLLineFilterOutput,
@@ -19,7 +19,7 @@ import {
     AnnotatedMutation,
     CaseAggregatedData,
     IQueriedCaseData,
-    IQueriedMergedTrackCaseData
+    IQueriedMergedTrackCaseData, ResultsViewPageStore
 } from "./ResultsViewPageStore";
 import {IndicatorQueryResp} from "../../shared/api/generated/OncoKbAPI";
 import _ from "lodash";
@@ -32,6 +32,7 @@ import MobxPromise, {MobxPromise_await} from "mobxpromise";
 import {AlterationEnrichment} from "../../shared/api/generated/CBioPortalAPIInternal";
 import {remoteData} from "../../shared/api/remoteData";
 import {calculateQValues} from "../../shared/lib/calculation/BenjaminiHochbergFDRCalculator";
+import {SpecialAttribute} from "../../shared/cache/ClinicalDataCache";
 
 type CustomDriverAnnotationReport = {
     hasBinary: boolean,
@@ -39,6 +40,13 @@ type CustomDriverAnnotationReport = {
 };
 
 type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
+
+export type ExtendedClinicalAttribute =
+    Pick<ClinicalAttribute, "datatype"|"description"|"displayName"|"patientAttribute"> &
+    {
+        clinicalAttributeId: string|SpecialAttribute;
+        molecularProfileIds?:string[];
+    };
 
 export type CoverageInformationForCase = {
     byGene:{[hugoGeneSymbol:string]:GenePanelData[]},
@@ -443,16 +451,27 @@ export function getMultipleGeneResultKey(groupedOql: MergedTrackLineFilterOutput
     return groupedOql.label ? groupedOql.label : _.map(groupedOql.list, (data) => data.gene).join(' / ');
 }
 
-export function makeEnrichmentDataPromise<T extends {pValue:number, qValue?:number}>(params:{
+export function makeEnrichmentDataPromise<T extends {hugoGeneSymbol:string, pValue:number, qValue?:number}>(params:{
+    store:ResultsViewPageStore,
     await: MobxPromise_await,
-    shouldFetchData:()=>boolean,
+    getSelectedProfile:()=>MolecularProfile|undefined,
     fetchData:()=>Promise<T[]>
 }):MobxPromise<(T & {qValue:number})[]> {
     return remoteData({
-        await: params.await,
+        await: ()=>params.await().concat([params.store.selectedMolecularProfiles]),
         invoke:async()=>{
-            if (params.shouldFetchData()) {
-                const data = await params.fetchData();
+            const profile = params.getSelectedProfile();
+            if (profile) {
+                let data = await params.fetchData();
+
+                // filter out query genes, if looking at a queried profile
+                // its important that we filter out *before* calculating Q values
+                if (params.store.selectedMolecularProfiles.result!
+                        .findIndex(x=>x.molecularProfileId === profile.molecularProfileId) > -1) {
+                    const queryGenes = _.keyBy(params.store.hugoGeneSymbols, x=>x.toUpperCase());
+                    data = data.filter(d=>!(d.hugoGeneSymbol.toUpperCase() in queryGenes));
+                }
+
                 const sortedByPvalue = _.sortBy(data, c=>c.pValue);
                 const qValues = calculateQValues(sortedByPvalue.map(c=>c.pValue));
                 qValues.forEach((qValue, index)=>{

@@ -1,5 +1,4 @@
 import * as React from "react";
-import {Modal} from "react-bootstrap";
 import {observer} from "mobx-react";
 import {Circle} from "better-react-spinkit";
 import DefaultTooltip from "shared/components/defaultTooltip/DefaultTooltip";
@@ -14,10 +13,14 @@ import {
 } from "shared/lib/OncoKbUtils";
 import {observable} from "mobx";
 import OncoKbEvidenceCache from "shared/cache/OncoKbEvidenceCache";
-import OncoKbTooltip from "./OncoKbTooltip";
 import OncokbPubMedCache from "shared/cache/PubMedCache";
+import {errorIcon, loaderIcon} from "./StatusHelpers";
+import OncoKbTooltip from "./OncoKbTooltip";
+import OncoKbFeedback from "./OncoKbFeedback";
 import {default as TableCellStatusIndicator, TableCellStatus} from "shared/components/TableCellStatus";
 import AppConfig from "appConfig";
+import {getCurrentURLWithoutHash} from "../../api/urls";
+import {Modal} from 'react-bootstrap';
 
 export interface IOncoKbProps {
     status: "pending" | "error" | "complete";
@@ -96,10 +99,10 @@ export default class OncoKB extends React.Component<IOncoKbProps, {}>
         );
 
         if (this.props.status === "error") {
-            oncoKbContent = this.errorIcon();
+            oncoKbContent = errorIcon("Error fetching OncoKB data");
         }
         else if (this.props.status === "pending") {
-            oncoKbContent = this.loaderIcon();
+            oncoKbContent = loaderIcon("pull-left");
         }
         else
         {
@@ -118,7 +121,13 @@ export default class OncoKB extends React.Component<IOncoKbProps, {}>
                 oncoKbContent = (
                     <span>
                         {oncoKbContent}
-                        {this.feedbackModal(this.props.hugoGeneSymbol, this.props.evidenceQuery && this.props.evidenceQuery.alteration)}
+                        <OncoKbFeedback
+                            userEmailAddress={this.props.userEmailAddress}
+                            hugoSymbol={this.props.hugoGeneSymbol}
+                            alteration={this.props.evidenceQuery ? this.props.evidenceQuery.alteration : undefined}
+                            showFeedback={this.showFeedback}
+                            handleFeedbackClose={this.handleFeedbackClose}
+                        />
                     </span>
                 );
             }
@@ -170,7 +179,7 @@ export default class OncoKB extends React.Component<IOncoKbProps, {}>
         const geneParam = `entry.1744186665=${hugoSymbol || ''}`;
         const alterationParam = `entry.1671960263=${alteration || ''}`;
         const userParam = `entry.1381123986=${this.props.userEmailAddress || ''}`;
-        const uriParam = `entry.1083850662=${encodeURIComponent(window.location.href)}`;
+        const uriParam = `entry.1083850662=${encodeURIComponent(getCurrentURLWithoutHash())}`;
 
         return (
             <Modal show={this.showFeedback} onHide={this.handleFeedbackClose}>

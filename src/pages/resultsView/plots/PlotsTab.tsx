@@ -9,14 +9,41 @@ import ReactSelect from "react-select";
 import _ from "lodash";
 import {
     getAxisDescription,
-    getAxisLabel, IScatterPlotData, isNumberData, isStringData, logScalePossible,
-    makeAxisDataPromise, makeScatterPlotData, makeScatterPlotPointAppearance, dataTypeDisplayOrder,
-    dataTypeToDisplayType, scatterPlotTooltip, scatterPlotLegendData, IStringAxisData, INumberAxisData,
-    makeBoxScatterPlotData, IScatterPlotSampleData, noMutationAppearance, IBoxScatterPlotPoint, boxPlotTooltip,
-    getCnaQueries, getMutationQueries, getScatterPlotDownloadData, getBoxPlotDownloadData,
-    mutationRenderPriority, mutationSummaryRenderPriority, MutationSummary, mutationSummaryToAppearance,
-    CNA_STROKE_WIDTH, PLOT_SIDELENGTH, CLIN_ATTR_DATA_TYPE,
-    sortMolecularProfilesForDisplay, scatterPlotZIndexSortBy, getMutationProfileDuplicateSamplesReport, GENESET_DATA_TYPE
+    getAxisLabel,
+    IScatterPlotData,
+    isNumberData,
+    isStringData,
+    logScalePossible,
+    makeAxisDataPromise,
+    makeScatterPlotData,
+    makeScatterPlotPointAppearance,
+    dataTypeDisplayOrder,
+    dataTypeToDisplayType,
+    scatterPlotTooltip,
+    scatterPlotLegendData,
+    IStringAxisData,
+    INumberAxisData,
+    makeBoxScatterPlotData,
+    IScatterPlotSampleData,
+    noMutationAppearance,
+    IBoxScatterPlotPoint,
+    boxPlotTooltip,
+    getCnaQueries,
+    getMutationQueries,
+    getScatterPlotDownloadData,
+    getBoxPlotDownloadData,
+    mutationRenderPriority,
+    mutationSummaryRenderPriority,
+    MutationSummary,
+    mutationSummaryToAppearance,
+    CNA_STROKE_WIDTH,
+    PLOT_SIDELENGTH,
+    CLIN_ATTR_DATA_TYPE,
+    sortMolecularProfilesForDisplay,
+    scatterPlotZIndexSortBy,
+    getMutationProfileDuplicateSamplesReport,
+    GENESET_DATA_TYPE,
+    makeClinicalAttributeOptions
 } from "./PlotsTabUtils";
 import {
     ClinicalAttribute, MolecularProfile, Mutation,
@@ -36,7 +63,7 @@ import setWindowVariable from "../../../shared/lib/setWindowVariable";
 import autobind from "autobind-decorator";
 import fileDownload from 'react-file-download';
 import onMobxPromise from "../../../shared/lib/onMobxPromise";
-import {SpecialAttribute} from "../../../shared/cache/OncoprintClinicalDataCache";
+import {SpecialAttribute} from "../../../shared/cache/ClinicalDataCache";
 import OqlStatusBanner from "../../../shared/components/oqlStatusBanner/OqlStatusBanner";
 import ScrollBar from "../../../shared/components/Scrollbar/ScrollBar";
 import {scatterPlotSize} from "../../../shared/components/plots/PlotUtils";
@@ -51,7 +78,8 @@ enum EventKey {
     utilities_viewMutationType,
     utilities_viewCopyNumber,
     utilities_discreteVsDiscreteTable,
-    utilities_stackedBarHorizontalBars
+    utilities_stackedBarHorizontalBars,
+    utilities_showRegressionLine
 }
 
 
@@ -126,6 +154,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps,{}> {
     @observable searchMutationInput:string;
     @observable viewMutationType:boolean = true;
     @observable viewCopyNumber:boolean = false;
+    @observable showRegressionLine = false;
     // discrete vs discrete settings
     @observable discreteVsDiscretePlotType = DiscreteVsDiscretePlotType.StackedBar;
     @observable stackedBarHorizontalBars = false;
@@ -362,6 +391,9 @@ export default class PlotsTab extends React.Component<IPlotsTabProps,{}> {
             case EventKey.utilities_viewMutationType:
                 this.viewMutationType = !this.viewMutationType;
                 break;
+            case EventKey.utilities_showRegressionLine:
+                this.showRegressionLine = !this.showRegressionLine;
+                break;
             case EventKey.utilities_discreteVsDiscreteTable:
                 if (this.discreteVsDiscretePlotType === DiscreteVsDiscretePlotType.Table) {
                     this.discreteVsDiscretePlotType = DiscreteVsDiscretePlotType.StackedBar;
@@ -584,34 +616,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps,{}> {
 
     readonly clinicalAttributeOptions = remoteData({
         await:()=>[this.props.store.clinicalAttributes],
-        invoke:()=>{
-
-            let _clinicalAttributes = _.sortBy<ClinicalAttribute>(this.props.store.clinicalAttributes.result!,
-                [(o: any)=>-o.priority, (o: any)=>o.label]).map(attribute=>(
-                {
-                    value: attribute.clinicalAttributeId,
-                    label: attribute.displayName,
-                    priority: attribute.priority
-                }
-            ));
-
-            // to load more quickly, only filter and annotate with data availability once its ready
-            // TODO: temporarily disabled because cant figure out a way right now to make this work nicely
-            /*if (this.props.store.clinicalAttributeIdToAvailableSampleCount.isComplete) {
-                const sampleCounts = this.props.store.clinicalAttributeIdToAvailableSampleCount.result!;
-                _clinicalAttributes = _clinicalAttributes.filter(option=>{
-                    const count = sampleCounts[option.value];
-                    if (!count) {
-                        return false;
-                    } else {
-                        option.label = `${option.label} (${count} samples)`;
-                        return true;
-                    }
-                });
-            }*/
-
-            return Promise.resolve(_clinicalAttributes);
-        }
+        invoke:()=>Promise.resolve(makeClinicalAttributeOptions(this.props.store.clinicalAttributes.result!))
     });
 
     readonly dataTypeOptions = remoteData<{value:string, label:string}[]>({
@@ -1092,7 +1097,8 @@ export default class PlotsTab extends React.Component<IPlotsTabProps,{}> {
         const showDiscreteVsDiscreteOption = this.plotType.isComplete && this.plotType.result === PlotType.DiscreteVsDiscrete;
         const showStackedBarHorizontalOption = showDiscreteVsDiscreteOption && this.discreteVsDiscretePlotType === DiscreteVsDiscretePlotType.StackedBar;
         const showSampleColoringOptions = this.mutationDataCanBeShown || this.cnaDataCanBeShown;
-        if (!showSearchOptions && !showSampleColoringOptions && !showDiscreteVsDiscreteOption && !showStackedBarHorizontalOption) {
+        const showRegression = this.plotType.isComplete && this.plotType.result === PlotType.ScatterPlot;
+        if (!showSearchOptions && !showSampleColoringOptions && !showDiscreteVsDiscreteOption && !showStackedBarHorizontalOption && !showRegression) {
             return <span></span>;
         }
         return (
@@ -1148,34 +1154,48 @@ export default class PlotsTab extends React.Component<IPlotsTabProps,{}> {
                     )}
                     {showSampleColoringOptions && (
                         <div>
-                            <label>Color Samples By</label>
-                            {this.mutationDataCanBeShown && (
-                                <div className="checkbox"><label>
-                                    <input
-                                        data-test="ViewMutationType"
-                                        type="checkbox"
-                                        name="utilities_viewMutationType"
-                                        value={EventKey.utilities_viewMutationType}
-                                        checked={this.viewMutationType}
-                                        onClick={this.onInputClick}
-                                        disabled={!this.mutationDataExists.isComplete || !this.mutationDataExists.result}
-                                    /> Mutation Type *
-                                </label></div>
-                            )}
-                            {this.cnaDataCanBeShown && (
-                                <div className="checkbox"><label>
-                                    <input
-                                        data-test="ViewCopyNumber"
-                                        type="checkbox"
-                                        name="utilities_viewCopyNumber"
-                                        value={EventKey.utilities_viewCopyNumber}
-                                        checked={this.viewCopyNumber}
-                                        onClick={this.onInputClick}
-                                        disabled={!this.cnaDataExists.isComplete || !this.cnaDataExists.result}
-                                    /> Copy Number Alteration
-                                </label></div>
-                            )}
+                            <label style={{marginBottom:0}}>Color Samples By</label>
+                            <div style={{marginLeft:14, marginTop:-4}}>
+                                {this.mutationDataCanBeShown && (
+                                    <div className="checkbox"><label>
+                                        <input
+                                            data-test="ViewMutationType"
+                                            type="checkbox"
+                                            name="utilities_viewMutationType"
+                                            value={EventKey.utilities_viewMutationType}
+                                            checked={this.viewMutationType}
+                                            onClick={this.onInputClick}
+                                            disabled={!this.mutationDataExists.isComplete || !this.mutationDataExists.result}
+                                        /> Mutation Type *
+                                    </label></div>
+                                )}
+                                {this.cnaDataCanBeShown && (
+                                    <div className="checkbox"><label>
+                                        <input
+                                            data-test="ViewCopyNumber"
+                                            type="checkbox"
+                                            name="utilities_viewCopyNumber"
+                                            value={EventKey.utilities_viewCopyNumber}
+                                            checked={this.viewCopyNumber}
+                                            onClick={this.onInputClick}
+                                            disabled={!this.cnaDataExists.isComplete || !this.cnaDataExists.result}
+                                        /> Copy Number Alteration
+                                    </label></div>
+                                )}
+                            </div>
                         </div>
+                    )}
+                    {showRegression && (
+                        <div className="checkbox" style={{marginTop:14}}><label>
+                            <input
+                                data-test="ShowRegressionline"
+                                type="checkbox"
+                                name="utilities_showRegressionLine"
+                                value={EventKey.utilities_showRegressionLine}
+                                checked={this.showRegressionLine}
+                                onClick={this.onInputClick}
+                            /> Show Regression Line
+                        </label></div>
                     )}
                 </div>
             </div>
@@ -1421,6 +1441,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps,{}> {
                                     chartHeight={PLOT_SIDELENGTH}
                                     tooltip={this.scatterPlotTooltip}
                                     highlight={this.scatterPlotHighlight}
+                                    showRegressionLine={this.showRegressionLine}
                                     logX={this.horzSelection.logScale}
                                     logY={this.vertSelection.logScale}
                                     fill={this.scatterPlotFill}

@@ -19,6 +19,7 @@ import {PageLayout} from "../../shared/components/PageLayout/PageLayout";
 import IFrameLoader from "../../shared/components/iframeLoader/IFrameLoader";
 import {StudySummaryTab} from 'pages/studyView/tabs/SummaryTab';
 import StudyPageHeader from "./studyPageHeader/StudyPageHeader";
+import CNSegments from "./tabs/CNSegments";
 import "./styles.scss";
 import styles from './styles.module.scss';
 import SelectedInfo from "./SelectedInfo/SelectedInfo";
@@ -33,6 +34,8 @@ import DefaultTooltip from "../../shared/components/defaultTooltip/DefaultToolti
 import CustomCaseSelection from "./addChartButton/customCaseSelection/CustomCaseSelection";
 import {AppStore} from "../../AppStore";
 import ActionButtons from "./studyPageHeader/ActionButtons";
+import onMobxPromise from "../../shared/lib/onMobxPromise";
+import {GACustomFieldsEnum, trackEvent} from "../../shared/lib/tracking";
 
 export interface IStudyViewPageProps {
     routing: any;
@@ -90,6 +93,16 @@ export default class StudyViewPage extends React.Component<IStudyViewPageProps, 
             },
             {fireImmediately: true}
         );
+
+        onMobxPromise(this.store.queriedPhysicalStudyIds, (strArr:string[])=>{
+            trackEvent(
+                {   category:"studyPage", action:"studyPageLoad",
+                    label: strArr.join(",") + ",",
+                    fieldsObject:{ [GACustomFieldsEnum.VirtualStudy]: (this.store.filteredVirtualStudies.result!.length > 0).toString()  }
+                }
+            );
+        });
+
     }
 
     private handleTabChange(id: string) {
@@ -167,6 +180,17 @@ export default class StudyViewPage extends React.Component<IStudyViewPageProps, 
                                         <IFrameLoader height={700}
                                                       url={`//bioinformatics.mdanderson.org/TCGA/NGCHMPortal/?${this.store.MDACCHeatmapStudyMeta.result[0]}`}/>
                                     </MSKTab>
+                                    <MSKTab
+                                        key={3}
+                                        id={StudyViewPageTabKeyEnum.CN_SEGMENTS}
+                                        linkText={StudyViewPageTabDescriptions.CN_SEGMENTS}
+                                        hide={
+                                            !this.store.initialMolecularProfileSampleCounts.result ||
+                                            !(this.store.initialMolecularProfileSampleCounts.result.numberOfCNSegmentSamples > 0)
+                                        }
+                                    >
+                                       <CNSegments store={this.store} />
+                                    </MSKTab>
                                 </MSKTabs>
 
 
@@ -198,9 +222,6 @@ export default class StudyViewPage extends React.Component<IStudyViewPageProps, 
                                             <DefaultTooltip
                                                 visible={this.showCustomSelectTooltip}
                                                 placement={"bottomLeft"}
-                                                onVisibleChange={()=>{
-
-                                                }}
                                                 destroyTooltipOnHide={true}
                                                 overlay={() => (
                                                     <div style={{width: '300px'}}
@@ -248,6 +269,7 @@ export default class StudyViewPage extends React.Component<IStudyViewPageProps, 
 
     componentWillUnmount(): void {
         this.queryReaction();
+        this.store.destroy();
     }
 
     render() {

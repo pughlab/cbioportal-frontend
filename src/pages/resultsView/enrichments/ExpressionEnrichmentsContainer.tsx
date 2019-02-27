@@ -7,7 +7,12 @@ import { ExpressionEnrichment } from 'shared/api/generated/CBioPortalAPIInternal
 import styles from "./styles.module.scss";
 import { Button, FormControl, FormGroup, Form, ControlLabel, Checkbox } from 'react-bootstrap';
 import { MolecularProfile } from 'shared/api/generated/CBioPortalAPI';
-import { getExpressionRowData, getExpressionScatterData, getFilteredData } from 'pages/resultsView/enrichments/EnrichmentsUtil';
+import {
+    ExpressionEnrichmentWithQ,
+    getExpressionRowData,
+    getExpressionScatterData,
+    getFilteredData
+} from 'pages/resultsView/enrichments/EnrichmentsUtil';
 import { ExpressionEnrichmentRow } from 'shared/model/ExpressionEnrichmentRow';
 import AddCheckedGenes from 'pages/resultsView/enrichments/AddCheckedGenes';
 import MiniScatterChart from 'pages/resultsView/enrichments/MiniScatterChart';
@@ -17,7 +22,7 @@ import autobind from 'autobind-decorator';
 import { EnrichmentsTableDataStore } from 'pages/resultsView/enrichments/EnrichmentsTableDataStore';
 
 export interface IExpressionEnrichmentContainerProps {
-    data: ExpressionEnrichment[];
+    data: ExpressionEnrichmentWithQ[];
     selectedProfile: MolecularProfile;
     store: ResultsViewPageStore;
 }
@@ -38,20 +43,9 @@ export default class ExpressionEnrichmentContainer extends React.Component<IExpr
         return getExpressionRowData(this.props.data, this.props.store.hugoGeneSymbols);
     }
 
-    @computed get excludeGenes():string[]|null {
-        if (this.props.store.selectedMolecularProfiles.isComplete &&
-            this.props.store.selectedMolecularProfiles.result
-                .findIndex(x=>x.molecularProfileId === this.props.selectedProfile.molecularProfileId) > -1) {
-            return this.props.store.hugoGeneSymbols;
-        } else {
-            return null;
-        }
-    }
-
-
     @computed get filteredData(): ExpressionEnrichmentRow[] {
         return getFilteredData(this.data, this.underExpressedFilter, this.overExpressedFilter, this.significanceFilter, 
-            this.selectedGenes, this.excludeGenes);
+            this.selectedGenes);
     }
 
     @autobind

@@ -15,6 +15,7 @@ import DefaultTooltip from 'shared/components/defaultTooltip/DefaultTooltip';
 import autobind from 'autobind-decorator';
 import client from "shared/api/cbioportalClientInstance";
 import LoadingIndicator from "shared/components/loadingIndicator/LoadingIndicator";
+import {serializeEvent} from "../../../shared/lib/tracking";
 
 const Clipboard = require('clipboard');
 
@@ -89,16 +90,12 @@ export default class VirtualStudy extends React.Component<IVirtualStudyProps, {}
                     return acc;
                 }, []);
 
-                let filters = { patients: {}, samples: {} };
+                let { sampleIdentifiersSet, ...studyViewFilter } = this.props.filter;
 
-                /* 
-                    TODO: this is to support existing virtual study feature.
-                    but eventually we need to save StudyViewFilter
-                 */
                 let parameters = {
                     name: this.name || this.namePlaceHolder,
                     description: this.description,
-                    filters: filters,
+                    studyViewFilter: studyViewFilter,
                     origin: this.props.studyWithSamples.map(study => study.studyId),
                     studies: studies
                 }
@@ -214,6 +211,7 @@ export default class VirtualStudy extends React.Component<IVirtualStudyProps, {}
                                             <div className="input-group-btn">
                                                 {this.showSaveButton && <button
                                                     className={classnames("btn btn-default", styles.saveButton)}
+                                                    data-event={serializeEvent({category:"studyPage", action:"saveVirtualStudy"})}
                                                     type="button"
                                                     disabled={this.buttonsDisabled}
                                                     onClick={(event) => { this.saving = true; }}>
@@ -223,6 +221,7 @@ export default class VirtualStudy extends React.Component<IVirtualStudyProps, {}
                                                     className={classnames("btn btn-default", styles.saveButton)}
                                                     type="button"
                                                     disabled={this.buttonsDisabled}
+                                                    data-event={serializeEvent({category:"studyPage", action:"shareVirtualStudy"})}
                                                     onClick={(event) => { this.sharing = true; }}>
                                                     {this.sharing ? <i className="fa fa-spinner fa-spin" aria-hidden="true"></i> : "Share"}
                                                 </button>
@@ -266,7 +265,7 @@ export default class VirtualStudy extends React.Component<IVirtualStudyProps, {}
                                                     </Else>
                                                 </If>}
                                             placement="top"
-                                            onVisibleChange={this.onTooltipVisibleChange as any}
+                                            onVisibleChange={this.onTooltipVisibleChange}
                                         >
                                             <span
                                                 className="btn btn-default"

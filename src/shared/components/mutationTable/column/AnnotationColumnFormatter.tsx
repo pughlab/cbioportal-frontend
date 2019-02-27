@@ -11,14 +11,13 @@ import Trial from "shared/components/annotation/Trial";
 import {IOncoKbData, IOncoKbDataWrapper} from "shared/model/OncoKB";
 import {IMyCancerGenomeData, IMyCancerGenome} from "shared/model/MyCancerGenome";
 import {IHotspotDataWrapper} from "shared/model/CancerHotspots";
-import {Mutation} from "shared/api/generated/CBioPortalAPI";
+import {CancerStudy, Mutation} from "shared/api/generated/CBioPortalAPI";
 import {IndicatorQueryResp, Query} from "shared/api/generated/OncoKbAPI";
-import {generateQueryVariantId, generateQueryVariant} from "shared/lib/OncoKbUtils";
+import {getEvidenceQuery, getIndicatorData, generateQueryVariantId} from "shared/lib/OncoKbUtils";
 import {is3dHotspot, isRecurrentHotspot} from "shared/lib/AnnotationUtils";
-import {ICivicVariant, ICivicGene, ICivicEntry, ICivicVariantData, ICivicGeneData,
-        ICivicGeneDataWrapper, ICivicVariantDataWrapper} from "shared/model/Civic.ts";
+import {ICivicVariant, ICivicGene, ICivicEntry, ICivicVariantData, ICivicGeneData, ICivicGeneDataWrapper, ICivicVariantDataWrapper} from "shared/model/Civic.ts";
 import {ITrialMatchVariant, ITrialMatchGene, ITrialMatchEntry, ITrialMatchVariantData,
-        ITrialMatchGeneData, ITrialMatchGeneDataWrapper, ITrialMatchVariantDataWrapper} from "shared/model/TrialMatch.ts";
+    ITrialMatchGeneData, ITrialMatchGeneDataWrapper, ITrialMatchVariantDataWrapper} from "shared/model/TrialMatch.ts";
 import {buildCivicEntry} from "shared/lib/CivicUtils";
 import {buildTrialMatchEntry} from "shared/lib/TrialMatchUtils";
 
@@ -39,6 +38,7 @@ export interface IAnnotationColumnProps {
     civicVariants?: ICivicVariantDataWrapper;
     trialMatchGenes?: ITrialMatchGeneDataWrapper;
     trialMatchVariants?: ITrialMatchVariantDataWrapper;
+    studyIdToStudy?: {[studyId:string]:CancerStudy};
 }
 
 export interface IAnnotation {
@@ -87,6 +87,7 @@ export default class AnnotationColumnFormatter
                           oncoKbData?:IOncoKbDataWrapper,
                           civicGenes?:ICivicGeneDataWrapper,
                           civicVariants?:ICivicVariantDataWrapper,
+                          studyIdToStudy?: {[studyId:string]:CancerStudy},
                           trialMatchGenes?:ITrialMatchGeneDataWrapper,
                           trialMatchVariants?:ITrialMatchVariantDataWrapper)
     {
@@ -138,7 +139,7 @@ export default class AnnotationColumnFormatter
                     !(oncoKbData.result instanceof Error) &&
                     oncoKbData.status === "complete")
                 {
-                    oncoKbIndicator = AnnotationColumnFormatter.getIndicatorData(mutation, oncoKbData.result);
+                    oncoKbIndicator = AnnotationColumnFormatter.getIndicatorData(mutation, oncoKbData.result, studyIdToStudy);
                 }
 
                 value = {
@@ -177,7 +178,7 @@ export default class AnnotationColumnFormatter
 
         return civicEntry;
     }
-    
+
     public static getCivicStatus(civicGenesStatus:"pending" | "error" | "complete",
                                  civicVariantsStatus:"pending" | "error" | "complete"): "pending" | "error" | "complete"
     {
@@ -222,30 +223,34 @@ export default class AnnotationColumnFormatter
         return "pending";
     }
 
-    public static getIndicatorData(mutation:Mutation, oncoKbData:IOncoKbData): IndicatorQueryResp|undefined
+    public static getIndicatorData(mutation:Mutation, oncoKbData:IOncoKbData, studyIdToStudy?: {[studyId:string]:CancerStudy}): IndicatorQueryResp|undefined
     {
         if (oncoKbData.uniqueSampleKeyToTumorType === null || oncoKbData.indicatorMap === null) {
             return undefined;
         }
 
-        const id = generateQueryVariantId(mutation.gene.entrezGeneId,
+        const id = generateQueryVariantId(
+            mutation.gene.entrezGeneId,
             oncoKbData.uniqueSampleKeyToTumorType[mutation.uniqueSampleKey],
             mutation.proteinChange,
-            mutation.mutationType);
+            mutation.mutationType
+        );
 
-        return oncoKbData.indicatorMap[id];
+        const indicator = oncoKbData.indicatorMap[id];
+
+        if (indicator && indicator.query.tumorType === null && studyIdToStudy) {
+            const studyMetaData = studyIdToStudy[mutation.studyId];
+            if (studyMetaData.cancerTypeId !== "mixed") {
+                indicator.query.tumorType = studyMetaData.cancerType.name;
+            }
+        }
+
+        return indicator;
     }
 
     public static getEvidenceQuery(mutation:Mutation, oncoKbData:IOncoKbData): Query|undefined
     {
-        // return null in case sampleToTumorMap is null
-        return oncoKbData.uniqueSampleKeyToTumorType ? generateQueryVariant(mutation.gene.entrezGeneId,
-            oncoKbData.uniqueSampleKeyToTumorType[mutation.uniqueSampleKey],
-            mutation.proteinChange,
-            mutation.mutationType,
-            mutation.proteinPosStart,
-            mutation.proteinPosEnd
-        ) : undefined;
+        return getEvidenceQuery(mutation, oncoKbData);
     }
 
     public static getMyCancerGenomeLinks(mutation:Mutation, myCancerGenomeData: IMyCancerGenomeData):string[] {

@@ -24,6 +24,7 @@ import ValidationStatusColumnFormatter from "./column/ValidationStatusColumnForm
 import StudyColumnFormatter from "./column/StudyColumnFormatter";
 import {ICosmicData} from "shared/model/Cosmic";
 import AnnotationColumnFormatter from "./column/AnnotationColumnFormatter";
+import ExonColumnFormatter from "./column/ExonColumnFormatter";
 import {IMyCancerGenomeData} from "shared/model/MyCancerGenome";
 import {IHotspotDataWrapper} from "shared/model/CancerHotspots";
 import {IOncoKbDataWrapper} from "shared/model/OncoKB";
@@ -45,6 +46,7 @@ import {IPaginationControlsProps} from "../paginationControls/PaginationControls
 import {IColumnVisibilityControlsProps} from "../columnVisibilityControls/ColumnVisibilityControls";
 import MobxPromise from "mobxpromise";
 import { VariantAnnotation } from "shared/api/generated/GenomeNexusAPI";
+import HgvscColumnFormatter from "./column/HgvscColumnFormatter";
 
 export interface IMutationTableProps {
     studyIdToStudy?: {[studyId:string]:CancerStudy};
@@ -120,7 +122,9 @@ export enum MutationTableColumnType {
     REF_READS,
     VAR_READS,
     CANCER_TYPE,
-    NUM_MUTATIONS
+    NUM_MUTATIONS,
+    EXON,
+    HGVSC
 }
 
 type MutationTableColumn = Column<Mutation[]>&{order?:number, shouldExclude?:()=>boolean};
@@ -209,6 +213,7 @@ export default class MutationTable<P extends IMutationTableProps> extends React.
             name: "Allele Freq (T)",
             render: TumorAlleleFreqColumnFormatter.renderFunction,
             headerRender: (name: string) => <span style={{display:'inline-block', maxWidth:55}}>{name}</span>,
+            download: TumorAlleleFreqColumnFormatter.getTextValue,
             sortBy: TumorAlleleFreqColumnFormatter.getSortValue,
             tooltip:(<span>Variant allele frequency in the tumor sample</span>),
             visible: true
@@ -218,6 +223,7 @@ export default class MutationTable<P extends IMutationTableProps> extends React.
             name: "Allele Freq (N)",
             render: NormalAlleleFreqColumnFormatter.renderFunction,
             headerRender: (name: string) => <span style={{display:'inline-block', maxWidth:55}}>{name}</span>,
+            download: NormalAlleleFreqColumnFormatter.getTextValue,
             sortBy: NormalAlleleFreqColumnFormatter.getSortValue,
             tooltip:(<span>Variant allele frequency in the normal sample</span>),
             visible: false
@@ -265,6 +271,15 @@ export default class MutationTable<P extends IMutationTableProps> extends React.
                         this.props.discreteCNACache as DiscreteCNACache);
                 } else {
                     return 0;
+                }
+            },
+            download: (d:Mutation[]):string=>{
+                if (this.props.discreteCNACache && this.props.molecularProfileIdToMolecularProfile) {
+                    return DiscreteCNAColumnFormatter.getTextValue(d,
+                        this.props.molecularProfileIdToMolecularProfile as {[molecularProfileId:string]:MolecularProfile},
+                        this.props.discreteCNACache as DiscreteCNACache);
+                } else {
+                    return "";
                 }
             },
             filter:(d:Mutation[], filterString:string)=>{
@@ -459,7 +474,8 @@ export default class MutationTable<P extends IMutationTableProps> extends React.
                 enableOncoKb: this.props.enableOncoKb as boolean,
                 enableMyCancerGenome: this.props.enableMyCancerGenome as boolean,
                 enableHotspot: this.props.enableHotspot as boolean,
-                userEmailAddress: this.props.userEmailAddress
+                userEmailAddress: this.props.userEmailAddress,
+                studyIdToStudy: this.props.studyIdToStudy
             })),
             download:(d:Mutation[])=>{
                 return AnnotationColumnFormatter.download(d,
@@ -502,6 +518,28 @@ export default class MutationTable<P extends IMutationTableProps> extends React.
             sortBy: (d:Mutation[]) => MutationCountColumnFormatter.sortBy(d, this.props.mutationCountCache),
             download: (d:Mutation[]) => MutationCountColumnFormatter.download(d, this.props.mutationCountCache),
             tooltip:(<span>Total number of nonsynonymous mutations in the sample</span>),
+            align: "right"
+        };
+
+        this._columns[MutationTableColumnType.EXON] = {
+            name: "Exon",
+            render: (d:Mutation[]) => (this.props.genomeNexusCache
+                ? ExonColumnFormatter.renderFunction(d, this.props.genomeNexusCache)
+                : <span></span>),
+            download: (d:Mutation[]) => ExonColumnFormatter.download(d, this.props.genomeNexusCache as GenomeNexusCache),
+            sortBy: (d:Mutation[]) => ExonColumnFormatter.getSortValue(d, this.props.genomeNexusCache as GenomeNexusCache),
+            visible: false,
+            align: "right"
+        };
+
+        this._columns[MutationTableColumnType.HGVSC] = {
+            name: "HGVSc",
+            render: (d:Mutation[]) => (this.props.genomeNexusCache
+                ? HgvscColumnFormatter.renderFunction(d, this.props.genomeNexusCache)
+                : <span></span>),
+            download: (d:Mutation[]) => HgvscColumnFormatter.download(d, this.props.genomeNexusCache as GenomeNexusCache),
+            sortBy: (d:Mutation[]) => HgvscColumnFormatter.getSortValue(d, this.props.genomeNexusCache as GenomeNexusCache),
+            visible: false,
             align: "right"
         };
     }

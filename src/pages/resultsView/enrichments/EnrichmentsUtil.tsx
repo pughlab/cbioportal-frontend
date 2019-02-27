@@ -11,6 +11,9 @@ import { roundLogRatio } from 'shared/lib/FormatUtils';
 const LOG_VALUE = "LOG-VALUE";
 const LOG2_VALUE = "LOG2-VALUE";
 
+export type AlterationEnrichmentWithQ = AlterationEnrichment & { qValue:number };
+export type ExpressionEnrichmentWithQ = ExpressionEnrichment & { qValue:number };
+
 export function calculateAlterationTendency(logOddsRatio: number): string {
     return logOddsRatio > 0 ? "Co-occurrence" : "Mutual exclusivity";
 }
@@ -54,7 +57,7 @@ export function getExpressionScatterData(expressionEnrichments: ExpressionEnrich
     });
 }
 
-export function getAlterationRowData(alterationEnrichments: AlterationEnrichment[], totalAltered: number,
+export function getAlterationRowData(alterationEnrichments: AlterationEnrichmentWithQ[], totalAltered: number,
     totalUnaltered: number, queryGenes: string[]): AlterationEnrichmentRow[] {
 
     return alterationEnrichments.map(alterationEnrichment => {
@@ -75,7 +78,7 @@ export function getAlterationRowData(alterationEnrichments: AlterationEnrichment
     });
 }
 
-export function getExpressionRowData(expressionEnrichments: ExpressionEnrichment[], queryGenes: string[]):
+export function getExpressionRowData(expressionEnrichments: ExpressionEnrichmentWithQ[], queryGenes: string[]):
     ExpressionEnrichmentRow[] {
 
     return expressionEnrichments.map(expressionEnrichment => {
@@ -97,7 +100,7 @@ export function getExpressionRowData(expressionEnrichments: ExpressionEnrichment
 }
 
 export function getFilteredData(data: Pick<ExpressionEnrichmentRow, "logRatio" | "qValue" | "hugoGeneSymbol">[], negativeLogFilter: boolean, positiveLogFilter: boolean, qValueFilter: boolean,
-    selectedGenes: string[]|null, excludeGenes:string[]|null): any[] {
+    selectedGenes: string[]|null): any[] {
 
     return data.filter(alterationEnrichment => {
         let result = false;
@@ -112,9 +115,6 @@ export function getFilteredData(data: Pick<ExpressionEnrichmentRow, "logRatio" |
         }
         if (selectedGenes) {
             result = result && selectedGenes.includes(alterationEnrichment.hugoGeneSymbol);
-        }
-        if (excludeGenes) {
-            result = result && !excludeGenes.includes(alterationEnrichment.hugoGeneSymbol);
         }
         return result;
     });

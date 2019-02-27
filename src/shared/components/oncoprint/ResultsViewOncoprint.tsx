@@ -28,7 +28,7 @@ import svgToPdfDownload from "shared/lib/svgToPdfDownload";
 import tabularDownload from "./tabularDownload";
 import classNames from 'classnames';
 import FadeInteraction from "shared/components/fadeInteraction/FadeInteraction";
-import {clinicalAttributeIsLocallyComputed, SpecialAttribute} from "../../cache/OncoprintClinicalDataCache";
+import {clinicalAttributeIsLocallyComputed, SpecialAttribute} from "../../cache/ClinicalDataCache";
 import OqlStatusBanner from "../oqlStatusBanner/OqlStatusBanner";
 import {getAnnotatingProgressMessage} from "./ResultsViewOncoprintUtils";
 import ProgressIndicator, {IProgressIndicatorItem} from "../progressIndicator/ProgressIndicator";
@@ -42,13 +42,6 @@ interface IResultsViewOncoprintProps {
     routing:any;
     addOnBecomeVisibleListener?:(callback:()=>void)=>void;
 }
-
-export type OncoprintClinicalAttribute =
-    Pick<ClinicalAttribute, "datatype"|"description"|"displayName"|"patientAttribute"> &
-    {
-        clinicalAttributeId: string|SpecialAttribute;
-        molecularProfileIds?:string[];
-    };
 
 export type SortMode = (
     {type:"data"|"alphabetical"|"caseList", clusteredHeatmapProfile?:undefined} |
@@ -519,7 +512,7 @@ export default class ResultsViewOncoprint extends React.Component<IResultsViewOn
                         onMobxPromise(
                             [this.props.store.sampleKeyToSample,
                                 this.props.store.patientKeyToPatient],
-                            (sampleKeyToSample:{[sampleKey:string]:Sample}, patientKeyToPatient)=>{
+                            (sampleKeyToSample:{[sampleKey:string]:Sample}, patientKeyToPatient: any)=>{
                                 let file = `${capitalizedColumnMode} order in the Oncoprint is:\n`;
                                 const keyToCase = (this.columnMode === "sample" ? sampleKeyToSample : patientKeyToPatient);
                                 const caseIds = this.oncoprint.getIdOrder().map(
@@ -541,7 +534,7 @@ export default class ResultsViewOncoprint extends React.Component<IResultsViewOn
                         onMobxPromise(
                             [this.props.store.sampleKeyToSample,
                                 this.props.store.patientKeyToPatient],
-                            (sampleKeyToSample:{[sampleKey:string]:Sample}, patientKeyToPatient)=>{
+                            (sampleKeyToSample:{[sampleKey:string]:Sample}, patientKeyToPatient: any)=>{
                                 tabularDownload(
                                     this.geneticTracks.result,
                                     this.clinicalTracks.result,

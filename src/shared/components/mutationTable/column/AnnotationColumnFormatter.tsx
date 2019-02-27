@@ -87,9 +87,9 @@ export default class AnnotationColumnFormatter
                           oncoKbData?:IOncoKbDataWrapper,
                           civicGenes?:ICivicGeneDataWrapper,
                           civicVariants?:ICivicVariantDataWrapper,
-                          studyIdToStudy?: {[studyId:string]:CancerStudy},
                           trialMatchGenes?:ITrialMatchGeneDataWrapper,
-                          trialMatchVariants?:ITrialMatchVariantDataWrapper)
+                          trialMatchVariants?:ITrialMatchVariantDataWrapper,
+                          studyIdToStudy?: {[studyId:string]:CancerStudy},)
     {
         let value: Partial<IAnnotation>;
 
@@ -345,6 +345,7 @@ export default class AnnotationColumnFormatter
             columnProps.civicVariants,
             columnProps.trialMatchGenes,
             columnProps.trialMatchVariants,
+            columnProps.studyIdToStudy,
             );
 
         let evidenceQuery:Query|undefined;

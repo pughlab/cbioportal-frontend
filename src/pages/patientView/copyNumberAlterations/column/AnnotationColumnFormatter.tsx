@@ -27,10 +27,9 @@ export default class AnnotationColumnFormatter
                           oncoKbData?: IOncoKbDataWrapper,
                           civicGenes?: ICivicGeneDataWrapper,
                           civicVariants?: ICivicVariantDataWrapper,
-                          studyIdToStudy?: {[studyId:string]:CancerStudy})
-                          civicVariants?: ICivicVariantDataWrapper,
                           trialMatchGenes?: ITrialMatchGeneDataWrapper,
-                          trialMatchVariants?: ITrialMatchVariantDataWrapper,)
+                          trialMatchVariants?: ITrialMatchVariantDataWrapper,
+                          studyIdToStudy?: {[studyId:string]:CancerStudy})
     {
         let value: IAnnotation;
 
@@ -217,7 +216,6 @@ export default class AnnotationColumnFormatter
 
     public static renderFunction(data:DiscreteCopyNumberData[], columnProps:IAnnotationColumnProps)
     {
-        const annotation:IAnnotation = AnnotationColumnFormatter.getData(data, columnProps.oncoKbAnnotatedGenes, columnProps.oncoKbData, columnProps.civicGenes, columnProps.civicVariants, columnProps.studyIdToStudy);
         const annotation:IAnnotation = AnnotationColumnFormatter.getData(data, columnProps.oncoKbAnnotatedGenes,
             columnProps.oncoKbData, columnProps.civicGenes, columnProps.civicVariants, columnProps.trialMatchGenes, columnProps.trialMatchVariants);
 

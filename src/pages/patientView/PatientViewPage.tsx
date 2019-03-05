@@ -610,6 +610,13 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                             <IFrameLoader height={900} url={  `https://iprweb.bcgsc.ca/reports/${patientViewPageStore.patientId}` } />
                         </div>
                     </MSKTab>
+                    <MSKTab key={9} id="BiospecimenTab" linkText="Biospecimen Synoptic Reports"
+                            hide={patientViewPageStore.clinicalDataPatient.isError}
+                    >
+                        <div style={{position: "relative"}}>
+                            <IFrameLoader height={900} url={  `http://biospecimenportal.rmpuhn.ca/#/main/specimensByParticipantID/${patientViewPageStore.patientId}` } />
+                        </div>
+                    </MSKTab>
                     </MSKTabs>
                         </Then>
                         <Else>

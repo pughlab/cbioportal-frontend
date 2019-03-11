@@ -527,7 +527,7 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                             )
                             }
                         </div>
-                        
+
                     </MSKTab>
 
 
@@ -608,7 +608,9 @@ export default class PatientViewPage extends React.Component<IPatientViewPagePro
                         </div>
                     </MSKTab>
                     <MSKTab key={9} id="BiospecimenTab" linkText="Biospecimen Synoptic Reports"
-                            hide={patientViewPageStore.clinicalDataPatient.isError}
+                            hide={patientViewPageStore.clinicalDataPatient.isError ||
+                            (patientViewPageStore.clinicalDataPatient.isComplete &&
+                                !(_.includes(patientViewPageStore.studyId, 'PDX'))) }
                     >
                         <div style={{position: "relative"}}>
                             <IFrameLoader height={900} url={  `http://biospecimenportal.rmpuhn.ca/#/main/specimensByParticipantID/${patientViewPageStore.patientId}` } />

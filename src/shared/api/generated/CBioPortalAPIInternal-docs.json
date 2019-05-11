@@ -631,6 +631,43 @@
         }
       }
     },
+    "/fusion-genes/fetch": {
+      "post": {
+        "tags": [
+          "Study View"
+        ],
+        "summary": "Fetch fusion genes by study view filter",
+        "operationId": "fetchFusionGenesUsingPOST",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "studyViewFilter",
+            "description": "Study view filter",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/StudyViewFilter"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/MutationCountByGene"
+              }
+            }
+          }
+        }
+      }
+    },
     "/geneset-hierarchy/fetch": {
       "post": {
         "tags": [

@@ -196,6 +196,22 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
                 props.downloadTypes = ["Data"];
                 break;
             }
+            case ChartTypeEnum.FUSION_GENES_TABLE: {
+                props.filters = this.store.getMutatedGenesTableFilters();
+                props.promise = this.store.fusionGeneData;
+                props.onValueSelection = this.handlers.addGeneFilters;
+                props.onResetSelection = this.handlers.resetGeneFilter;
+                props.selectedGenes=this.store.selectedGenes;
+                props.onGeneSelect=this.store.onCheckGene;
+                props.title = props.title + ( !this.store.molecularProfileSampleCounts.isComplete || this.store.molecularProfileSampleCounts.result === undefined ? '' : ` (${this.store.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples} profiled samples)`),
+                    props.download = [
+                        {
+                            initDownload: () => this.store.getFusionGenesDownloadData(),
+                            type: 'TSV'
+                        }
+                    ];
+                break;
+            }
             case ChartTypeEnum.CNA_GENES_TABLE: {
                 props.filters = this.store.getCNAGenesTableFilters();
                 props.promise = this.store.cnaGeneData;

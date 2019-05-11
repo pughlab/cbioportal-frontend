@@ -123,6 +123,22 @@ import jStat from 'jStat'
 import {CancerGene, Gene as OncokbGene} from "../../public-lib/api/generated/OncoKbAPI";
 import {DataType} from "public-lib/components/downloadControls/DownloadControls";
 
+export type ChartType = 'PIE_CHART' | 'BAR_CHART' | 'SURVIVAL' | 'TABLE' | 'SCATTER' | 'MUTATED_GENES_TABLE' | 'FUSION_GENES_TABLE' | 'CNA_GENES_TABLE' | 'NONE';
+
+export enum UniqueKey {
+    MUTATED_GENES_TABLE = 'MUTATED_GENES_TABLE',
+    FUSION_GENES_TABLE = 'FUSION_GENES_TABLE',
+    CNA_GENES_TABLE = 'CNA_GENES_TABLE',
+    CUSTOM_SELECT = 'CUSTOM_SELECT',
+    MUTATION_COUNT_CNA_FRACTION = 'MUTATION_COUNT_CNA_FRACTION',
+    DISEASE_FREE_SURVIVAL = 'DFS_SURVIVAL',
+    OVERALL_SURVIVAL = 'OS_SURVIVAL',
+    CANCER_STUDIES = 'CANCER_STUDIES',
+    MUTATION_COUNT = "SAMPLE_MUTATION_COUNT",
+    FRACTION_GENOME_ALTERED = "SAMPLE_FRACTION_GENOME_ALTERED",
+    WITH_MUTATION_DATA = "WITH_MUTATION_DATA",
+    WITH_CNA_DATA = "WITH_CNA_DATA"
+}
 
 export enum StudyViewPageTabKeyEnum {
     SUMMARY = 'summary',
@@ -155,6 +171,7 @@ export const SELECTED_ANALYSIS_GROUP_VALUE = "Selected";
 export const UNSELECTED_ANALYSIS_GROUP_VALUE = "Unselected";
 
 export type MutatedGenesData = MutationCountByGene[];
+export type FusionGenesData = MutationCountByGene[];
 export type CNAGenesData = CopyNumberCountByGene[];
 export type SurvivalType = {
     id: string,
@@ -1242,6 +1259,9 @@ export class StudyViewPageStore {
                 case ChartTypeEnum.MUTATED_GENES_TABLE:
                     this.resetGeneFilter();
                     break;
+                case ChartTypeEnum.FUSION_GENES_TABLE:
+                    this.resetGeneFilter();
+                    break;
                 case ChartTypeEnum.CNA_GENES_TABLE:
                     this.resetCNAGeneFilter();
                     break;
@@ -2244,6 +2264,20 @@ export class StudyViewPageStore {
             };
         }
 
+        if (!_.isEmpty(this.mutationProfiles.result!)) {
+            _chartMetaSet[UniqueKey.FUSION_GENES_TABLE] = {
+                uniqueKey: UniqueKey.FUSION_GENES_TABLE,
+                dataType: getChartMetaDataType(UniqueKey.FUSION_GENES_TABLE),
+                patientAttribute:false,
+                chartType: this.chartsType.get(UniqueKey.FUSION_GENES_TABLE)!,
+                dimension: this.chartsDimension[UniqueKey.FUSION_GENES_TABLE]!,
+                displayName: 'Fusion Genes',
+                priority: getDefaultPriorityByUniqueKey(UniqueKey.FUSION_GENES_TABLE),
+                renderWhenDataChange: true,
+                description: ''
+            };
+        }
+
         if (!_.isEmpty(this.cnaProfiles.result)) {
             _chartMetaSet[UniqueKey.CNA_GENES_TABLE] = {
                 uniqueKey: UniqueKey.CNA_GENES_TABLE,
@@ -2317,6 +2351,14 @@ export class StudyViewPageStore {
             }
             this.chartsType.set(UniqueKey.MUTATED_GENES_TABLE, ChartTypeEnum.MUTATED_GENES_TABLE);
             this.chartsDimension.set(UniqueKey.MUTATED_GENES_TABLE, STUDY_VIEW_CONFIG.layout.dimensions[ChartTypeEnum.MUTATED_GENES_TABLE]);
+        }
+        if (!_.isEmpty(this.mutationProfiles.result)) {
+            const fusionGeneMeta = _.find(this.chartMetaSet, chartMeta => chartMeta.uniqueKey === UniqueKey.FUSION_GENES_TABLE);
+            if (fusionGeneMeta && fusionGeneMeta.priority !== 0) {
+                this.changeChartVisibility(UniqueKey.FUSION_GENES_TABLE, true);
+            }
+            this.chartsType.set(UniqueKey.FUSION_GENES_TABLE, ChartTypeEnum.FUSION_GENES_TABLE);
+            this.chartsDimension[UniqueKey.FUSION_GENES_TABLE] = STUDY_VIEW_CONFIG.layout.dimensions[ChartTypeEnum.FUSION_GENES_TABLE];
         }
         if (!_.isEmpty(this.cnaProfiles.result)) {
             const cnaGeneMeta = _.find(this.chartMetaSet, chartMeta => chartMeta.uniqueKey === UniqueKey.CNA_GENES_TABLE);
@@ -2724,6 +2766,24 @@ export class StudyViewPageStore {
         await: () => this.oncokbCancerGeneFilterEnabled ?
             [this.cnaProfiles, this.oncokbAnnotatedGeneEntrezGeneIds, this.oncokbOncogeneEntrezGeneIds, this.oncokbTumorSuppressorGeneEntrezGeneIds, this.oncokbCancerGeneEntrezGeneIds] :
             [this.mutationProfiles],
+    readonly fusionGeneData = remoteData<FusionGenesData>({
+        await: () => [this.mutationProfiles],
+        invoke: async () => {
+            if (!_.isEmpty(this.mutationProfiles.result!)) {
+                // TODO: get data for all profiles
+                return internalClient.fetchFusionGenesUsingPOST({
+                    studyViewFilter: this.filters
+                });
+            } else {
+                return [];
+            }
+        },
+        onError: (error => {}),
+        default: []
+    });
+
+    readonly cnaGeneData = remoteData<CNAGenesData>({
+        await:()=>[this.cnaProfiles],
         invoke: async () => {
             if (!_.isEmpty(this.cnaProfiles.result)) {
                 // TODO: get data for all profiles
@@ -2998,6 +3058,20 @@ export class StudyViewPageStore {
                     rowData.push(this.oncokbCancerGeneFilterEnabled ? (record.isCancerGene ? 'Yes' : 'No') : 'NA');
                 }
                 data.push(rowData.join("\t"));
+            });
+            return data.join("\n");
+        } else
+            return '';
+    }
+
+    public async getFusionGenesDownloadData() {
+        if (this.fusionGeneData.result) {
+            let data = [['Gene', 'MutSig(Q-value)', '# Mut', '#', 'Freq'].join('\t')];
+            _.each(this.fusionGeneData.result, function (record: MutationCountByGene) {
+                data.push([
+                    record.hugoGeneSymbol,
+                    record.qValue === undefined ? '' : getQValue(record.qValue),
+                    record.totalCount, record.countByEntity].join("\t"));
             });
             return data.join("\n");
         } else
@@ -3307,6 +3381,11 @@ export class StudyViewPageStore {
                 if (UniqueKey.MUTATED_GENES_TABLE in this.chartMetaSet) {
                     ret[UniqueKey.MUTATED_GENES_TABLE] = this.molecularProfileSampleCounts.result ? this.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples : 0;
                     ret[UniqueKey.WITH_MUTATION_DATA] = this.molecularProfileSampleCounts.result ? this.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples : 0;
+                }
+
+                if (UniqueKey.FUSION_GENES_TABLE in this.chartMetaSet) {
+                    ret[UniqueKey.FUSION_GENES_TABLE] = this.molecularProfileSampleCounts.result ? this.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples : 0;
+                    ret[UniqueKey.FUSION_GENES_TABLE] = this.molecularProfileSampleCounts.result ? this.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples : 0;
                 }
 
                 if (UniqueKey.CNA_GENES_TABLE in this.chartMetaSet) {

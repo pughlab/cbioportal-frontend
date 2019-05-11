@@ -14,6 +14,7 @@ import ClinicalTable from "pages/studyView/table/ClinicalTable";
 import MobxPromise from "mobxpromise";
 import SurvivalChart, {LegendLocation} from "../../resultsView/survival/SurvivalChart";
 import {MutatedGenesTable} from "../table/MutatedGenesTable";
+import {FusionGenesTable} from "../table/FusionGenesTable";
 import {CNAGenesTable} from "../table/CNAGenesTable";
 
 import autobind from 'autobind-decorator';
@@ -351,6 +352,20 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                         onGeneSelect={this.props.onGeneSelect}
                         selectedGenes={this.props.selectedGenes}
                         cancerGeneFilterEnabled={this.props.cancerGeneFilterEnabled}
+                    />
+                );
+            }
+            case ChartTypeEnum.FUSION_GENES_TABLE: {
+                return ()=>(
+                    <FusionGenesTable
+                        promise={this.props.promise}
+                        width={getWidthByDimension(this.props.chartMeta.dimension, this.borderWidth)}
+                        height={getTableHeightByDimension(this.props.chartMeta.dimension, this.chartHeaderHeight)}
+                        numOfSelectedSamples={100}
+                        filters={this.props.filters}
+                        onUserSelection={this.handlers.updateGeneFilters}
+                        onGeneSelect={this.props.onGeneSelect}
+                        selectedGenes={this.props.selectedGenes}
                     />
                 );
             }

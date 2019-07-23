@@ -43,11 +43,13 @@ export type ChartType =
     | 'TABLE'
     | 'SCATTER'
     | 'MUTATED_GENES_TABLE'
+    | 'FUSION_GENES_TABLE'
     | 'CNA_GENES_TABLE'
     | 'NONE';
 
 export enum UniqueKey {
     MUTATED_GENES_TABLE = 'MUTATED_GENES_TABLE',
+    FUSION_GENES_TABLE = 'FUSION_GENES_TABLE',
     CNA_GENES_TABLE = 'CNA_GENES_TABLE',
     CUSTOM_SELECT = 'CUSTOM_SELECT',
     SELECTED_COMPARISON_GROUPS = 'SELECTED_COMPARISON_GROUPS',
@@ -58,6 +60,7 @@ export enum UniqueKey {
     MUTATION_COUNT = "SAMPLE_MUTATION_COUNT",
     FRACTION_GENOME_ALTERED = "SAMPLE_FRACTION_GENOME_ALTERED",
     WITH_MUTATION_DATA = "WITH_MUTATION_DATA",
+    WITH_FUSION_DATA = "WITH_FUSION_DATA",
     WITH_CNA_DATA = "WITH_CNA_DATA"
 }
 
@@ -124,7 +127,22 @@ export const SPECIAL_CHARTS: ChartMetaWithDimensionAndChartType[] = [{
         },
         priority: 0,
         renderWhenDataChange: false
-    }, {
+    },
+    {
+        uniqueKey: UniqueKey.WITH_FUSION_DATA,
+        displayName: 'With Fusion Data',
+        description: 'With Fusion Data',
+        chartType: ChartTypeEnum.PIE_CHART,
+        dataType: ChartMetaDataTypeEnum.GENOMIC,
+        patientAttribute: false,
+        dimension: {
+            w: 1,
+            h: 1
+        },
+        priority: 0,
+        renderWhenDataChange: false
+    },
+    {
         uniqueKey: UniqueKey.WITH_CNA_DATA,
         displayName: 'With CNA Data',
         description: 'With CNA Data',

@@ -134,6 +134,9 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
             updateGeneFilters: action((value: number[]) => {
                 this.props.onValueSelection(value);
             }),
+            updateFusionGeneFilters: action((value: number[]) => {
+                this.props.onValueSelection(value);
+            }),
             onMouseEnterChart: action((event: React.MouseEvent<any>) => {
                 if (this.mouseLeaveTimeout) {
                     clearTimeout(this.mouseLeaveTimeout);
@@ -359,13 +362,14 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                 return ()=>(
                     <FusionGenesTable
                         promise={this.props.promise}
-                        width={getWidthByDimension(this.props.chartMeta.dimension, this.borderWidth)}
-                        height={getTableHeightByDimension(this.props.chartMeta.dimension, this.chartHeaderHeight)}
+                        width={getWidthByDimension(this.props.dimension, this.borderWidth)}
+                        height={getTableHeightByDimension(this.props.dimension, this.chartHeaderHeight)}
                         numOfSelectedSamples={100}
                         filters={this.props.filters}
-                        onUserSelection={this.handlers.updateGeneFilters}
+                        onUserSelection={this.handlers.updateFusionGeneFilters}
                         onGeneSelect={this.props.onGeneSelect}
                         selectedGenes={this.props.selectedGenes}
+                        cancerGeneFilterEnabled={this.props.cancerGeneFilterEnabled}
                     />
                 );
             }

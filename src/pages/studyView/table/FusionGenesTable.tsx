@@ -1,17 +1,16 @@
 import * as React from "react";
-import {GeneIdentifier, FusionGenesData} from "pages/studyView/StudyViewPageStore";
-import {observer} from "mobx-react";
+import {GeneIdentifier, FusionCountByGeneWithCancerGene} from "pages/studyView/StudyViewPageStore";
+import { observer } from "mobx-react";
 import styles from "./tables.module.scss";
-import {MutationCountByGene} from "shared/api/generated/CBioPortalAPIInternal";
 import LabeledCheckbox from "../../../shared/components/labeledCheckbox/LabeledCheckbox";
 import MobxPromise from "mobxpromise";
-import {If} from 'react-if';
-import * as _ from 'lodash';
-import classnames from 'classnames';
-import DefaultTooltip from "shared/components/defaultTooltip/DefaultTooltip";
+import { If } from "react-if";
+import * as _ from "lodash";
+import classnames from "classnames";
+import DefaultTooltip from "public-lib/components/defaultTooltip/DefaultTooltip";
 import FixedHeaderTable from "./FixedHeaderTable";
-import {action, computed, IReactionDisposer, observable, reaction} from "mobx";
-import autobind from 'autobind-decorator';
+import { action, computed, IReactionDisposer, observable, reaction } from "mobx";
+import autobind from "autobind-decorator";
 import {
     correctMargin,
     correctColumnWidth,
@@ -20,11 +19,15 @@ import {
     getFrequencyStr,
     getQValue
 } from "../StudyViewUtils";
-import {SortDirection} from "../../../shared/components/lazyMobXTable/LazyMobXTable";
-import {DEFAULT_SORTING_COLUMN} from "../StudyViewConfig";
+import {Column, SortDirection} from "../../../shared/components/lazyMobXTable/LazyMobXTable";
+import { DEFAULT_SORTING_COLUMN } from "../StudyViewConfig";
+import { GenePanelToGene } from "shared/api/generated/CBioPortalAPI";
+import { GenePanelModal, GenePanelList } from "./GenePanelModal";
+import {getFreqColumnRender, getGeneColumnHeaderRender} from "pages/studyView/TableUtils";
+import {GeneCell} from "pages/studyView/table/GeneCell";
 
 export interface IFusionGenesTablePros {
-    promise: MobxPromise<FusionGenesData>;
+    promise: MobxPromise<FusionCountByGeneWithCancerGene[]>;
     width: number;
     height: number;
     filters: number[];
@@ -32,183 +35,244 @@ export interface IFusionGenesTablePros {
     numOfSelectedSamples: number;
     onGeneSelect: (hugoGeneSymbol: string) => void;
     selectedGenes: string[];
+    cancerGeneFilterEnabled?: boolean;
 }
 
 type FusionGenesTableUserSelectionWithIndex = {
     entrezGeneId: number;
     hugoGeneSymbol: string;
     rowIndex: number;
-}
+};
 
 enum ColumnKey {
-    GENE = 'Gene',
-    NUMBER_MUTATIONS = '# Mut',
-    NUMBER = '#'
+    GENE = "Gene",
+    NUMBER_FUSIONS = "# Fusion",
+    NUMBER = "#",
+    FREQ = "Freq"
 }
 
-class FusionGenesTableComponent extends FixedHeaderTable<MutationCountByGene> {
-}
+class FusionGenesTableComponent extends FixedHeaderTable<FusionCountByGeneWithCancerGene> {}
 
 @observer
 export class FusionGenesTable extends React.Component<IFusionGenesTablePros, {}> {
     @observable private preSelectedRows: FusionGenesTableUserSelectionWithIndex[] = [];
-    @observable private sortBy: string = DEFAULT_SORTING_COLUMN;
+    @observable private sortBy: string = ColumnKey.FREQ;
     @observable private sortDirection: SortDirection;
-    @observable private cellMargin: { [key: string]: number } = {
-        [ColumnKey.GENE]: 0,
-        [ColumnKey.NUMBER_MUTATIONS]: 0,
-        [ColumnKey.NUMBER]: 0
+    @observable private cancerGeneFilterIconEnabled = true;
+    @observable private modalSettings: {
+        modalOpen: boolean;
+        modalPanelName: string;
+        modalPanelGenes: GenePanelToGene[];
+    } = {
+        modalOpen: false,
+        modalPanelName: "",
+        modalPanelGenes: []
     };
 
-    private disposers:IReactionDisposer[] = [];
+    public static defaultProps = {
+        cancerGeneFilterEnabled: false
+    };
 
-    constructor(props: IFusionGenesTablePros) {
-        super(props);
-        this.disposers.push(
-            reaction(() => this.columnsWidth, () => {
-                this.updateCellMargin();
-            }, {fireImmediately: true})
-        );
-        this.disposers.push(
-            reaction(() => this.props.promise.result, () => {
-                this.updateCellMargin();
-            }, {fireImmediately: true})
-        );
+    @autobind
+    @action
+    toggleModal(panelName: string, genes: GenePanelToGene[]) {
+        this.modalSettings.modalOpen = !this.modalSettings.modalOpen;
+        if (!this.modalSettings.modalOpen) {
+            return;
+        }
+        this.modalSettings.modalPanelName = panelName;
+        this.modalSettings.modalPanelGenes = genes;
     }
 
-    componentWillUnmount() {
-        for (const disposer of this.disposers) {
-            disposer();
-        }
+    @autobind
+    @action
+    closeModal() {
+        this.modalSettings.modalOpen = !this.modalSettings.modalOpen;
     }
 
     @computed
     get columnsWidth() {
         return {
             [ColumnKey.GENE]: correctColumnWidth(this.props.width * 0.35),
-            [ColumnKey.NUMBER_MUTATIONS]: correctColumnWidth(this.props.width * 0.25),
-            [ColumnKey.NUMBER]: correctColumnWidth(this.props.width * 0.25)
+            [ColumnKey.NUMBER_FUSIONS]: correctColumnWidth(this.props.width * 0.25),
+            [ColumnKey.NUMBER]: correctColumnWidth(this.props.width * 0.25),
+            [ColumnKey.FREQ]: correctColumnWidth(this.props.width * 0.15)
         };
     }
 
-    @autobind
-    @action
-    updateCellMargin() {
-        if (this.props.promise.result!.length > 0) {
-            this.cellMargin[ColumnKey.NUMBER_MUTATIONS] = correctMargin(
+    @computed
+    get cellMargin() {
+        const maxNumberFusionsColumn = _.max(this.tableData.map(item => item.totalCount));
+        const maxNumberColumn = _.max(this.tableData!.map(item => item.numberOfAlteredCases));
+        const localeNumberMutationsString = maxNumberFusionsColumn === undefined ? '' : maxNumberFusionsColumn.toLocaleString();
+        const localeNumberString = maxNumberColumn === undefined ? '' : maxNumberColumn.toLocaleString();
+        return {
+            [ColumnKey.GENE]: 0,
+            [ColumnKey.NUMBER_FUSIONS]: correctMargin(
                 getFixedHeaderNumberCellMargin(
-                    this.columnsWidth[ColumnKey.NUMBER_MUTATIONS],
-                    _.max(this.props.promise.result!.map(item => item.totalCount))!.toLocaleString()
+                    this.columnsWidth[ColumnKey.NUMBER_FUSIONS],
+                    localeNumberMutationsString
                 )
-            );
-            this.cellMargin[ColumnKey.NUMBER] = correctMargin(
+            ),
+            [ColumnKey.NUMBER]: correctMargin(
                 (this.columnsWidth[ColumnKey.NUMBER] - 10 - (
-                        getFixedHeaderTableMaxLengthStringPixel(
-                            _.max(this.props.promise.result!.map(item => item.countByEntity))!.toLocaleString()
-                        ) + 20)
-                ) / 2);
+                        getFixedHeaderTableMaxLengthStringPixel(localeNumberString) + 20)
+                ) / 2),
+            [ColumnKey.FREQ]: correctMargin(
+                getFixedHeaderNumberCellMargin(
+                    this.columnsWidth[ColumnKey.FREQ],
+                    getFrequencyStr(_.max(this.tableData.map(item => (item.numberOfAlteredCases / item.numberOfSamplesProfiled) * 100))!)
+                )
+            )
         }
     }
 
+    @autobind
+    toggleCancerGeneFilter(event: any) {
+        event.stopPropagation();
+        this.cancerGeneFilterIconEnabled = !this.cancerGeneFilterIconEnabled;
+    }
+
+    @computed get isFilteredByCancerGeneList() {
+        return this.props.cancerGeneFilterEnabled! && this.cancerGeneFilterIconEnabled;
+    }
+
+    @computed get tableData() {
+        return this.isFilteredByCancerGeneList ? _.filter(this.props.promise.result, data => data.isCancerGene) : (this.props.promise.result || []);
+    }
+
     @computed
-    get tableColumns() {
-        return [{
-            name: ColumnKey.GENE,
-            tooltip: (<span>Gene</span>),
-            render: (data: MutationCountByGene) => {
-                const addGeneOverlay = () =>
-                    <span>{`Click ${data.hugoGeneSymbol} to ${_.includes(this.props.selectedGenes, data.hugoGeneSymbol) ? 'remove from' : 'add to'} your query`}</span>;
-                const qvalOverlay = () =>
-                    <div><b>MutSig</b><br/><i>Q-value: </i><span>{getQValue(data.qValue)}</span></div>;
-                return (
-                    <div className={styles.displayFlex}>
-                        <DefaultTooltip
-                            placement="left"
-                            overlay={addGeneOverlay}
-                            destroyTooltipOnHide={true}
-                        >
-                            <span
-                                className={classnames(styles.geneSymbol, styles.ellipsisText, _.includes(this.props.selectedGenes, data.hugoGeneSymbol) ? styles.selected : undefined, _.isUndefined(data.qValue) ? undefined : styles.shortenText)}
-                                onClick={() => this.props.onGeneSelect(data.hugoGeneSymbol)}>
-                                {data.hugoGeneSymbol}
-                            </span>
-                        </DefaultTooltip>
-                        <If condition={!_.isUndefined(data.qValue)}>
-                            <DefaultTooltip
-                                placement="right"
-                                overlay={qvalOverlay}
-                                destroyTooltipOnHide={true}
-                            >
-                                    <span><img src={require("./images/mutsig.png")}
-                                               className={styles.mutSig}></img></span>
-                            </DefaultTooltip>
-                        </If>
-                    </div>
-                )
+    get tableColumns():Column<FusionCountByGeneWithCancerGene>[] {
+        return [
+            {
+                name: ColumnKey.GENE,
+                headerRender: () => {
+                    return getGeneColumnHeaderRender(this.cellMargin[ColumnKey.GENE], ColumnKey.GENE, this.props.cancerGeneFilterEnabled!, this.isFilteredByCancerGeneList, this.toggleCancerGeneFilter);
+                },
+                render: (data: FusionCountByGeneWithCancerGene) => {
+                    return <GeneCell
+                        tableType={'mutation'}
+                        selectedGenes={this.props.selectedGenes}
+                        hugoGeneSymbol={data.hugoGeneSymbol}
+                        qValue={data.qValue}
+                        isCancerGene={data.isCancerGene}
+                        oncokbAnnotated={data.oncokbAnnotated}
+                        isOncogene={data.oncokbOncogene}
+                        isTumorSuppressorGene={data.oncokbTumorSuppressorGene}
+                        onGeneSelect={this.props.onGeneSelect}
+                    />
+                },
+                sortBy: (data: FusionCountByGeneWithCancerGene) => data.hugoGeneSymbol,
+                defaultSortDirection: "asc" as "asc",
+                filter: (
+                    data: FusionCountByGeneWithCancerGene,
+                    filterString: string,
+                    filterStringUpper: string
+                ) => {
+                    return data.hugoGeneSymbol.toUpperCase().includes(filterStringUpper);
+                },
+                width: this.columnsWidth[ColumnKey.GENE]
             },
-            sortBy: (data: MutationCountByGene) => data.hugoGeneSymbol,
-            defaultSortDirection: 'asc' as 'asc',
-            filter: (data: MutationCountByGene, filterString: string, filterStringUpper: string) => {
-                return data.hugoGeneSymbol.toUpperCase().includes(filterStringUpper);
+            {
+                name: ColumnKey.NUMBER_FUSIONS,
+                tooltip: <span>Total number of mutations</span>,
+                headerRender: () => {
+                    return (
+                        <div style={{ marginLeft: this.cellMargin[ColumnKey.NUMBER_FUSIONS] }}>
+                            # Fusion
+                        </div>
+                    );
+                },
+                render: (data: FusionCountByGeneWithCancerGene) => (
+                    <span
+                        style={{
+                            flexDirection: "row-reverse",
+                            display: "flex",
+                            marginRight: this.cellMargin[ColumnKey.NUMBER_FUSIONS]
+                        }}
+                    >
+                        {data.totalCount.toLocaleString()}
+                    </span>
+                ),
+                sortBy: (data: FusionCountByGeneWithCancerGene) => data.totalCount,
+                defaultSortDirection: "desc" as "desc",
+                filter: (data: FusionCountByGeneWithCancerGene, filterString: string) => {
+                    return _.toString(data.totalCount).includes(filterString);
+                },
+                width: this.columnsWidth[ColumnKey.NUMBER_FUSIONS]
             },
-            width: this.columnsWidth[ColumnKey.GENE]
-        }, {
-            name: ColumnKey.NUMBER_MUTATIONS,
-            tooltip: (<span>Total number of mutations</span>),
-            headerRender: () => {
-                return <div style={{marginLeft: this.cellMargin[ColumnKey.NUMBER_MUTATIONS]}}># Mut</div>
+            {
+                name: ColumnKey.NUMBER,
+                tooltip: <span>Number of samples with one or more mutations</span>,
+                headerRender: () => {
+                    return <div style={{ marginLeft: this.cellMargin[ColumnKey.NUMBER] }}>#</div>;
+                },
+                render: (data: FusionCountByGeneWithCancerGene) => (
+                    <LabeledCheckbox
+                        checked={this.isChecked(data.entrezGeneId)}
+                        disabled={this.isDisabled(data.entrezGeneId)}
+                        onChange={event => this.togglePreSelectRow(data.entrezGeneId)}
+                        labelProps={{
+                            style: {
+                                display: "flex",
+                                justifyContent: "space-between",
+                                marginLeft: this.cellMargin[ColumnKey.NUMBER],
+                                marginRight: this.cellMargin[ColumnKey.NUMBER]
+                            }
+                        }}
+                        inputProps={{
+                            className: styles.autoMarginCheckbox
+                        }}
+                    >
+                        <span>{data.numberOfAlteredCases.toLocaleString()}</span>
+                    </LabeledCheckbox>
+                ),
+                sortBy: (data: FusionCountByGeneWithCancerGene) => data.numberOfAlteredCases,
+                defaultSortDirection: "desc" as "desc",
+                filter: (data: FusionCountByGeneWithCancerGene, filterString: string) => {
+                    return _.toString(data.numberOfAlteredCases).includes(filterString);
+                },
+                width: this.columnsWidth[ColumnKey.NUMBER]
             },
-            render: (data: MutationCountByGene) => <span
-                style={{
-                    flexDirection: 'row-reverse',
-                    display: 'flex',
-                    marginRight: this.cellMargin[ColumnKey.NUMBER_MUTATIONS]
-                }}>{data.totalCount.toLocaleString()}</span>,
-            sortBy: (data: MutationCountByGene) => data.totalCount,
-            defaultSortDirection: 'desc' as 'desc',
-            filter: (data: MutationCountByGene, filterString: string) => {
-                return _.toString(data.totalCount).includes(filterString);
-            },
-            width: this.columnsWidth[ColumnKey.NUMBER_MUTATIONS]
-        }, {
-            name: ColumnKey.NUMBER,
-            tooltip: (<span>Number of samples with one or more mutations</span>),
-            headerRender: () => {
-                return <div style={{marginLeft: this.cellMargin[ColumnKey.NUMBER]}}>#</div>
-            },
-            render: (data: MutationCountByGene) =>
-                <LabeledCheckbox
-                    checked={this.isChecked(data.entrezGeneId)}
-                    disabled={this.isDisabled(data.entrezGeneId)}
-                    onChange={event => this.togglePreSelectRow(data.entrezGeneId)}
-                    labelProps={{
-                        style: {
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            marginLeft: this.cellMargin[ColumnKey.NUMBER],
-                            marginRight: this.cellMargin[ColumnKey.NUMBER]
-                        }
-                    }}
-                    inputProps={{
-                        className: styles.autoMarginCheckbox
-                    }}
-                >
-                    <span>{data.countByEntity.toLocaleString()}</span>
-                </LabeledCheckbox>,
-            sortBy: (data: MutationCountByGene) => data.countByEntity,
-            defaultSortDirection: 'desc' as 'desc',
-            filter: (data: MutationCountByGene, filterString: string) => {
-                return _.toString(data.countByEntity).includes(filterString);
-            },
-            width: this.columnsWidth[ColumnKey.NUMBER]
-        }];
+            {
+                name: ColumnKey.FREQ,
+                tooltip: <span>Percentage of samples with one or more mutations</span>,
+                headerRender: () => {
+                    return <div style={{ marginLeft: this.cellMargin[ColumnKey.FREQ] }}>Freq</div>;
+                },
+                render: (data: FusionCountByGeneWithCancerGene) => {
+                    return getFreqColumnRender('mutation', data.numberOfSamplesProfiled, data.numberOfAlteredCases, data.matchingGenePanels, this.toggleModal);
+                },
+                sortBy: (data: FusionCountByGeneWithCancerGene) =>
+                    (data.numberOfAlteredCases / data.numberOfSamplesProfiled) * 100,
+                defaultSortDirection: "desc" as "desc",
+                filter: (data: FusionCountByGeneWithCancerGene, filterString: string) => {
+                    return _.toString(
+                        getFrequencyStr(data.numberOfAlteredCases / data.numberOfSamplesProfiled)
+                    ).includes(filterString);
+                },
+                width: this.columnsWidth[ColumnKey.FREQ]
+            }
+        ];
     }
 
     @autobind
     isChecked(entrezGeneId: number) {
-        let record = _.find(this.preSelectedRows, (row: FusionGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId);
+        const record = _.find(
+            this.preSelectedRows,
+            (row: FusionGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId
+        );
         if (_.isUndefined(record)) {
-            return this.selectedRows.length > 0 && !_.isUndefined(_.find(this.selectedRows, (row: FusionGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId));
+            return (
+                this.selectedRows.length > 0 &&
+                !_.isUndefined(
+                    _.find(
+                        this.selectedRows,
+                        (row: FusionGenesTableUserSelectionWithIndex) =>
+                            row.entrezGeneId === entrezGeneId
+                    )
+                )
+            );
         } else {
             return true;
         }
@@ -216,45 +280,57 @@ export class FusionGenesTable extends React.Component<IFusionGenesTablePros, {}>
 
     @autobind
     isDisabled(entrezGeneId: number) {
-        return !_.isUndefined(_.find(this.selectedRows, (row: FusionGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId));
+        return !_.isUndefined(
+            _.find(
+                this.selectedRows,
+                (row: FusionGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId
+            )
+        );
     }
 
     @autobind
     togglePreSelectRow(entrezGeneId: number) {
-        let record: FusionGenesTableUserSelectionWithIndex | undefined = _.find(this.preSelectedRows, (row: FusionGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId);
+        const record: FusionGenesTableUserSelectionWithIndex | undefined = _.find(
+            this.preSelectedRows,
+            (row: FusionGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId
+        );
         if (_.isUndefined(record)) {
             let dataIndex = -1;
             // definitely there is a match
-            let datum: MutationCountByGene | undefined = _.find(this.props.promise.result, (row: MutationCountByGene, index: number) => {
-                let exist = row.entrezGeneId === entrezGeneId;
-                if (exist) {
-                    dataIndex = index;
+            const datum: FusionCountByGeneWithCancerGene | undefined = _.find(
+                this.tableData,
+                (row: FusionCountByGeneWithCancerGene, index: number) => {
+                    const exist = row.entrezGeneId === entrezGeneId;
+                    if (exist) {
+                        dataIndex = index;
+                    }
+                    return exist;
                 }
-                return exist;
-            });
+            );
 
             if (!_.isUndefined(datum)) {
                 this.preSelectedRows.push({
                     rowIndex: dataIndex,
                     entrezGeneId: datum.entrezGeneId,
                     hugoGeneSymbol: datum.hugoGeneSymbol
-                })
+                });
             }
         } else {
-            this.preSelectedRows = _.xorBy(this.preSelectedRows, [record], 'rowIndex');
+            this.preSelectedRows = _.xorBy(this.preSelectedRows, [record], "rowIndex");
         }
     }
-
 
     @autobind
     @action
     afterSelectingRows() {
-        this.props.onUserSelection(this.preSelectedRows.map(row => {
-            return {
-                entrezGeneId: row.entrezGeneId,
-                hugoGeneSymbol: row.hugoGeneSymbol
-            };
-        }));
+        this.props.onUserSelection(
+            this.preSelectedRows.map(row => {
+                return {
+                    entrezGeneId: row.entrezGeneId,
+                    hugoGeneSymbol: row.hugoGeneSymbol
+                };
+            })
+        );
         this.preSelectedRows = [];
     }
 
@@ -263,24 +339,34 @@ export class FusionGenesTable extends React.Component<IFusionGenesTablePros, {}>
         if (this.props.filters.length === 0) {
             return [];
         } else {
-            return _.reduce(this.props.promise.result, (acc: FusionGenesTableUserSelectionWithIndex[], row: MutationCountByGene, index: number) => {
-                if (_.includes(this.props.filters, row.entrezGeneId)) {
-                    acc.push({
-                        rowIndex: index,
-                        entrezGeneId: row.entrezGeneId,
-                        hugoGeneSymbol: row.hugoGeneSymbol
-                    });
-                }
-                return acc;
-            }, []);
+            return _.reduce(
+                this.tableData,
+                (
+                    acc: FusionGenesTableUserSelectionWithIndex[],
+                    row: FusionCountByGeneWithCancerGene,
+                    index: number
+                ) => {
+                    if (_.includes(this.props.filters, row.entrezGeneId)) {
+                        acc.push({
+                            rowIndex: index,
+                            entrezGeneId: row.entrezGeneId,
+                            hugoGeneSymbol: row.hugoGeneSymbol
+                        });
+                    }
+                    return acc;
+                },
+                []
+            );
         }
     }
 
     @autobind
-    isSelectedRow(data: MutationCountByGene) {
-        return !_.isUndefined(_.find(_.union(this.selectedRows, this.preSelectedRows), function (row) {
-            return row.entrezGeneId === data.entrezGeneId;
-        }));
+    isSelectedRow(data: FusionCountByGeneWithCancerGene) {
+        return !_.isUndefined(
+            _.find(_.union(this.selectedRows, this.preSelectedRows), function(row) {
+                return row.entrezGeneId === data.entrezGeneId;
+            })
+        );
     }
 
     @autobind
@@ -292,19 +378,28 @@ export class FusionGenesTable extends React.Component<IFusionGenesTablePros, {}>
 
     public render() {
         return (
-            <FusionGenesTableComponent
-                width={this.props.width}
-                height={this.props.height}
-                data={this.props.promise.result || []}
-                columns={this.tableColumns}
-                showSelectSamples={true && this.preSelectedRows.length > 0}
-                isSelectedRow={this.isSelectedRow}
-                afterSelectingRows={this.afterSelectingRows}
-                sortBy={this.sortBy}
-                sortDirection={this.sortDirection}
-                afterSorting={this.afterSorting}
-            />
+            <>
+                {this.props.promise.isComplete && (
+                    <FusionGenesTableComponent
+                        width={this.props.width}
+                        height={this.props.height}
+                        data={this.tableData}
+                        columns={this.tableColumns}
+                        showSelectSamples={true && this.preSelectedRows.length > 0}
+                        isSelectedRow={this.isSelectedRow}
+                        afterSelectingRows={this.afterSelectingRows}
+                        sortBy={this.sortBy}
+                        sortDirection={this.sortDirection}
+                        afterSorting={this.afterSorting}
+                    />
+                )}
+                <GenePanelModal
+                    show={this.modalSettings.modalOpen}
+                    genes={this.modalSettings.modalPanelGenes}
+                    panelName={this.modalSettings.modalPanelName}
+                    hide={this.closeModal}
+                />
+            </>
         );
     }
 }
-

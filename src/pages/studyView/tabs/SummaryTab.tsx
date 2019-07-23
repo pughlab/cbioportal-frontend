@@ -70,6 +70,15 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
             resetGeneFilter: (chartMeta: ChartMeta) => {
                 this.store.resetGeneFilter();
             },
+            addFusionGeneFilters: (genes: GeneIdentifier[]) => {
+                this.store.addFusionGeneFilters(genes);
+            },
+            removeFusionGeneFilter: (entrezGeneId:number) => {
+                this.store.removeFusionGeneFilter(entrezGeneId);
+            },
+            resetFustionGeneFilter: (chartMeta: ChartMeta) => {
+                this.store.resetFusionGeneFilter();
+            },
             resetCNAGeneFilter: (chartMeta: ChartMeta) => {
                 this.store.resetCNAGeneFilter();
             },
@@ -197,19 +206,14 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
                 break;
             }
             case ChartTypeEnum.FUSION_GENES_TABLE: {
-                props.filters = this.store.getMutatedGenesTableFilters();
+                props.filters = this.store.getFusionGenesTableFilters();
                 props.promise = this.store.fusionGeneData;
-                props.onValueSelection = this.handlers.addGeneFilters;
-                props.onResetSelection = this.handlers.resetGeneFilter;
+                props.onValueSelection = this.handlers.addFusionGeneFilters;
+                props.onResetSelection = this.handlers.resetFustionGeneFilter;
                 props.selectedGenes=this.store.selectedGenes;
                 props.onGeneSelect=this.store.onCheckGene;
                 props.title = props.title + ( !this.store.molecularProfileSampleCounts.isComplete || this.store.molecularProfileSampleCounts.result === undefined ? '' : ` (${this.store.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples} profiled samples)`),
-                    props.download = [
-                        {
-                            initDownload: () => this.store.getFusionGenesDownloadData(),
-                            type: 'TSV'
-                        }
-                    ];
+                props.downloadTypes = ["Data"];
                 break;
             }
             case ChartTypeEnum.CNA_GENES_TABLE: {

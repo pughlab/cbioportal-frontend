@@ -101,7 +101,7 @@ const studyViewFrontEnd = {
         "DFS_SURVIVAL": 300,
         "MUTATION_COUNT_CNA_FRACTION": 200,
         "MUTATED_GENES_TABLE": 90,
-        "FUSION_GENES_TABLE": 90,
+        "FUSION_GENES_TABLE": 89,
         "CNA_GENES_TABLE": 80,
         "CANCER_STUDIES": 70,
         "SEQUENCED": 60,

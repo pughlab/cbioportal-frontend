@@ -212,6 +212,7 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
                 props.onResetSelection = this.handlers.resetFustionGeneFilter;
                 props.selectedGenes=this.store.selectedGenes;
                 props.onGeneSelect=this.store.onCheckGene;
+                props.getData = () => this.store.getFusionGenesDownloadData();
                 props.title = props.title + ( !this.store.molecularProfileSampleCounts.isComplete || this.store.molecularProfileSampleCounts.result === undefined ? '' : ` (${this.store.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples} profiled samples)`),
                 props.downloadTypes = ["Data"];
                 break;

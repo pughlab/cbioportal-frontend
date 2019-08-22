@@ -178,9 +178,7 @@ export class FusionGenesTable extends React.Component<IFusionGenesTablePros, {}>
                 tooltip: <span>Total number of mutations</span>,
                 headerRender: () => {
                     return (
-                        <div style={{ marginLeft: this.cellMargin[ColumnKey.NUMBER_FUSIONS] }}>
-                            # Fusion
-                        </div>
+                        <span># Fusion</span>
                     );
                 },
                 render: (data: FusionCountByGeneWithCancerGene) => (
@@ -241,7 +239,7 @@ export class FusionGenesTable extends React.Component<IFusionGenesTablePros, {}>
                     return <div style={{ marginLeft: this.cellMargin[ColumnKey.FREQ] }}>Freq</div>;
                 },
                 render: (data: FusionCountByGeneWithCancerGene) => {
-                    return getFreqColumnRender('mutation', data.numberOfSamplesProfiled, data.numberOfAlteredCases, data.matchingGenePanels, this.toggleModal);
+                    return getFreqColumnRender('fusion', data.numberOfSamplesProfiled, data.numberOfAlteredCases, data.matchingGenePanels, this.toggleModal);
                 },
                 sortBy: (data: FusionCountByGeneWithCancerGene) =>
                     (data.numberOfAlteredCases / data.numberOfSamplesProfiled) * 100,

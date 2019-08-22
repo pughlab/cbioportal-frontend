@@ -2785,7 +2785,6 @@ export class StudyViewPageStore {
             [this.mutationProfiles],
         invoke: async () => {
             if (!_.isEmpty(this.mutationProfiles.result!)) {
-                // TODO: get data for all profiles
                 let mutatedGenes = await internalClient.fetchMutatedGenesUsingPOST({
                     studyViewFilter: this.filters
                 });
@@ -2814,7 +2813,6 @@ export class StudyViewPageStore {
             [this.mutationProfiles],
         invoke: async () => {
             if (!_.isEmpty(this.mutationProfiles.result!)) {
-                // TODO: get data for all profiles
                 const fusionGenes = await internalClient.fetchFusionGenesUsingPOST({
                     studyViewFilter: this.filters
                 });
@@ -2842,7 +2840,6 @@ export class StudyViewPageStore {
             [this.mutationProfiles],
         invoke: async () => {
             if (!_.isEmpty(this.cnaProfiles.result)) {
-                // TODO: get data for all profiles
                 let cnaGenes = await internalClient.fetchCNAGenesUsingPOST({
                     studyViewFilter: this.filters
                 });

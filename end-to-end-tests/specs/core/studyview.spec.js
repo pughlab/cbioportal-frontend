@@ -263,6 +263,27 @@ describe('check the filters are working properly', ()=>{
     });
 });
 
+// This needs to be done separately due to leak of data in the other tests
+describe('check the fusion filter is working properly', ()=>{
+
+    before(function() {
+        const url = `${CBIOPORTAL_URL}/study/summary?filters=%7B%2522fusionGenes%2522%3A%5B%7B%2522entrezGeneIds%2522%3A%5B2313%5D%7D%5D%7D&id=es_dfarber_broad_2014`;
+        goToUrlAndSetLocalStorage(url);
+        waitForNetworkQuiet(60000);
+    });
+    it('filter study from url', function() {
+        const res = checkElementWithMouseDisabled('#mainColumn');
+        assertScreenShotMatch(res);
+    });
+
+    it('removing filters are working properly', function() {
+        // Remove cna genes filter
+        browser.elements("[data-test='pill-tag-delete']").value[0].click();
+        waitForStudyViewSelectedInfo();
+        assert(getTextFromElement(SELECTED_PATIENTS) === '103');
+        assert(getTextFromElement(SELECTED_SAMPLES) === '107');
+    });
+});
 
 describe('cancer gene filter', () => {
     before(() => {

@@ -483,6 +483,7 @@ export function isFiltered(filter: Partial<StudyViewFilterWithSampleIdentifierFi
             _.isEmpty(filter.clinicalDataIntervalFilters) &&
             _.isEmpty(filter.cnaGenes) &&
             _.isEmpty(filter.mutatedGenes) &&
+            _.isEmpty(filter.fusionGenes) &&
             filter.withMutationData === undefined &&
             filter.withCNAData === undefined &&
             !filter.mutationCountVsCNASelection)

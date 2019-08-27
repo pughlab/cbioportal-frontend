@@ -49,35 +49,17 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
             onDataBinSelection: (chartMeta: ChartMeta, dataBins: DataBin[]) => {
                 this.store.updateClinicalDataIntervalFilters(chartMeta, dataBins);
             },
-            onUpdateIntervalFilters: (chartMeta: ChartMeta, values: ClinicalDataIntervalFilterValue[]) => {
-                this.store.updateClinicalDataIntervalFiltersByValues(chartMeta, values);
-            },
             onToggleLogScale: (chartMeta: ChartMeta) => {
                 this.store.toggleLogScale(chartMeta);
             },
             addGeneFilters: (genes: GeneIdentifier[]) => {
                 this.store.addGeneFilters(genes);
             },
-            removeGeneFilter: (entrezGeneId:number) => {
-                this.store.removeGeneFilter(entrezGeneId);
-            },
             resetGeneFilter: (chartMeta: ChartMeta) => {
                 this.store.resetGeneFilter();
             },
-            addFusionGeneFilters: (genes: GeneIdentifier[]) => {
-                this.store.addFusionGeneFilters(genes);
-            },
-            removeFusionGeneFilter: (entrezGeneId:number) => {
-                this.store.removeFusionGeneFilter(entrezGeneId);
-            },
-            resetFustionGeneFilter: (chartMeta: ChartMeta) => {
-                this.store.resetFusionGeneFilter();
-            },
             resetCNAGeneFilter: (chartMeta: ChartMeta) => {
                 this.store.resetCNAGeneFilter();
-            },
-            removeCNAGeneFilter: (filter:CopyNumberGeneFilterElement) => {
-                this.store.removeCNAGeneFilters(filter);
             },
             resetMutationCountVsCNAFilter: ()=>{
                 this.store.resetMutationCountVsCNAFilter();
@@ -91,26 +73,11 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
             onChangeChartType: (chartMeta: ChartMeta, newChartType: ChartType) => {
                 this.store.changeChartType(chartMeta, newChartType);
             },
-            updateChartSampleIdentifierFilter: (uniqueKey:string, cases: SampleIdentifier[], keepCurrent?:boolean) => {
-                this.store.updateChartSampleIdentifierFilter(uniqueKey, cases, keepCurrent);
-            },
             updateMutationCountVsCNAFilter:(bounds:RectangleBounds)=>{
                 this.store.setMutationCountVsCNAFilter(bounds);
             },
-            clearCNAGeneFilter: () => {
-                this.store.clearCNAGeneFilter();
-            },
-            clearGeneFilter: () => {
-                this.store.clearGeneFilter();
-            },
-            clearChartSampleIdentifierFilter: (chartMeta: ChartMeta) => {
-                this.store.clearChartSampleIdentifierFilter(chartMeta);
-            },
             isNewlyAdded:(uniqueKey: string) => {
                 return this.store.isNewlyAdded(uniqueKey);
-            },
-            clearAllFilters: () => {
-                this.store.clearAllFilters();
             },
             setCustomChartFilters: (chartMeta: ChartMeta, values: string[]) => {
                 this.store.setCustomChartFilters(chartMeta, values);
@@ -205,11 +172,12 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
             case FUSION_GENES_TABLE: {
                 props.filters = this.store.getFusionGenesTableFilters();
                 props.promise = this.store.fusionGeneData;
-                props.onValueSelection = this.handlers.addFusionGeneFilters;
-                props.onResetSelection = this.handlers.resetFustionGeneFilter;
+                props.onValueSelection = this.store.addFusionGeneFilters;
+                props.onResetSelection = this.store.resetFusionGeneFilter;
                 props.selectedGenes=this.store.selectedGenes;
                 props.onGeneSelect=this.store.onCheckGene;
                 props.title = props.title + ( !this.store.molecularProfileSampleCounts.isComplete || this.store.molecularProfileSampleCounts.result === undefined ? '' : ` (${this.store.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples} profiled samples)`),
+                props.getData = () => this.store.getFusionGenesDownloadData();
                 props.downloadTypes = ["Data"];
                 break;
             }

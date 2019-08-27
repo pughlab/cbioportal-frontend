@@ -1,13 +1,9 @@
 import * as React from "react";
-import {GeneIdentifier, MutatedGenesData, AlteredCountByGeneWithCancerGene} from "pages/studyView/StudyViewPageStore";
+import {AlteredCountByGeneWithCancerGene} from "pages/studyView/StudyViewPageStore";
 import { observer } from "mobx-react";
 import styles from "./tables.module.scss";
 import LabeledCheckbox from "../../../shared/components/labeledCheckbox/LabeledCheckbox";
-import MobxPromise from "mobxpromise";
-import { If } from "react-if";
 import * as _ from "lodash";
-import classnames from "classnames";
-import DefaultTooltip from "public-lib/components/defaultTooltip/DefaultTooltip";
 import FixedHeaderTable from "./FixedHeaderTable";
 import { action, computed, IReactionDisposer, observable, reaction } from "mobx";
 import autobind from "autobind-decorator";
@@ -16,19 +12,17 @@ import {
     correctColumnWidth,
     getFixedHeaderNumberCellMargin,
     getFixedHeaderTableMaxLengthStringPixel,
-    getFrequencyStr,
-    getQValue
+    getFrequencyStr
 } from "../StudyViewUtils";
 import {Column, SortDirection} from "../../../shared/components/lazyMobXTable/LazyMobXTable";
-import { DEFAULT_SORTING_COLUMN } from "../StudyViewConfig";
-import {GenePanel, GenePanelToGene} from "shared/api/generated/CBioPortalAPI";
 import { GenePanelModal } from "./GenePanelModal";
-import {getFreqColumnRender,
-        getGeneColumnHeaderRender,
-        IAlteredGenesTablePros,
-        AlteredGenesTableUserSelectionWithIndex} from "pages/studyView/TableUtils";
+import {
+    getFreqColumnRender,
+    getGeneColumnHeaderRender,
+    IAlteredGenesTablePros,
+    AlteredGenesTableUserSelectionWithIndex, rowIsChecked, rowIsDisabled
+} from "pages/studyView/TableUtils";
 import {GeneCell} from "pages/studyView/table/GeneCell";
-import MobxPromiseCache from "shared/lib/MobxPromiseCache";
 
 enum ColumnKey {
     GENE = "Gene",
@@ -241,34 +235,12 @@ export class MutatedGenesTable extends React.Component<IAlteredGenesTablePros, {
 
     @autobind
     isChecked(entrezGeneId: number) {
-        const record = _.find(
-            this.preSelectedRows,
-            (row: AlteredGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId
-        );
-        if (_.isUndefined(record)) {
-            return (
-                this.selectedRows.length > 0 &&
-                !_.isUndefined(
-                    _.find(
-                        this.selectedRows,
-                        (row: AlteredGenesTableUserSelectionWithIndex) =>
-                            row.entrezGeneId === entrezGeneId
-                    )
-                )
-            );
-        } else {
-            return true;
-        }
+        return rowIsChecked(entrezGeneId, this.preSelectedRows, this.selectedRows);
     }
 
     @autobind
     isDisabled(entrezGeneId: number) {
-        return !_.isUndefined(
-            _.find(
-                this.selectedRows,
-                (row: AlteredGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId
-            )
-        );
+        return rowIsDisabled(entrezGeneId, this.selectedRows);
     }
 
     @autobind

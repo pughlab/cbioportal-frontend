@@ -907,7 +907,7 @@ export class StudyViewPageStore {
 
     @autobind
     @action
-    clearGeneFilter() {
+    clearMutatedGeneFilter() {
         this._mutatedGeneFilter = [];
     }
 
@@ -935,7 +935,8 @@ export class StudyViewPageStore {
     clearAllFilters() {
         this._clinicalDataEqualityFilterSet.clear();
         this._clinicalDataIntervalFilterSet.clear();
-        this.clearGeneFilter();
+        this.clearMutatedGeneFilter();
+        this.clearFusionGeneFilter();
         this.clearCNAGeneFilter();
         this.resetMutationCountVsCNAFilter();
         this._chartSampleIdentifiersFilterSet.clear();
@@ -1097,7 +1098,7 @@ export class StudyViewPageStore {
 
     @autobind
     @action
-    removeGeneFilter(toBeRemoved: number) {
+    removeMutatedGeneFilter(toBeRemoved: number) {
         this._mutatedGeneFilter = _.reduce(this._mutatedGeneFilter, (acc, next) => {
             const newGroup = _.reduce(next.entrezGeneIds, (list, entrezGeneId) => {
                 if (entrezGeneId !== toBeRemoved) {

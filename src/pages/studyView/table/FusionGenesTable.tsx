@@ -15,11 +15,12 @@ import {
     getFrequencyStr
 } from "../StudyViewUtils";
 import {Column, SortDirection} from "../../../shared/components/lazyMobXTable/LazyMobXTable";
-import { GenePanelModal } from "./GenePanelModal";
-import {getFreqColumnRender,
-        getGeneColumnHeaderRender,
-        IAlteredGenesTablePros,
-        AlteredGenesTableUserSelectionWithIndex} from "pages/studyView/TableUtils";
+import {
+    getFreqColumnRender,
+    getGeneColumnHeaderRender,
+    IAlteredGenesTablePros,
+    AlteredGenesTableUserSelectionWithIndex, rowIsChecked, rowIsDisabled
+} from "pages/studyView/TableUtils";
 import {GeneCell} from "pages/studyView/table/GeneCell";
 
 enum ColumnKey {
@@ -37,33 +38,10 @@ export class FusionGenesTable extends React.Component<IAlteredGenesTablePros, {}
     @observable private sortBy: string = ColumnKey.FREQ;
     @observable private sortDirection: SortDirection;
     @observable private cancerGeneFilterIconEnabled = true;
-    @observable private modalSettings: {
-        modalOpen: boolean;
-        modalPanelName: string;
-    } = {
-        modalOpen: false,
-        modalPanelName: ""
-    };
 
     public static defaultProps = {
         cancerGeneFilterEnabled: false
     };
-
-    @autobind
-    @action
-    toggleModal(panelName: string) {
-        this.modalSettings.modalOpen = !this.modalSettings.modalOpen;
-        if (!this.modalSettings.modalOpen) {
-            return;
-        }
-        this.modalSettings.modalPanelName = panelName;
-    }
-
-    @autobind
-    @action
-    closeModal() {
-        this.modalSettings.modalOpen = !this.modalSettings.modalOpen;
-    }
 
     @computed
     get columnsWidth() {
@@ -214,7 +192,7 @@ export class FusionGenesTable extends React.Component<IAlteredGenesTablePros, {}
                     return <div style={{ marginLeft: this.cellMargin[ColumnKey.FREQ] }}>Freq</div>;
                 },
                 render: (data: AlteredCountByGeneWithCancerGene) => {
-                    return getFreqColumnRender('fusion', data.numberOfSamplesProfiled, data.numberOfAlteredCases, data.matchingGenePanelIds, this.toggleModal, {marginLeft: this.cellMargin[ColumnKey.FREQ]});
+                    return getFreqColumnRender('fusion', data.numberOfSamplesProfiled, data.numberOfAlteredCases, data.matchingGenePanelIds, undefined, {marginLeft: this.cellMargin[ColumnKey.FREQ]});
                 },
                 sortBy: (data: AlteredCountByGeneWithCancerGene) =>
                     (data.numberOfAlteredCases / data.numberOfSamplesProfiled) * 100,
@@ -231,34 +209,12 @@ export class FusionGenesTable extends React.Component<IAlteredGenesTablePros, {}
 
     @autobind
     isChecked(entrezGeneId: number) {
-        const record = _.find(
-            this.preSelectedRows,
-            (row: AlteredGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId
-        );
-        if (_.isUndefined(record)) {
-            return (
-                this.selectedRows.length > 0 &&
-                !_.isUndefined(
-                    _.find(
-                        this.selectedRows,
-                        (row: AlteredGenesTableUserSelectionWithIndex) =>
-                            row.entrezGeneId === entrezGeneId
-                    )
-                )
-            );
-        } else {
-            return true;
-        }
+        return rowIsChecked(entrezGeneId, this.preSelectedRows, this.selectedRows);
     }
 
     @autobind
     isDisabled(entrezGeneId: number) {
-        return !_.isUndefined(
-            _.find(
-                this.selectedRows,
-                (row: AlteredGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId
-            )
-        );
+        return rowIsDisabled(entrezGeneId, this.selectedRows);
     }
 
     @autobind
@@ -366,12 +322,6 @@ export class FusionGenesTable extends React.Component<IAlteredGenesTablePros, {}
                         afterSorting={this.afterSorting}
                     />
                 )}
-                <GenePanelModal
-                    show={this.modalSettings.modalOpen}
-                    genePanelCache={this.props.genePanelCache}
-                    panelName={this.modalSettings.modalPanelName}
-                    hide={this.closeModal}
-                />
             </>
         );
     }

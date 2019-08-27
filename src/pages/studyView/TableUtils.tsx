@@ -11,6 +11,8 @@ import MobxPromiseCache from "shared/lib/MobxPromiseCache";
 import {CSSProperties} from "react";
 import MobxPromise from "mobxpromise";
 import {GeneIdentifier, AlteredCountByGeneWithCancerGene} from "pages/studyView/StudyViewPageStore";
+import { If , Then, Else } from "react-if";
+import * as _ from "lodash";
 
 export interface IAlteredGenesTablePros {
     promise: MobxPromise<AlteredCountByGeneWithCancerGene[]>;
@@ -69,27 +71,70 @@ export function getCancerGeneFilterToggleIcon(isFilteredByCancerGeneList:boolean
     return <span data-test='cancer-gene-filter' className={classnames(styles.cancerGeneIcon, styles.displayFlex)} style={{color: isFilteredByCancerGeneList ? ICON_FILTER_ON : ICON_FILTER_OFF}}><i className='fa fa-filter'></i></span>;
 }
 
-export function getFreqColumnRender(type: 'mutation' | 'fusion' | 'cna', numberOfSamplesProfiled: number, numberOfAlteredCases: number, matchingGenePanelIds: string[], toggleModal: (panelName: string) => void, style?:CSSProperties) {
-    const addTotalProfiledOverlay = () => (
+export function getFreqColumnRender(type: 'mutation' | 'fusion' | 'cna', numberOfSamplesProfiled: number, numberOfAlteredCases: number, matchingGenePanelIds: string[], toggleModal?: (panelName: string) => void, style?:CSSProperties) {
+    const addTotalProfiledOverlay = (profiledType: 'mutation' | 'cna') => (
         <span style={{display: 'flex', flexDirection: 'column'}} data-test='freq-cell-tooltip'>
-            <span>{`# of samples profiled for ${type === 'mutation' ? 'mutations' : 'copy number alterations'} in this gene: ${numberOfSamplesProfiled.toLocaleString()}`}</span>
+            <span>{`# of samples profiled for ${profiledType === 'mutation' ? 'mutations' : 'copy number alterations'} in this gene: ${numberOfSamplesProfiled.toLocaleString()}`}</span>
             <GenePanelList
                 genePanelIds={matchingGenePanelIds}
-                toggleModal={toggleModal}
+                toggleModal={toggleModal!}
             />
         </span>
     );
-    return (
-        <DefaultTooltip
-            placement="right"
-            overlay={addTotalProfiledOverlay}
-            destroyTooltipOnHide={true}
-        >
-            <span data-test='freq-cell' style={style}>
+
+    function getCellContent() {
+        return <span data-test='freq-cell' style={style}>
                 {getFrequencyStr(
                     (numberOfAlteredCases / numberOfSamplesProfiled) * 100
                 )}
-            </span>
-        </DefaultTooltip>
+            </span>;
+    }
+
+    return (
+        <If condition={type === 'fusion'}>
+            <Then>
+                {getCellContent()}
+            </Then>
+            <Else>
+                <DefaultTooltip
+                    placement="right"
+                    disabled={type === 'fusion'}
+                    overlay={addTotalProfiledOverlay}
+                    destroyTooltipOnHide={true}
+                >
+                    {getCellContent()}
+                </DefaultTooltip>
+            </Else>
+        </If>
+    );
+}
+
+export function rowIsChecked(entrezGeneId:number, preSelectedRows:AlteredGenesTableUserSelectionWithIndex[], selectedRows:AlteredGenesTableUserSelectionWithIndex[]) {
+    const record = _.find(
+        preSelectedRows,
+        (row: AlteredGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId
+    );
+    if (_.isUndefined(record)) {
+        return (
+            selectedRows.length > 0 &&
+            !_.isUndefined(
+                _.find(
+                    selectedRows,
+                    (row: AlteredGenesTableUserSelectionWithIndex) =>
+                        row.entrezGeneId === entrezGeneId
+                )
+            )
+        );
+    } else {
+        return true;
+    }
+}
+
+export function rowIsDisabled(entrezGeneId: number, selectedRows:AlteredGenesTableUserSelectionWithIndex[]) {
+    return !_.isUndefined(
+        _.find(
+            selectedRows,
+            (row: AlteredGenesTableUserSelectionWithIndex) => row.entrezGeneId === entrezGeneId
+        )
     );
 }

@@ -1083,7 +1083,7 @@ export async function fetchPharmacoDbCnaView(oncotreecode:MobxPromise<string>,
             }
         });
     
-        let pharmacoDBViewList: IPharmacoDBViewList = (await getPharmacoDBCnaView(oncoTreeCode,querySymbols));
+        let pharmacoDBViewList: IPharmacoDBViewList = (await getPharmacoDBCnaView(otc,querySymbols));
     
         return pharmacoDBViewList;
     } else {

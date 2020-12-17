@@ -1050,12 +1050,12 @@ export async function fetchDiscreteCNAData(
 PharmacoDB CNA View
 */ 
 
-export async function fetchPharmacoDbCnaView(oncotreecode:MobxPromise<string>,
+export async function fetchPharmacoDbCnaView(oncotreecode:string,
                                              discreteCNAData:MobxPromise<DiscreteCopyNumberData[]>)
 {
     let otc:string = '';
     
-    otc = oncotreecode.result || '';
+    otc = oncotreecode;
 
     if (discreteCNAData.result && discreteCNAData.result.length > 0) {
          

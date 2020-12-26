@@ -32,6 +32,7 @@ import {
 } from 'cbioportal-utils';
 import { CancerGene } from 'oncokb-ts-api-client';
 import { getPercentage } from 'shared/lib/FormatUtils';
+import { IPharmacoDBCnaEntry, IPharmacoDBViewList, IPharmacoDBViewListDataWrapper } from 'shared/model/PharmacoDB';
 
 class CNATableComponent extends LazyMobXTable<DiscreteCopyNumberData[]> {}
 
@@ -54,6 +55,8 @@ type ICopyNumberTableWrapperProps = {
     pubMedCache?: PubMedCache;
     referenceGenes: ReferenceGenomeGene[];
     data: DiscreteCopyNumberData[][];
+    enablePharmacoDB?:boolean;
+    cnaPharmacoDBViewListDW? : IPharmacoDBViewListDataWrapper;
     copyNumberCountCache?: CopyNumberCountCache;
     mrnaExprRankCache?: MrnaExprRankCache;
     gisticData: IGisticData;
@@ -83,6 +86,7 @@ export default class CopyNumberTableWrapper extends React.Component<
         enableOncoKb: true,
         enableCivic: false,
         showGeneFilterMenu: true,
+        enablePharmacoDB: true
     };
 
     @computed get hugoGeneSymbolToCytoband() {
@@ -222,6 +226,8 @@ export default class CopyNumberTableWrapper extends React.Component<
                     civicGenes: this.props.cnaCivicGenes,
                     civicVariants: this.props.cnaCivicVariants,
                     enableCivic: this.props.enableCivic as boolean,
+                    cnaPharmacoDBViewListDW: this.props.cnaPharmacoDBViewListDW,
+                    enablePharmacoDB: this.props.enablePharmacoDB as boolean,
                     enableMyCancerGenome: false,
                     enableHotspot: false,
                     userEmailAddress: this.props.userEmailAddress,
@@ -235,7 +241,8 @@ export default class CopyNumberTableWrapper extends React.Component<
                     this.props.cnaOncoKbData,
                     this.props.uniqueSampleKeyToTumorType,
                     this.props.cnaCivicGenes,
-                    this.props.cnaCivicVariants
+                    this.props.cnaCivicVariants,
+                    this.props.cnaPharmacoDBViewListDW
                 );
             },
             order: 50,

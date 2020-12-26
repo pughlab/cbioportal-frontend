@@ -26,6 +26,8 @@ import { IAnnotationColumnProps } from 'shared/components/mutationTable/column/A
 import { CancerGene, IndicatorQueryResp } from 'oncokb-ts-api-client';
 import { getAlterationString } from 'shared/lib/CopyNumberUtils';
 import { getCivicCNAVariants } from 'shared/lib/CivicUtils';
+import PharmacoDB from "shared/components/annotation/PharmacoDB";
+import { IPharmacoDBCnaEntry, IPharmacoDBView, IPharmacoDBViewList, IPharmacoDBViewListDataWrapper } from 'shared/model/PharmacoDB';
 
 /**
  * @author Selcuk Onur Sumer
@@ -39,6 +41,7 @@ export default class AnnotationColumnFormatter {
         uniqueSampleKeyToTumorType?: { [sampleId: string]: string },
         civicGenes?: RemoteData<ICivicGene | undefined>,
         civicVariants?: RemoteData<ICivicVariant | undefined>,
+        cnaPharmacoDBViewListDW? : IPharmacoDBViewListDataWrapper,
         studyIdToStudy?: { [studyId: string]: CancerStudy }
     ) {
         let value: IAnnotation;
@@ -143,7 +146,10 @@ export default class AnnotationColumnFormatter {
                               civicVariants.result
                           )
                         : true,
-                myCancerGenomeLinks: [],
+                    pharmacoDBView: cnaPharmacoDBViewListDW && cnaPharmacoDBViewListDW.result ? 
+                                        AnnotationColumnFormatter.getPharamacoDBView(copyNumberData, cnaPharmacoDBViewListDW.result) : undefined,
+                    pharmacoDBStatus: cnaPharmacoDBViewListDW && cnaPharmacoDBViewListDW.status ? cnaPharmacoDBViewListDW.status : "pending",    
+                    myCancerGenomeLinks: [],
                 hotspotStatus: 'complete',
                 isHotspot: false,
                 is3dHotspot: false,
@@ -155,6 +161,22 @@ export default class AnnotationColumnFormatter {
         return value;
     }
 
+    /**
+    * Returns an IPharmacoDBView if the oncoTreeCode, Gene and CNA Status match
+    * Otherwise it returns an empty object.
+    * Todo: Need to match against all 3 parameters
+    */
+   public static getPharamacoDBView(copyNumberData:DiscreteCopyNumberData[], cnaPharmacoDBViewListDW : IPharmacoDBViewList): IPharmacoDBView | null 
+   {
+       
+       let pharmacoDBView = null;
+       let geneSymbol: string = copyNumberData[0].gene.hugoGeneSymbol;
+       if (cnaPharmacoDBViewListDW[geneSymbol])
+       {
+           pharmacoDBView = cnaPharmacoDBViewListDW[geneSymbol];
+       }
+       return pharmacoDBView;
+   }
     /**
      * Returns an ICivicEntry if the civicGenes and civicVariants have information about the gene and the mutation (variant) specified. Otherwise it returns
      * an empty object.
@@ -256,7 +278,8 @@ export default class AnnotationColumnFormatter {
         oncoKbData?: RemoteData<IOncoKbData | Error | undefined>,
         uniqueSampleKeyToTumorType?: { [sampleId: string]: string },
         civicGenes?: RemoteData<ICivicGene | undefined>,
-        civicVariants?: RemoteData<ICivicVariant | undefined>
+        civicVariants?: RemoteData<ICivicVariant | undefined>,
+        cnaPharmacoDBViewListDW?:IPharmacoDBViewListDataWrapper
     ): number[] {
         const annotationData: IAnnotation = AnnotationColumnFormatter.getData(
             data,
@@ -265,13 +288,15 @@ export default class AnnotationColumnFormatter {
             usingPublicOncoKbInstance,
             uniqueSampleKeyToTumorType,
             civicGenes,
-            civicVariants
+            civicVariants,
+            cnaPharmacoDBViewListDW
         );
 
         return _.flatten([
             oncoKbAnnotationSortValue(annotationData.oncoKbIndicator),
             civicSortValue(annotationData.civicEntry),
             annotationData.isOncoKbCancerGene ? 1 : 0,
+            PharmacoDB.sortValue(annotationData.pharmacoDBView),
         ]);
     }
 
@@ -287,6 +312,7 @@ export default class AnnotationColumnFormatter {
             columnProps.uniqueSampleKeyToTumorType,
             columnProps.civicGenes,
             columnProps.civicVariants,
+            columnProps.cnaPharmacoDBViewListDW,
             columnProps.studyIdToStudy
         );
 

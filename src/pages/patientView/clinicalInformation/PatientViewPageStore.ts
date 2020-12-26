@@ -118,6 +118,8 @@ import {
     parseOtherBiomarkerQueryId,
     tumorTypeResolver,
 } from 'shared/lib/StoreUtils';
+import {IPharmacoDBViewList} from "shared/model/PharmacoDB";
+import {fetchPharmacoDbCnaView} from "shared/lib/StoreUtils";
 import {
     computeGenePanelInformation,
     CoverageInformation,
@@ -2685,4 +2687,15 @@ export class PatientViewPageStore {
         },
         default: {},
     });
+    readonly cnaPharmacoDBViewList = remoteData<IPharmacoDBViewList | undefined>({
+        await: () => [
+            this.discreteCNAData,
+            this.clinicalDataForSamples
+        ],
+        invoke: async() => AppConfig.serverConfig.show_pharmacodb ? fetchPharmacoDbCnaView(this.uniqueSampleKeyToOncoTreeCode,this.discreteCNAData) : {},
+        onError: (err: Error) => {
+            // fail silently
+        }
+    }, undefined);
 }
+

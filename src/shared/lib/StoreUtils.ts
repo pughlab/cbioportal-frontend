@@ -1050,12 +1050,10 @@ export async function fetchDiscreteCNAData(
 PharmacoDB CNA View
 */ 
 
-export async function fetchPharmacoDbCnaView(oncotreecode:string,
+export async function fetchPharmacoDbCnaView(uniqueSampleKeyToOncoTreeCode:{[uniqueSampleKey: string]: string},
                                              discreteCNAData:MobxPromise<DiscreteCopyNumberData[]>)
 {
-    let otc:string = '';
     
-    otc = oncotreecode;
 
     if (discreteCNAData.result && discreteCNAData.result.length > 0) {
          
@@ -1077,13 +1075,14 @@ export async function fetchPharmacoDbCnaView(oncotreecode:string,
                         alteration ='AMP';
                     break;
                 } 
-                const pharmacoDBCnaRequest:IPharmacoDBCnaRequest = {gene:cna.gene.hugoGeneSymbol,cna:alteration};
+                const otc = uniqueSampleKeyToOncoTreeCode[cna.uniqueSampleKey] || '';
+                const pharmacoDBCnaRequest:IPharmacoDBCnaRequest = {oncotreecode:otc, gene:cna.gene.hugoGeneSymbol,cna:alteration};
                 querySymbols.push(pharmacoDBCnaRequest);
                 alteration ='';
             }
         });
     
-        let pharmacoDBViewList: IPharmacoDBViewList = (await getPharmacoDBCnaView(otc,querySymbols));
+        let pharmacoDBViewList: IPharmacoDBViewList = (await getPharmacoDBCnaView(querySymbols));
     
         return pharmacoDBViewList;
     } else {
@@ -1178,6 +1177,22 @@ export function findMrnaRankMolecularProfileId(
 
         return fallbackProfile ? fallbackProfile.molecularProfileId : null;
     }
+}
+
+export function generateUniqueSampleKeyToOncoTreeCodeMap(clinicalDataForSamples: MobxPromise<ClinicalData[]>): {[sampleId: string]: string}
+{
+    const map: { [sampleId: string]: string } = {};
+
+    if (clinicalDataForSamples.result) {
+        //  only ONCOTREE_CODE in clinical data can be used for each sample
+        _.each(clinicalDataForSamples.result, (clinicalData: ClinicalData) => {
+            if (clinicalData.clinicalAttributeId === "ONCOTREE_CODE") {
+                map[clinicalData.uniqueSampleKey] = clinicalData.value;
+            }
+        });
+    }
+
+    return map;
 }
 
 export function generateUniqueSampleKeyToTumorTypeMap(

@@ -166,17 +166,45 @@ export default class AnnotationColumnFormatter {
     * Otherwise it returns an empty object.
     * Todo: Need to match against all 3 parameters
     */
-   public static getPharamacoDBView(copyNumberData:DiscreteCopyNumberData[], cnaPharmacoDBViewListDW : IPharmacoDBViewList): IPharmacoDBView | null 
-   {
-       
-       let pharmacoDBView = null;
-       let geneSymbol: string = copyNumberData[0].gene.hugoGeneSymbol;
-       if (cnaPharmacoDBViewListDW[geneSymbol])
-       {
-           pharmacoDBView = cnaPharmacoDBViewListDW[geneSymbol];
-       }
-       return pharmacoDBView;
-   }
+     public static getPharamacoDBView(copyNumberData:DiscreteCopyNumberData[], 
+        uniqueSampleKeyToOncoTreeCode:{[uniqueSampleKey: string]: string},
+        cnaPharmacoDBViewListDW : IPharmacoDBViewList): IPharmacoDBView | null
+    {
+        
+        let pharmacoDBView = null;
+        let geneSymbol: string = copyNumberData[0].gene.hugoGeneSymbol;
+        let alteration:number = copyNumberData[0].alteration;
+        let status:string = '';
+        if(alteration != 0) {
+            switch (alteration) {
+                case -2:
+                    status ='DEEPDEL';
+                break;
+                case -1:
+                    status ='SHALLOWDEL';
+                break;
+                case 1:
+                    status ='GAIN';
+                break;
+                case 2:
+                    status ='AMP';
+                break;
+                default:
+                    status='';
+                break;
+            } 
+        }
+        let otc:string = '';
+        if(uniqueSampleKeyToOncoTreeCode && uniqueSampleKeyToOncoTreeCode[copyNumberData[0].uniqueSampleKey])
+            otc = uniqueSampleKeyToOncoTreeCode[copyNumberData[0].uniqueSampleKey];
+        let key:string = geneSymbol + otc + status;
+        if (cnaPharmacoDBViewListDW && cnaPharmacoDBViewListDW[key])
+        {
+            pharmacoDBView = cnaPharmacoDBViewListDW[key] ;
+        }
+        return pharmacoDBView;
+    }
+
     /**
      * Returns an ICivicEntry if the civicGenes and civicVariants have information about the gene and the mutation (variant) specified. Otherwise it returns
      * an empty object.

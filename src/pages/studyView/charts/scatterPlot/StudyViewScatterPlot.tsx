@@ -13,7 +13,7 @@ import {DOWNSAMPLE_PIXEL_DISTANCE_THRESHOLD, getDownsampledData, MAX_DOT_SIZE} f
 import {ClinicalAttribute, SampleIdentifier} from "../../../../shared/api/generated/CBioPortalAPI";
 import LoadingIndicator from "shared/components/loadingIndicator/LoadingIndicator"
 import $ from "jquery";
-import {AnalysisGroup} from "../../StudyViewPageStore";
+import {AnalysisGroup} from "../../StudyViewUtils";
 import {AbstractChart} from "../ChartContainer";
 
 export interface IStudyViewScatterPlotData {
@@ -91,8 +91,8 @@ export default class StudyViewScatterPlot extends React.Component<IStudyViewScat
     }
 
     componentWillUnmount() {
-        $(document).off("keydown",this.onKeyDown);
-        $(document).off("keyup", this.onKeyUp);
+        $(document).off("keydown" as any,this.onKeyDown as any);
+        $(document).off("keyup" as any, this.onKeyUp as any);
     }
 
     public toSVGDOMNode(): Element {

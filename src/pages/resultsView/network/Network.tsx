@@ -43,17 +43,18 @@ export default class Network extends React.Component<INetworkTabParams, {}> {
 
         };
 
-        let path = (/\/\/localhost|127\.0\.0\.1/.test(AppConfig.frontendUrl!)) ?
-            AppConfig.frontendUrl! :
-            `//${AppConfig.baseUrl!}`;
-
         const strParams = encodeURIComponent(JSON.stringify(networkParams));
-        return `${trimTrailingSlash(path)}/reactapp/network/network.htm?${AppConfig.serverConfig.app_version}&apiHost=${encodeURIComponent(AppConfig.apiRoot!.replace(/^http[s]?:\/\//,''))}#${strParams}`;
+        return `${trimTrailingSlash(AppConfig.frontendUrl!)}/reactapp/network/network.htm?${AppConfig.serverConfig.app_version}&apiHost=${encodeURIComponent(AppConfig.apiRoot!.replace(/^http[s]?:\/\//,''))}#${strParams}`;
     }
 
     render(){
 
-        return <IFrameLoader iframeId={"networkFrame"} url={this.url} height={800} />;
+        return <>
+                <div className={"alert alert-info"}>
+                    The Network tab will be retired on 11/1/2019. For similar functionality, please visit <a href={"http://www.pathwaycommons.org/pcviz/"} target="_blank">http://www.pathwaycommons.org/pcviz/</a>
+                </div>
+                <IFrameLoader iframeId={"networkFrame"} url={this.url} height={800} />
+            </>;
 
     }
 

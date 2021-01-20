@@ -1,6 +1,5 @@
 import { assert } from 'chai';
-import {indexHotspots} from "./CancerHotspotsUtils";
-import {IHotspotIndex} from "shared/model/CancerHotspots";
+import {IHotspotIndex, indexHotspots} from "react-mutation-mapper";
 import {isRecurrentHotspot, is3dHotspot} from './AnnotationUtils';
 import {initMutation} from "test/MutationMockUtils";
 
@@ -89,6 +88,13 @@ describe('AnnotationUtils', () => {
                 referenceAllele: "A",
                 variantAllele: "T"
             },
+            transcriptId: '',
+            proteinLocation: {
+                transcriptId: '',
+                start: 0,
+                end: 0,
+                mutationType: ''
+            },
             variant: "17:g.66A>T",
             hotspots: [
                 {
@@ -116,6 +122,13 @@ describe('AnnotationUtils', () => {
                 end: 668,
                 referenceAllele: "G",
                 variantAllele: "CAT"
+            },
+            transcriptId: '',
+            proteinLocation: {
+                transcriptId: '',
+                start: 0,
+                end: 0,
+                mutationType: ''
             },
             variant: "3:g.666G>CAT",
             hotspots: [
@@ -147,6 +160,13 @@ describe('AnnotationUtils', () => {
                 end: 111,
                 referenceAllele: "T",
                 variantAllele: "C"
+            },
+            transcriptId: '',
+            proteinLocation: {
+                transcriptId: '',
+                start: 0,
+                end: 0,
+                mutationType: ''
             },
             variant: "4:g.111T>C",
             hotspots: [

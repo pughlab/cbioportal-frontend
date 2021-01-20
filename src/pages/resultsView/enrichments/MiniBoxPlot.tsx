@@ -14,7 +14,7 @@ import { getDownloadContent, getAlterationsTooltipContent, shortenGenesLabel,
 import autobind from 'autobind-decorator';
 import CBIOPORTAL_VICTORY_THEME from "../../../shared/theme/cBioPoralTheme";
 import {getSampleViewUrl} from "../../../shared/api/urls";
-import DownloadControls from "../../../shared/components/downloadControls/DownloadControls";
+import DownloadControls from "../../../public-lib/components/downloadControls/DownloadControls";
 
 export interface IMiniBoxPlotProps {
     selectedGeneHugo: string;
@@ -113,16 +113,16 @@ export default class MiniBoxPlot extends React.Component<IMiniBoxPlotProps, {}> 
             <div>
                 {this.props.selectedGeneHugo && this.scatterData.length > 0 &&
                     <div>
-                        <div className="small" style={{ margin:"10px 0", paddingRight:20 }}>
-                            Boxplots of {this.props.selectedProfile.name} data for altered and unaltered cases
-                        </div>
+                        {/*<div className="small" style={{ margin:"10px 0", paddingRight:20 }}>*/}
+                        {/*    Boxplots of {this.props.selectedProfile.name} data for altered and unaltered cases*/}
+                        {/*</div>*/}
                         <div className="posRelative">
                             <div className="borderedChart inlineBlock posRelative" data-test="MiniBoxPlot">
                                 <DownloadControls
                                     buttons={["SVG", "PNG", "Data"]}
                                     getSvg={this.getSvg}
                                     getData={this.getData}
-                                    collapse={true}
+                                    type='button'
                                     dontFade={true}
                                     style={{position:'absolute', zIndex:10, right: 10 }}
                                     filename={FILE_NAME}
@@ -168,9 +168,9 @@ export default class MiniBoxPlot extends React.Component<IMiniBoxPlotProps, {}> 
                     </div>
                 }
                 {!this.props.selectedGeneHugo &&
-                    <div className="borderedChart inlineBlock" style={{ marginTop:20}}>
-                        <div className="text-center" style={{width:350}}>
-                            Click on a gene in table to render plots here.
+                    <div className="borderedChart inlineBlock">
+                        <div className="text-center" style={{ width: 350, height: 350, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                            Click on a gene in the table to render this plot.
                         </div>
                     </div>
                 }

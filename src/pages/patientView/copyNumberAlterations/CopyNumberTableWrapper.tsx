@@ -33,6 +33,7 @@ import {
 import { CancerGene } from 'oncokb-ts-api-client';
 import { getPercentage } from 'shared/lib/FormatUtils';
 import { IPharmacoDBCnaEntry, IPharmacoDBViewList, IPharmacoDBViewListDataWrapper } from 'shared/model/PharmacoDB';
+import PharmacoDBCnaCache from "shared/cache/PharmacoDBCnaCache";
 
 class CNATableComponent extends LazyMobXTable<DiscreteCopyNumberData[]> {}
 
@@ -57,6 +58,7 @@ type ICopyNumberTableWrapperProps = {
     data: DiscreteCopyNumberData[][];
     enablePharmacoDB?:boolean;
     cnaPharmacoDBViewListDW? : IPharmacoDBViewListDataWrapper;
+    pharmacoDBCnaCache?: PharmacoDBCnaCache;
     copyNumberCountCache?: CopyNumberCountCache;
     mrnaExprRankCache?: MrnaExprRankCache;
     gisticData: IGisticData;
@@ -228,6 +230,7 @@ export default class CopyNumberTableWrapper extends React.Component<
                     enableCivic: this.props.enableCivic as boolean,
                     cnaPharmacoDBViewListDW: this.props.cnaPharmacoDBViewListDW,
                     enablePharmacoDB: this.props.enablePharmacoDB as boolean,
+                    pharmacoDBCnaCache: this.props.pharmacoDBCnaCache,
                     enableMyCancerGenome: false,
                     enableHotspot: false,
                     userEmailAddress: this.props.userEmailAddress,

@@ -120,6 +120,7 @@ import {
 } from 'shared/lib/StoreUtils';
 import {IPharmacoDBViewList} from "shared/model/PharmacoDB";
 import {fetchPharmacoDbCnaView} from "shared/lib/StoreUtils";
+import PharmacoDBCnaCache from "shared/cache/PharmacoDBCnaCache";
 import {
     computeGenePanelInformation,
     CoverageInformation,
@@ -2324,6 +2325,10 @@ export class PatientViewPageStore {
         return new PubMedCache();
     }
 
+    @cached get pharmacoDBCnaCache() {
+        return new PharmacoDBCnaCache();
+    }
+
     @cached @computed get copyNumberCountCache() {
         return new CopyNumberCountCache(this.molecularProfileIdDiscrete.result);
     }
@@ -2698,4 +2703,3 @@ export class PatientViewPageStore {
         }
     }, undefined);
 }
-

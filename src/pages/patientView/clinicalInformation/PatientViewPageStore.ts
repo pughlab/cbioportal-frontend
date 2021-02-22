@@ -18,8 +18,7 @@ import request from 'superagent';
 import DiscreteCNACache from "shared/cache/DiscreteCNACache";
 import {
     getDarwinUrl,
-    getDigitalSlideArchiveMetaUrl,
-    getPathologySlideCheckUrl
+    getDigitalSlideArchiveMetaUrl
 } from "../../../shared/api/urls";
 import OncoKbEvidenceCache from "shared/cache/OncoKbEvidenceCache";
 import PubMedCache from "shared/cache/PubMedCache";
@@ -351,17 +350,6 @@ export class PatientViewPageStore {
         }
 
     }, []);
-
-    readonly pathologySlides = remoteData({
-        await: () => [this.derivedPatientId],
-        invoke: async() => {
-            let resp: any = await request.get(getPathologySlideCheckUrl(this.patientId));
-            return JSON.parse(resp.text);
-        },
-        onError: ()=>{
-            //fail silently
-        }
-    }, false);	  
 
     readonly cosmicData = remoteData({
         await: () => [

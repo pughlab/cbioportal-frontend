@@ -1,122 +1,195 @@
-import * as _ from "lodash";
-import {computed} from "mobx";
-import MobxPromise, {cached, labelMobxPromises} from "mobxpromise";
+import autobind from 'autobind-decorator';
+import { computed, makeObservable } from 'mobx';
+import MobxPromise, { cached } from 'mobxpromise';
+import memoize from 'memoize-weak-decorator';
 
 import {
-    DataFilter, defaultHotspotFilter,
+    applyDataFilters,
+    DataFilterType,
     DefaultMutationMapperDataFetcher,
-    DefaultMutationMapperStore, defaultOncoKbFilter,
-    getMutationsToTranscriptId,
+    groupDataByProteinImpactType,
     groupOncoKbIndicatorDataByMutations,
-    IHotspotIndex, isHotspot
-} from "react-mutation-mapper";
-
-import genomeNexusClient from "shared/api/genomeNexusClientInstance";
-import internalGenomeNexusClient from "shared/api/genomeNexusInternalClientInstance";
-import oncoKBClient from "shared/api/oncokbClientInstance";
-import {Gene, Mutation} from "shared/api/generated/CBioPortalAPI";
-import {IOncoKbData} from "shared/model/OncoKB";
-import ResidueMappingCache from "shared/cache/ResidueMappingCache";
-import {remoteData} from "public-lib/api/remoteData";
+    DefaultMutationMapperStore,
+    ONCOKB_DEFAULT_INFO,
+    ApplyFilterFn,
+} from 'react-mutation-mapper';
 import {
-    fetchPdbAlignmentData, indexPdbAlignmentData
-} from "shared/lib/StoreUtils";
+    defaultOncoKbIndicatorFilter,
+    IHotspotIndex,
+    getMutationsByTranscriptId,
+} from 'cbioportal-utils';
+import { remoteData } from 'cbioportal-frontend-commons';
+import { Gene, Mutation } from 'cbioportal-ts-api-client';
 import {
-    EnsemblTranscript,
-    VariantAnnotation
-} from "public-lib/api/generated/GenomeNexusAPI";
-import {CancerGene} from "public-lib/api/generated/OncoKbAPI";
-import {IPdbChain, PdbAlignmentIndex} from "shared/model/Pdb";
-import {calcPdbIdNumericalValue, mergeIndexedPdbAlignments, PDB_IGNORELIST} from "shared/lib/PdbUtils";
-import {lazyMobXTableSort} from "shared/components/lazyMobXTable/LazyMobXTable";
-import {MutationTableDownloadDataFetcher} from "shared/lib/MutationTableDownloadDataFetcher";
+    VariantAnnotation,
+    GenomeNexusAPI,
+    GenomeNexusAPIInternal,
+} from 'genome-nexus-ts-api-client';
+import { CancerGene, OncoKBInfo } from 'oncokb-ts-api-client';
 
-import PdbChainDataStore from "./PdbChainDataStore";
-import MutationMapperDataStore from "./MutationMapperDataStore";
+import defaultGenomeNexusClient from 'shared/api/genomeNexusClientInstance';
+import defaultInternalGenomeNexusClient from 'shared/api/genomeNexusInternalClientInstance';
+import oncoKBClient from 'shared/api/oncokbClientInstance';
+import ResidueMappingCache from 'shared/cache/ResidueMappingCache';
+import {
+    fetchPdbAlignmentData,
+    indexPdbAlignmentData,
+} from 'shared/lib/StoreUtils';
+import { IPdbChain, PdbAlignmentIndex } from 'shared/model/Pdb';
+import {
+    calcPdbIdNumericalValue,
+    mergeIndexedPdbAlignments,
+    PDB_IGNORELIST,
+} from 'shared/lib/PdbUtils';
+import { lazyMobXTableSort } from 'shared/components/lazyMobXTable/LazyMobXTable';
+import { MutationTableDownloadDataFetcher } from 'shared/lib/MutationTableDownloadDataFetcher';
 import {
     groupMutationsByProteinStartPos,
-    countUniqueMutations
-} from "shared/lib/MutationUtils";
-import {defaultOncoKbIndicatorFilter} from "shared/lib/OncoKbUtils";
-
-import {IMutationMapperConfig} from "./MutationMapper";
-import autobind from "autobind-decorator";
-import {normalizeMutation, normalizeMutations} from "./MutationMapperUtils";
+    countUniqueMutations,
+} from 'shared/lib/MutationUtils';
+import PdbChainDataStore from './PdbChainDataStore';
+import MutationMapperDataStore from './MutationMapperDataStore';
+import { IMutationMapperConfig } from './MutationMapperConfig';
+import { normalizeMutations } from './MutationMapperUtils';
+import { getOncoKbApiUrl } from 'shared/api/urls';
 
 export interface IMutationMapperStoreConfig {
-    filterMutationsBySelectedTranscript?:boolean
+    filterMutationsBySelectedTranscript?: boolean;
+    filterAppliersOverride?: { [filterType: string]: ApplyFilterFn };
 }
 
-export default class MutationMapperStore extends DefaultMutationMapperStore
-{
+export default class MutationMapperStore extends DefaultMutationMapperStore<
+    Mutation
+> {
     constructor(
         protected mutationMapperConfig: IMutationMapperConfig,
         protected mutationMapperStoreConfig: IMutationMapperStoreConfig,
         public gene: Gene,
         protected getMutations: () => Mutation[],
         // TODO: we could merge indexedVariantAnnotations and indexedHotspotData
-        public indexedHotspotData:MobxPromise<IHotspotIndex|undefined>,
-        public indexedVariantAnnotations:MobxPromise<{[genomicLocation: string]: VariantAnnotation}|undefined>,
-        public oncoKbCancerGenes:MobxPromise<CancerGene[] | Error>,
-        public oncoKbData:MobxPromise<IOncoKbData | Error>,
-        public uniqueSampleKeyToTumorType:{[uniqueSampleKey:string]:string},
-    )
-    {
+        public indexedHotspotData: MobxPromise<IHotspotIndex | undefined>,
+        public indexedVariantAnnotations: MobxPromise<
+            { [genomicLocation: string]: VariantAnnotation } | undefined
+        >,
+        public oncoKbCancerGenes: MobxPromise<CancerGene[] | Error>,
+        public uniqueSampleKeyToTumorType: {
+            [uniqueSampleKey: string]: string;
+        },
+        protected genomenexusClient?: GenomeNexusAPI,
+        protected genomenexusInternalClient?: GenomeNexusAPIInternal,
+        public getTranscriptId?: () => string
+    ) {
         super(
             gene,
             {
-                isoformOverrideSource: mutationMapperConfig.isoformOverrideSource,
-                filterMutationsBySelectedTranscript: mutationMapperStoreConfig.filterMutationsBySelectedTranscript
+                isoformOverrideSource:
+                    mutationMapperConfig.isoformOverrideSource,
+                filterMutationsBySelectedTranscript:
+                    mutationMapperStoreConfig.filterMutationsBySelectedTranscript,
+                enableCivic: mutationMapperConfig.show_civic,
+                enableOncoKb: mutationMapperConfig.show_oncokb,
+                filterAppliersOverride:
+                    mutationMapperStoreConfig.filterAppliersOverride,
             },
-            getMutations);
+            getMutations,
+            getTranscriptId
+        );
+
+        makeObservable(this);
 
         const unnormalizedGetMutations = this.getMutations;
-        this.getMutations = ()=>normalizeMutations(unnormalizedGetMutations());
-        labelMobxPromises(this);
+        this.getMutations = () =>
+            normalizeMutations(unnormalizedGetMutations());
+        //labelMobxPromises(this);
     }
 
-    @computed
-    public get dataFetcher(): DefaultMutationMapperDataFetcher {
-        return new DefaultMutationMapperDataFetcher({
-            myGeneUrlTemplate: this.mutationMapperConfig.mygene_info_url || undefined,
-            uniprotIdUrlTemplate: this.mutationMapperConfig.uniprot_id_url || undefined,
-            genomeNexusUrl: this.mutationMapperConfig.genomenexus_url || undefined,
-            oncoKbUrl: this.mutationMapperConfig.oncokb_public_api_url || undefined
-        }, genomeNexusClient, internalGenomeNexusClient, oncoKBClient);
+    protected getDataFetcher = () => {
+        return new DefaultMutationMapperDataFetcher(
+            {
+                myGeneUrlTemplate:
+                    this.mutationMapperConfig.mygene_info_url || undefined,
+                uniprotIdUrlTemplate:
+                    this.mutationMapperConfig.uniprot_id_url || undefined,
+                genomeNexusUrl:
+                    this.mutationMapperConfig.genomenexus_url || undefined,
+                oncoKbUrl: getOncoKbApiUrl() || undefined,
+            },
+            this.genomenexusClient || defaultGenomeNexusClient,
+            this.genomenexusInternalClient || defaultInternalGenomeNexusClient,
+            oncoKBClient
+        );
+    };
+
+    @memoize
+    protected getAnnotatedMutationsByTranscriptId(
+        mutations: Mutation[],
+        transcriptId: string,
+        indexedVariantAnnotations: {
+            [genomicLocation: string]: VariantAnnotation;
+        }
+    ) {
+        // overriding the base method (DefaultMutationMapperStore.getAnnotatedMutationsByTranscriptId)
+        // to skip annotating mutations for canonical transcript.
+        // we want to use the values from database for canonical transcript
+        return getMutationsByTranscriptId(
+            mutations,
+            transcriptId,
+            indexedVariantAnnotations,
+            this.canonicalTranscript.result
+                ? this.canonicalTranscript.result!.transcriptId === transcriptId
+                : false,
+            true
+        );
     }
 
-    readonly mutationData = remoteData({
-        await: () => {
-            if (this.mutationMapperStoreConfig.filterMutationsBySelectedTranscript) {
-                return [this.canonicalTranscript, this.indexedVariantAnnotations];
-            } else {
-                return [this.canonicalTranscript];
-            }
+    readonly oncoKbInfo: MobxPromise<OncoKBInfo> = remoteData(
+        {
+            invoke: () => this.dataFetcher.fetchOncoKbInfo(),
+            onError: () => ONCOKB_DEFAULT_INFO,
         },
-        invoke: async () => {
-            return this.mutations as Mutation[];
-        }
-    }, []);
+        ONCOKB_DEFAULT_INFO
+    );
 
-    readonly alignmentData = remoteData({
-        await: () => [
-            this.mutationData
-        ],
-        invoke: async () => {
-            if (this.activeTranscript) {
-                return fetchPdbAlignmentData(this.activeTranscript);
-            }
-            else {
-                return [];
-            }
+    readonly mutationData = remoteData(
+        {
+            await: () => {
+                if (
+                    this.mutationMapperStoreConfig
+                        .filterMutationsBySelectedTranscript
+                ) {
+                    return [
+                        this.canonicalTranscript,
+                        this.indexedVariantAnnotations,
+                    ];
+                } else {
+                    return [this.canonicalTranscript];
+                }
+            },
+            invoke: async () => {
+                return this.mutations as Mutation[];
+            },
         },
-        onError: (err: Error) => {
-            // fail silently
-        }
-    }, []);
+        []
+    );
 
-    public countUniqueMutations(mutations: Mutation[]): number
-    {
+    readonly alignmentData = remoteData(
+        {
+            await: () => [this.mutationData, this.activeTranscript],
+            invoke: async () => {
+                if (this.activeTranscript.result) {
+                    return fetchPdbAlignmentData(this.activeTranscript.result);
+                } else {
+                    return [];
+                }
+            },
+            onError: () => {
+                // fail silently
+            },
+        },
+        []
+    );
+
+    public countUniqueMutations(mutations: Mutation[]): number {
         return countUniqueMutations(mutations);
     }
 
@@ -130,65 +203,56 @@ export default class MutationMapperStore extends DefaultMutationMapperStore
         return mutation.gene.entrezGeneId;
     }
 
-    @autobind
-    protected customFilterApplier(filter: DataFilter,
-                                  mutation: Mutation,
-                                  positions: {[position: string]: {position: number}})
-    {
+    // TODO remove when done refactoring react-mutation-mapper
+    @computed get unfilteredMutationsByPosition(): {
+        [pos: number]: Mutation[];
+    } {
+        return groupMutationsByProteinStartPos(
+            (this.dataStore as MutationMapperDataStore).sortedData
+        );
+    }
 
-        mutation = normalizeMutation(mutation);
-
-        let pick = false;
-
-        if (filter.position) {
-            pick = !!positions[mutation.proteinPosStart+""];
-        }
-
-        if (pick &&
-            filter.hotspot &&
-            this.indexedHotspotData.result)
-        {
-            // TODO for now ignoring the actual filter value and treating as a boolean
-            pick = isHotspot(mutation, this.indexedHotspotData.result, defaultHotspotFilter);
-        }
-
-        if (pick &&
-            filter.oncokb &&
+    // TODO remove when done refactoring react-mutation-mapper
+    @computed get oncoKbDataByProteinPosStart() {
+        if (
             this.oncoKbData.result &&
-            !(this.oncoKbData.result instanceof Error))
-        {
-            // TODO for now ignoring the actual filter value and treating as a boolean
-            pick = defaultOncoKbFilter(mutation,
-                this.oncoKbData.result,
-                this.getDefaultTumorType,
-                this.getDefaultEntrezGeneId);
-        }
-
-        return pick;
-    }
-
-    // TODO remove when done refactoring react-mutation-mapper
-    @computed get unfilteredMutationsByPosition(): {[pos: number]: Mutation[]} {
-        return groupMutationsByProteinStartPos(this.dataStore.sortedData);
-    }
-
-    // TODO remove when done refactoring react-mutation-mapper
-    @computed get oncoKbDataByProteinPosStart()
-    {
-        if (this.oncoKbData.result &&
-            !(this.oncoKbData.result instanceof Error))
-        {
+            !(this.oncoKbData.result instanceof Error)
+        ) {
             return groupOncoKbIndicatorDataByMutations(
                 this.unfilteredMutationsByPosition,
                 this.oncoKbData.result,
                 this.getDefaultTumorType,
                 this.getDefaultEntrezGeneId,
-                defaultOncoKbIndicatorFilter);
-        }
-        else {
+                defaultOncoKbIndicatorFilter
+            );
+        } else {
             return {};
         }
     }
+
+    protected getMutationsGroupedByProteinImpactType = () => {
+        const filtersWithoutProteinImpactTypeFilter = this.dataStore.dataFilters.filter(
+            f => f.type !== DataFilterType.PROTEIN_IMPACT_TYPE
+        );
+
+        // apply filters excluding the protein impact type filters
+        // this prevents number of unchecked protein impact types from being counted as zero
+        let sortedFilteredData = applyDataFilters(
+            this.dataStore.allData,
+            filtersWithoutProteinImpactTypeFilter,
+            this.dataStore.applyFilter
+        );
+
+        // also apply lazy mobx table search filter
+        sortedFilteredData = sortedFilteredData.filter(m =>
+            (this
+                .dataStore as MutationMapperDataStore).applyLazyMobXTableFilter(
+                m
+            )
+        );
+
+        return groupDataByProteinImpactType(sortedFilteredData);
+    };
 
     @computed get processedMutationData(): Mutation[][] {
         // just convert Mutation[] to Mutation[][]
@@ -205,35 +269,15 @@ export default class MutationMapperStore extends DefaultMutationMapperStore
 
     @computed get sortedMergedAlignmentData(): IPdbChain[] {
         const sortMetric = (pdbChain: IPdbChain) => [
-            pdbChain.identity,         // first, sort by identity
+            pdbChain.identity, // first, sort by identity
             pdbChain.alignment.length, // then by alignment length
-            pdbChain.identityPerc,     // then by identity percentage
+            pdbChain.identityPerc, // then by identity percentage
             // current sort metric cannot handle mixed values so generating numerical values for strings
             ...calcPdbIdNumericalValue(pdbChain.pdbId, true), // then by pdb id (A-Z): always returns an array of size 4
-            -1 * pdbChain.chain.charCodeAt(0)                 // then by chain id (A-Z): chain id is always one char
+            -1 * pdbChain.chain.charCodeAt(0), // then by chain id (A-Z): chain id is always one char
         ];
 
         return lazyMobXTableSort(this.mergedAlignmentData, sortMetric, false);
-    }
-
-    @computed get transcriptsByTranscriptId(): {[transcriptId:string]: EnsemblTranscript} {
-        return _.keyBy(this.allTranscripts.result as EnsemblTranscript[], (transcript  => transcript.transcriptId));
-    }
-
-    @computed get mutationsByTranscriptId(): {[transcriptId:string]: Mutation[]} {
-        if (this.indexedVariantAnnotations.result && this.transcriptsWithAnnotations.result) {
-            return _.fromPairs(
-                this.transcriptsWithAnnotations.result.map((t:string) => (
-                    [t,
-                    getMutationsToTranscriptId(this.getMutations(),
-                                               t,
-                                               this.indexedVariantAnnotations.result!!)
-                    ]
-                ))
-            );
-        } else {
-            return {};
-        }
     }
 
     @computed get numberOfMutationsTotal(): number {
@@ -241,23 +285,38 @@ export default class MutationMapperStore extends DefaultMutationMapperStore
         return this.getMutations().length;
     }
 
-    @cached get dataStore(): MutationMapperDataStore {
-        return new MutationMapperDataStore(this.processedMutationData, this.customFilterApplier);
-    }
+    protected getDataStore: () => MutationMapperDataStore = () => {
+        return new MutationMapperDataStore(
+            this.processedMutationData,
+            this.filterApplier,
+            this.config.dataFilters,
+            this.config.selectionFilters,
+            this.config.highlightFilters,
+            this.config.groupFilters
+        );
+    };
 
-    @cached get downloadDataFetcher(): MutationTableDownloadDataFetcher {
+    protected getDownloadDataFetcher() {
         return new MutationTableDownloadDataFetcher(this.mutationData);
     }
 
-    @cached get pdbChainDataStore(): PdbChainDataStore {
-        // initialize with sorted merged alignment data
-        return new PdbChainDataStore(this.sortedMergedAlignmentData.filter(
-            // TODO temporary workaround for problematic pdb structures
-            chain => !PDB_IGNORELIST.includes(chain.pdbId.toLowerCase())));
+    @cached
+    @computed
+    get downloadDataFetcher(): MutationTableDownloadDataFetcher {
+        return this.getDownloadDataFetcher();
     }
 
-    @cached get residueMappingCache()
-    {
+    @cached @computed get pdbChainDataStore(): PdbChainDataStore {
+        // initialize with sorted merged alignment data
+        return new PdbChainDataStore(
+            this.sortedMergedAlignmentData.filter(
+                // TODO temporary workaround for problematic pdb structures
+                chain => !PDB_IGNORELIST.includes(chain.pdbId.toLowerCase())
+            )
+        );
+    }
+
+    @cached @computed get residueMappingCache() {
         return new ResidueMappingCache();
     }
 }

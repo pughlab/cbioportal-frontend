@@ -5,38 +5,41 @@
     }
 }
 
-.oncoprintjs__scroll_div {
-    // force scrollbar visible, to indicate when theres more oncoprint offscreen to scroll to
-    // source: https://gist.github.com/devinrhode2/2573411#gistcomment-2243001
-    &::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-        background-color: rgba(0, 0, 0, 0);
-        -webkit-border-radius: 100px;
+.oncoprintAddTracks {
+    .nav > li > a {
+        padding: 5px;
     }
-
-    &::-webkit-scrollbar:hover {
-        //background-color: rgba(0, 0, 0, 0.09);
+    .nav .active a {
+        padding-top: 5px !important;
     }
-
-    &::-webkit-scrollbar-thumb {
-        background: rgba(0, 0, 0, 0.21);
-        -webkit-border-radius: 100px;
-        width: 8px;
-        height: 8px;
+    .tab-content {
+        min-height: 100px !important;
+        padding: 10px 0 10px 0 !important;
+        .msk-tab {
+            padding-left: 10px !important;
+            padding-right: 10px !important;
+        }
     }
+}
 
-    &::-webkit-scrollbar-thumb:hover {
-        background: rgba(0, 0, 0, 0.3);
-    }
+.oncoprintAddTracksDropdown {
+    display: inline-block;
+}
 
-    &::-webkit-scrollbar-thumb:active {
-        background: rgba(0, 0, 0, 0.42);
-        -webkit-border-radius: 100px;
+.oncoprintGenericAssayTab {
+    button {
+        width: auto !important;
+        margin-bottom: 0 !important;
     }
 }
 
 .oncoprintAddClinicalTracks {
+    > ul {
+        border-bottom: none !important;
+        margin-top: -5px !important;
+        padding-left: 20px;
+        margin-left: -20px;
+    }
     > .tab-content {
         padding: 10px 0 5px 0 !important;
 
@@ -49,6 +52,10 @@
             }
         }
     }
+    button:first-child {
+        margin-bottom: 0px !important;
+        width: auto !important;
+    }
 }
 
 .oncoprintAddClinicalTracksDropdown {
@@ -57,42 +64,16 @@
     }
 }
 
+.oncoprintDropdownCount {
+    font-size: 11px;
+    background: #ddd;
+    border-radius: 40px;
+    padding: 2px 6px;
+}
+
 .oncoprintContainer {
     border: none !important;
     padding: 0 !important;
-
-    #oncoprintDiv {
-        .oncoprintjs__track_options__toggle_btn_img {
-            border-width: 0px !important;
-            border-radius: $cornerBorderRadius;
-            position: relative;
-            top: 4px;
-            &:hover {
-                background-color: #eee;
-            }
-        }
-
-        .oncoprintjs__track_options__dropdown {
-            border: 1px solid rgba(0, 0, 0, 0.15) !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
-            border-radius: $cornerBorderRadius;
-            li {
-                &.oncoprintjs__track_options__separator {
-                    border-top: 1px solid #dddddd !important;
-                }
-                &:not(.oncoprintjs__track_options__separator) {
-                    border-width: 0 !important;
-                }
-                padding: 2px 5px;
-                &:hover {
-                    background: #fff !important;
-                    text-decoration: underline;
-                }
-            }
-        }
-    }
 }
 
 .oncoprintContainer {
@@ -114,4 +95,19 @@
     white-space: normal;
     width: 100%;
     max-width: 555px;
+}
+
+.quick_oql_edit {
+    display: flex;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+
+    .oqlValidationContainer {
+        min-height: 27px;
+    }
+
+    div {
+        justify-content: left !important;
+    }
 }

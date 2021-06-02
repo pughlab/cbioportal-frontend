@@ -1,13 +1,17 @@
-import ComplexKeyMap, {ComplexKey} from "./ComplexKeyMap";
+import ComplexKeyMap, { ComplexKey } from './ComplexKeyMap';
 
 export default class ComplexKeyCounter {
-    private map:ComplexKeyMap<number> = new ComplexKeyMap<number>();
+    private map: ComplexKeyMap<number> = new ComplexKeyMap<number>();
 
-    public increment(key:ComplexKey) {
-        this.map.set(key, (this.map.get(key) || 0) + 1);
+    public add(key: ComplexKey, amount: number) {
+        this.map.set(key, (this.map.get(key) || 0) + amount);
     }
 
-    public get(key:ComplexKey) {
+    public increment(key: ComplexKey) {
+        this.add(key, 1);
+    }
+
+    public get(key: ComplexKey) {
         return this.map.get(key) || 0;
     }
 

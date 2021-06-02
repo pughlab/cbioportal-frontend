@@ -1,291 +1,482 @@
-import * as React from "react";
-import {observer, Observer} from "mobx-react";
-import {Helmet} from "react-helmet";
-import {PageLayout} from "../../../../shared/components/PageLayout/PageLayout";
-import OncoprinterStore from "./OncoprinterStore";
-import Oncoprinter from "./Oncoprinter";
-import {action, computed, observable} from "mobx";
-import {Button,FormGroup, ControlLabel, FormControl} from "react-bootstrap";
-import {Collapse} from "react-collapse";
-import autobind from "autobind-decorator";
-import {exampleData} from "./OncoprinterConstants";
-import $ from "jquery";
-import {SyntheticEvent} from "react";
-import onMobxPromise from "../../../../shared/lib/onMobxPromise";
-import {WindowWidthBox} from "../../../../shared/components/WindowWidthBox/WindowWidthBox";
-import {MSKTab, MSKTabs} from "../../../../shared/components/MSKTabs/MSKTabs";
-import MutualExclusivityTab from "../../../resultsView/mutualExclusivity/MutualExclusivityTab";
+import * as React from 'react';
+import { observer, Observer } from 'mobx-react';
+import { Helmet } from 'react-helmet';
+import { PageLayout } from '../../../../shared/components/PageLayout/PageLayout';
+import OncoprinterStore from './OncoprinterStore';
+import Oncoprinter from './Oncoprinter';
+import { action, observable, runInAction, makeObservable } from 'mobx';
+import { Button, ControlLabel, FormControl, FormGroup } from 'react-bootstrap';
+import { Collapse } from 'react-collapse';
+import autobind from 'autobind-decorator';
+import {
+    exampleClinicalData,
+    exampleGeneticData,
+    exampleHeatmapData,
+} from './OncoprinterConstants';
+import { MSKTab, MSKTabs } from '../../../../shared/components/MSKTabs/MSKTabs';
+import MutualExclusivityTab from '../../../resultsView/mutualExclusivity/MutualExclusivityTab';
+import { getDataForSubmission } from './OncoprinterToolUtils';
+import {
+    ClinicalTrackDataType,
+    HeatmapTrackDataType,
+    ONCOPRINTER_VAL_NA,
+} from './OncoprinterClinicalAndHeatmapUtils';
+import styles from './styles.module.scss';
+import { getBrowserWindow } from 'cbioportal-frontend-commons';
+import {
+    ClinicalFormatHelp,
+    GenomicFormatHelp,
+    HeatmapFormatHelp,
+} from './OncoprinterHelp';
+import { buildCBioLink } from 'shared/api/urls';
 
-export interface IOncoprinterToolProps {
-}
+export interface IOncoprinterToolProps {}
 
 export enum OncoprinterTab {
-    ONCOPRINT="oncoprint",
-    MUTUAL_EXCLUSIVITY="mutualExclusivity",
+    ONCOPRINT = 'oncoprint',
+    MUTUAL_EXCLUSIVITY = 'mutualExclusivity',
 }
 
-const helpSection = (
-    <div style={{backgroundColor:"#eee", padding:13, borderRadius: 11, marginTop:10}}>
-        <h4>Data format</h4>
-        Each row of the data can take one of two formats, with tab-delimited columns:<br/>
-        <strong>(1)</strong> <code>Sample</code> only (e.g. so that percent altered in your data can be properly calculated by including unaltered samples).<br/>
-        <strong>(2)</strong> <code>Sample</code>, <code>Gene</code>, <code>Alteration (defined below)</code>, <code>Type (defined below)</code>.<br/>
-        {/*<strong>(3) (MAF format, mutation only)</strong> <code>Sample</code>, <code>Cancer Type</code>, <code>Protein Change</code>, <code>Mutation Type</code>,	<code>Chromosome</code>,
-        <code>Start position</code>, <code>End position</code>, <code>Reference allele</code>,	<code>Variant allele</code><br/>
-        <br/>*/}
-        For rows of type 2, the definition is below:
-        <ol>
-            <li><code>Sample</code>: Sample ID</li>
-            <li><code>Gene</code>: Gene symbol (or other gene identifier)</li>
-            <li><code>Alteration</code>: Definition of the alteration event
-                <ul>
-                    <li>Mutation event: amino acid change or any other information about the mutation</li>
-                    <li>Fusion event: fusion information</li>
-                    <li>Copy number alteration (CNA) - please use one of the four events below:
-                        <ul>
-                            <li><code>AMP</code>: high level amplification</li>
-                            <li><code>GAIN</code>: low level gain</li>
-                            <li><code>HETLOSS</code>: shallow deletion</li>
-                            <li><code>HOMDEL</code>: deep deletion</li>
-                        </ul>
-                    </li>
-                    <li>mRNA expression - please use one of the two events below:
-                        <ul>
-                            <li><code>HIGH</code>: expression high</li>
-                            <li><code>LOW</code>: expression low</li>
-                        </ul>
-                    </li>
-                    <li>Protein expression - please use one of the two events below:
-                        <ul>
-                            <li><code>HIGH</code>: Protein high</li>
-                            <li><code>LOW</code>: Protein low</li>
-                        </ul>
-                    </li>
-                </ul>
-            </li>
-            <li><code>Type</code>: Definition of the alteration type. It has to be one of the following.
-                <ul>
-                    <li>For a mutation event, please use one of the five mutation types below:
-                        <ul>
-                            <li><code>MISSENSE</code>: a missense mutation</li>
-                            <li><code>INFRAME</code>: a inframe mutation</li>
-                            <li><code>TRUNC</code>: a truncation mutation</li>
-                            <li><code>PROMOTER</code>: a promoter mutation</li>
-                            <li><code>OTHER</code>: any other kind of mutation</li>
-                        </ul>
-                    </li>
-                    <li><code>FUSION</code>: a fusion event
-                    </li>
-                    <li><code>CNA</code>: a copy number alteration event
-                    </li>
-                    <li><code>EXP</code>: a expression event
-                    </li>
-                    <li><code>PROT</code>: a protein expression event
-                    </li>
-                </ul>
-            </li>
-        </ol>
-    </div>
-);
-
 @observer
-export default class OncoprinterTool extends React.Component<IOncoprinterToolProps, {}> {
+export default class OncoprinterTool extends React.Component<
+    IOncoprinterToolProps,
+    {}
+> {
     private store = new OncoprinterStore();
-    private oncoprinter:Oncoprinter|null;
-    private filesInput:HTMLInputElement|null;
-    @observable private activeTabId:OncoprinterTab = OncoprinterTab.ONCOPRINT;
-
-    @autobind
-    private oncoprinterRef(o:Oncoprinter|null) {
-        this.oncoprinter = o;
-    }
+    private geneticFileInput: HTMLInputElement | null;
+    private clinicalFileInput: HTMLInputElement | null;
+    private heatmapFileInput: HTMLInputElement | null;
+    @observable private activeTabId: OncoprinterTab = OncoprinterTab.ONCOPRINT;
 
     @observable dataInputOpened = true;
+    @observable geneticHelpOpened = false;
+    @observable clinicalHelpOpened = false;
+    @observable heatmapHelpOpened = false;
 
     // help
     @observable helpOpened = false;
 
     // input
-    @observable dataInput = "";
-    @observable geneOrderInput = "";
-    @observable sampleOrderInput = "";
+    @observable geneticDataInput = '';
+    @observable clinicalDataInput = '';
+    @observable heatmapDataInput = '';
+    @observable geneOrderInput = '';
+    @observable sampleOrderInput = '';
 
-    @autobind
+    constructor(props: IOncoprinterToolProps) {
+        super(props);
+        makeObservable(this);
+    }
+
+    componentDidMount() {
+        // Load posted data, if it exists
+        const postData = getBrowserWindow().clientPostedData;
+        if (postData) {
+            this.geneticDataInput = postData.genetic;
+            this.clinicalDataInput = postData.clinical;
+            this.heatmapDataInput = postData.heatmap;
+            this.doSubmit(
+                this.geneticDataInput,
+                this.clinicalDataInput,
+                this.heatmapDataInput
+            );
+            getBrowserWindow().clientPostedData = null;
+        }
+    }
+
+    @action.bound
     private toggleHelpOpened() {
         this.helpOpened = !this.helpOpened;
     }
 
-    @autobind
-    private populateExampleData() {
-        this.dataInput = exampleData;
+    @action.bound
+    private populateGeneticExampleData() {
+        this.geneticDataInput = exampleGeneticData;
     }
 
-    @autobind
-    private onDataInputChange(e: any) {
-        this.dataInput = e.currentTarget.value;
+    @action.bound
+    private populateClinicalExampleData() {
+        this.clinicalDataInput = exampleClinicalData;
     }
 
-    @autobind
+    @action.bound
+    private populateHeatmapExampleData() {
+        this.heatmapDataInput = exampleHeatmapData;
+    }
+
+    @action.bound
+    private onGeneticDataInputChange(e: any) {
+        this.geneticDataInput = e.currentTarget.value;
+    }
+
+    @action.bound
+    private onClinicalDataInputChange(e: any) {
+        this.clinicalDataInput = e.currentTarget.value;
+    }
+
+    @action.bound
+    private onHeatmapDataInputChange(e: any) {
+        this.heatmapDataInput = e.currentTarget.value;
+    }
+
+    @action.bound
     private onGeneOrderInputChange(e: any) {
         this.geneOrderInput = e.currentTarget.value;
     }
 
-    @autobind
+    @action.bound
     private onSampleOrderInputChange(e: any) {
         this.sampleOrderInput = e.currentTarget.value;
     }
 
-    @action private doSubmit(dataInput:string) {
-        this.store.setInput(dataInput, this.geneOrderInput, this.sampleOrderInput);
-        if (!this.store.parsedInputLines.error) {
+    @action.bound
+    private toggleGeneticHelp() {
+        this.geneticHelpOpened = !this.geneticHelpOpened;
+    }
+
+    @action.bound
+    private toggleClinicalHelp() {
+        this.clinicalHelpOpened = !this.clinicalHelpOpened;
+    }
+
+    @action.bound
+    private toggleHeatmapHelp() {
+        this.heatmapHelpOpened = !this.heatmapHelpOpened;
+    }
+
+    @action private doSubmit(
+        geneticDataInput: string,
+        clinicalDataInput: string,
+        heatmapDataInput: string
+    ) {
+        this.store.setInput(
+            geneticDataInput,
+            clinicalDataInput,
+            heatmapDataInput,
+            this.geneOrderInput,
+            this.sampleOrderInput
+        );
+
+        if (this.store.parseErrors.length === 0) {
             this.dataInputOpened = false;
         }
-
-        onMobxPromise(this.store.alteredSampleIds,
-            (alteredUids:string[])=>{
-                this.oncoprinter && this.oncoprinter.oncoprint.setHorzZoomToFit(alteredUids);
-            });
     }
 
-    @autobind private filesInputRef(input:HTMLInputElement|null) {
-        this.filesInput = input;
+    @autobind private geneticFileInputRef(input: HTMLInputElement | null) {
+        this.geneticFileInput = input;
     }
 
-    @autobind
-    @action private onClickSubmit() {
-        if (this.filesInput && this.filesInput.files && this.filesInput.files.length > 0) {
-            // get data from file upload
-            const fileReader = new FileReader();
-            fileReader.onload = ()=>{
-                const data = fileReader.result as string | null;
-                if (data) {
-                    this.doSubmit(data);
-                }
-            };
-            fileReader.readAsText(this.filesInput.files[0]);
-        } else {
-            // get data from text input
-            this.doSubmit(this.dataInput);
-        }
+    @autobind private clinicalFileInputRef(input: HTMLInputElement | null) {
+        this.clinicalFileInput = input;
+    }
+
+    @autobind private heatmapFileInputRef(input: HTMLInputElement | null) {
+        this.heatmapFileInput = input;
     }
 
     @autobind
-    private getHelpSection() {
-        return (
-            <div>
-                <span>Please input <strong>tab-delimited</strong> genomic alteration events.</span>
-                <Button style={{marginLeft:7}} bsStyle="primary" bsSize="small" onClick={this.toggleHelpOpened}>{`${this.helpOpened ? "Close" : "Open"} data format help`}</Button>
-                <Collapse isOpened={this.helpOpened}>
-                    {helpSection}
-                </Collapse>
-            </div>
+    private getGeneticDataForSubmission() {
+        return getDataForSubmission(
+            this.geneticFileInput,
+            this.geneticDataInput
         );
     }
 
-    @computed get error() {
-        return this.store.parsedInputLines.error;
+    @autobind
+    private getClinicalDataForSubmission() {
+        return getDataForSubmission(
+            this.clinicalFileInput,
+            this.clinicalDataInput
+        );
+    }
+
+    @autobind
+    private getHeatmapDataForSubmission() {
+        return getDataForSubmission(
+            this.heatmapFileInput,
+            this.heatmapDataInput
+        );
+    }
+
+    @action.bound
+    private async onClickSubmit() {
+        const geneticData = await this.getGeneticDataForSubmission();
+        const clinicalData = await this.getClinicalDataForSubmission();
+        const heatmapData = await this.getHeatmapDataForSubmission();
+
+        this.doSubmit(geneticData, clinicalData, heatmapData);
+    }
+
+    private openDataFormat(tab: 'genomic' | 'clinical' | 'heatmap') {
+        window.open(`oncoprinterDataFormat?tab=${tab}`, '_blank');
     }
 
     @autobind
     private getInputSection() {
         return (
             <FormGroup
-                style={{ display:this.dataInputOpened ? undefined : "none" }}
+                style={{ display: this.dataInputOpened ? undefined : 'none' }}
             >
-                <ControlLabel>Input genomic alteration data:<Button className="oncoprinterExampleData" style={{marginLeft:7}} bsStyle="primary" bsSize="small" onClick={this.populateExampleData}>Load example data</Button></ControlLabel>
-                <FormControl
-                    className="oncoprinterDataInput"
-                    componentClass="textarea"
-                    value={this.dataInput}
-                    placeholder="Enter data here..."
-                    onChange={this.onDataInputChange}
-                    style={{"height":500, width:"100%"}}
-                />
-                <ControlLabel>or input data from file:</ControlLabel>
-                <input ref={this.filesInputRef} type="file"/>
-                <br/>
-                <ControlLabel>Please define the order of genes (optional):</ControlLabel>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div>
+                        <ControlLabel style={{ marginBottom: 7 }}>
+                            Step 1) Input genomic alteration data (optional):
+                        </ControlLabel>
+                        <Button
+                            className="oncoprinterGeneticExampleData"
+                            style={{ marginLeft: 7 }}
+                            bsStyle="primary"
+                            bsSize="xs"
+                            onClick={this.populateGeneticExampleData}
+                        >
+                            Load example data
+                        </Button>
+                        <Button
+                            className="oncoprinterGeneticHelp"
+                            style={{ marginLeft: 7 }}
+                            bsStyle="primary"
+                            bsSize="xs"
+                            onClick={this.toggleGeneticHelp}
+                        >
+                            {this.geneticHelpOpened ? 'Close ' : 'View '}data
+                            format
+                        </Button>
+                        <Collapse isOpened={this.geneticHelpOpened}>
+                            <div style={{ paddingBottom: 10 }}>
+                                {GenomicFormatHelp}
+                            </div>
+                        </Collapse>
+                        <FormControl
+                            className="oncoprinterGeneticDataInput"
+                            componentClass="textarea"
+                            value={this.geneticDataInput}
+                            placeholder="Enter data here..."
+                            onChange={this.onGeneticDataInputChange}
+                            style={{ height: 200, width: '100%' }}
+                        />
+                        <ControlLabel>or input data from file:</ControlLabel>
+                        <input ref={this.geneticFileInputRef} type="file" />
+                    </div>
+                    <hr style={{ width: '100%' }} />
+                    <div>
+                        <ControlLabel style={{ marginBottom: 7 }}>
+                            Step 2) Input clinical data (optional):
+                        </ControlLabel>
+                        <Button
+                            className="oncoprinterClinicalExampleData"
+                            style={{ marginLeft: 7 }}
+                            bsStyle="primary"
+                            bsSize="xs"
+                            onClick={this.populateClinicalExampleData}
+                        >
+                            Load example data
+                        </Button>
+                        <Button
+                            className="oncoprinterClinicalHelp"
+                            style={{ marginLeft: 7 }}
+                            bsStyle="primary"
+                            bsSize="xs"
+                            onClick={this.toggleClinicalHelp}
+                        >
+                            {this.clinicalHelpOpened ? 'Close ' : 'View '}data
+                            format
+                        </Button>
+                        <Collapse isOpened={this.clinicalHelpOpened}>
+                            <div style={{ paddingBottom: 10 }}>
+                                {ClinicalFormatHelp}
+                            </div>
+                        </Collapse>
+                        <FormControl
+                            className="oncoprinterClinicalDataInput"
+                            componentClass="textarea"
+                            value={this.clinicalDataInput}
+                            placeholder="Enter data here..."
+                            onChange={this.onClinicalDataInputChange}
+                            style={{ height: 200, width: '100%' }}
+                        />
+                        <ControlLabel>or input data from file:</ControlLabel>
+                        <input ref={this.clinicalFileInputRef} type="file" />
+                    </div>
+                    <hr style={{ width: '100%' }} />
+                    <div>
+                        <ControlLabel style={{ marginBottom: 7 }}>
+                            Step 3) Input heatmap data (optional):
+                        </ControlLabel>
+                        <Button
+                            className="oncoprinterHeatmapExampleData"
+                            style={{ marginLeft: 7 }}
+                            bsStyle="primary"
+                            bsSize="xs"
+                            onClick={this.populateHeatmapExampleData}
+                        >
+                            Load example data
+                        </Button>
+                        <Button
+                            className="oncoprinterHeatmapHelp"
+                            style={{ marginLeft: 7 }}
+                            bsStyle="primary"
+                            bsSize="xs"
+                            onClick={this.toggleHeatmapHelp}
+                        >
+                            {this.heatmapHelpOpened ? 'Close ' : 'View '}data
+                            format
+                        </Button>
+                        <Collapse isOpened={this.heatmapHelpOpened}>
+                            <div style={{ paddingBottom: 10 }}>
+                                {HeatmapFormatHelp}
+                            </div>
+                        </Collapse>
+                        <FormControl
+                            className="oncoprinterHeatmapDataInput"
+                            componentClass="textarea"
+                            value={this.heatmapDataInput}
+                            placeholder="Enter data here..."
+                            onChange={this.onHeatmapDataInputChange}
+                            style={{ height: 200, width: '100%' }}
+                        />
+                        <ControlLabel>or input data from file:</ControlLabel>
+                        <input ref={this.heatmapFileInputRef} type="file" />
+                    </div>
+                </div>
+                <br />
+                <ControlLabel>
+                    Please define the order of genes (optional):
+                </ControlLabel>
                 <FormControl
                     className="oncoprinterGenesInput"
                     componentClass="textarea"
                     value={this.geneOrderInput}
                     placeholder="Enter genes here, comma- or whitespace-delimited..."
                     onChange={this.onGeneOrderInputChange}
-                    style={{"height":35, width:475}}
+                    style={{ height: 35, width: 475 }}
                 />
-                <br/>
-                <ControlLabel>Please define the order of samples (optional):</ControlLabel>
+                <br />
+                <ControlLabel>
+                    Please define the order of samples (optional):
+                </ControlLabel>
                 <FormControl
                     className="oncoprinterSamplesInput"
                     componentClass="textarea"
                     value={this.sampleOrderInput}
                     placeholder="Enter samples here, comma- or whitespace-delimited..."
                     onChange={this.onSampleOrderInputChange}
-                    style={{"height":35, width:475}}
+                    style={{ height: 35, width: 475 }}
                 />
-                <br/>
-                <Button className="oncoprinterSubmit" bsSize="large" bsStyle="primary" disabled={this.dataInput.trim().length === 0} onClick={this.onClickSubmit}>Submit</Button>
-                { this.error && <div className="alert alert-danger" style={{marginTop:5, whiteSpace:"pre-wrap"}}>{this.error}</div> }
+                <br />
+                <Button
+                    className="oncoprinterSubmit"
+                    bsSize="large"
+                    bsStyle="primary"
+                    disabled={
+                        this.geneticDataInput.trim().length === 0 &&
+                        this.clinicalDataInput.trim().length === 0 &&
+                        this.heatmapDataInput.trim().length === 0
+                    }
+                    onClick={this.onClickSubmit}
+                    style={{ marginBottom: 20 }}
+                >
+                    Submit
+                </Button>
+                {this.store.parseErrors.length > 0 && (
+                    <div
+                        className="alert alert-danger"
+                        style={{ marginTop: 5, whiteSpace: 'pre-wrap' }}
+                    >
+                        {this.store.parseErrors.map(err => (
+                            <div>{err}</div>
+                        ))}
+                    </div>
+                )}
             </FormGroup>
         );
     }
 
     render() {
-
-        const numCells = this.store.hugoGeneSymbols.length * this.store.sampleIds.length;
+        const numCells =
+            this.store.hugoGeneSymbols.length * this.store.sampleIds.length;
         return (
             <PageLayout className={'whiteBackground staticPage'}>
                 <Helmet>
-                    <title>{'cBioPortal for Cancer Genomics::Oncoprinter'}</title>
+                    <title>
+                        {'cBioPortal for Cancer Genomics::Oncoprinter'}
+                    </title>
                 </Helmet>
-                <WindowWidthBox offset={60}>
-                    <div className="cbioportal-frontend">
-                        <h1 style={{display: "inline"}}>Oncoprinter</h1> generates Oncoprints from your own data.
-                        <br/><br/>
-                        <Observer>
-                            {this.getHelpSection}
-                        </Observer>
-                        <Observer>
-                            {this.getInputSection}
-                        </Observer>
-                        { !this.dataInputOpened && (
-                            <button className="btn btn-primary btn-lg oncoprinterModifyInput" style={{paddingLeft:50, paddingRight:50, marginBottom:15}}
-                                    onClick={()=>{ this.dataInputOpened = true; }}
+                <div className="cbioportal-frontend">
+                    <h1 style={{ display: 'inline', marginRight: 10 }}>
+                        Oncoprinter
+                    </h1>{' '}
+                    Generate Oncoprints and perform mutual exclusivity analysis
+                    from your own data.
+                    <br />
+                    <br />
+                    <Observer>{this.getInputSection}</Observer>
+                    {!this.dataInputOpened && (
+                        <button
+                            className="btn btn-primary btn-lg oncoprinterModifyInput"
+                            style={{
+                                paddingLeft: 50,
+                                paddingRight: 50,
+                                marginBottom: 15,
+                            }}
+                            onClick={() => {
+                                this.dataInputOpened = true;
+                            }}
+                        >
+                            Modify Input
+                        </button>
+                    )}
+                    <div
+                        style={{
+                            display:
+                                this.store.hasData() &&
+                                !this.store.parseErrors.length
+                                    ? 'block'
+                                    : 'none',
+                        }}
+                    >
+                        <MSKTabs
+                            activeTabId={this.activeTabId}
+                            unmountOnHide={false}
+                            onTabClick={(id: string) => {
+                                this.activeTabId = id as OncoprinterTab;
+                            }}
+                            className="mainTabs"
+                        >
+                            <MSKTab
+                                key={0}
+                                id={OncoprinterTab.ONCOPRINT}
+                                linkText="Oncoprint"
                             >
-                                Modify Input
-                            </button>
-                        )}
-                        <div style={{display:(this.store.hasData() && !this.error ? "block" : "none")}}>
-                            <MSKTabs activeTabId={this.activeTabId} unmountOnHide={false}
-                                     onTabClick={(id:string)=>{ this.activeTabId=id as OncoprinterTab; }}
-                                     className="mainTabs"
-                            >
-                                <MSKTab key={0} id={OncoprinterTab.ONCOPRINT} linkText="Oncoprint">
-                                    {(numCells > 100000) && (
-                                        <div
-                                            className="alert alert-warning"
-                                        >
-                                            Warning: Because your inputted data is very large,
-                                            the Oncoprinter may be slow, and downloaded PDF, SVG, and PNG 
-                                            may be huge and unresponsive. We recommend plotting
-                                            data for fewer genes at a time.
-                                        </div>
-                                    )}
-                                    <div style={{marginTop:10}}>
-                                        <Oncoprinter
-                                            ref={this.oncoprinterRef}
-                                            divId="oncoprinter"
-                                            store={this.store}
-                                        />
+                                {numCells > 100000 && (
+                                    <div className="alert alert-warning">
+                                        Warning: Because your inputted data is
+                                        very large, the Oncoprinter may be slow,
+                                        and downloaded PDF, SVG, and PNG may be
+                                        huge and unresponsive. We recommend
+                                        plotting data for fewer genes at a time.
                                     </div>
-                                </MSKTab>
-                                <MSKTab key={1} id={OncoprinterTab.MUTUAL_EXCLUSIVITY} linkText="Mutual Exclusivity">
-                                    <MutualExclusivityTab isSampleAlteredMap={this.store.isSampleAlteredMap}/>
-                                </MSKTab>
-                            </MSKTabs>
-                        </div>
+                                )}
+                                <div style={{ marginTop: 10 }}>
+                                    <Oncoprinter
+                                        divId="oncoprinter"
+                                        store={this.store}
+                                    />
+                                </div>
+                            </MSKTab>
+                            <MSKTab
+                                key={1}
+                                id={OncoprinterTab.MUTUAL_EXCLUSIVITY}
+                                linkText="Mutual Exclusivity"
+                            >
+                                <MutualExclusivityTab
+                                    isSampleAlteredMap={
+                                        this.store.isSampleAlteredMap
+                                    }
+                                />
+                            </MSKTab>
+                        </MSKTabs>
                     </div>
-                </WindowWidthBox>
+                </div>
             </PageLayout>
         );
     }

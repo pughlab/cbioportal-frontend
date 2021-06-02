@@ -1,45 +1,80 @@
 import * as React from 'react';
-import { observer } from "mobx-react";
-import StandaloneMutationTable from "./StandaloneMutationTable";
+import { observer } from 'mobx-react';
+import StandaloneMutationTable from './StandaloneMutationTable';
 import {
-    IMutationMapperProps, default as MutationMapper
-} from "shared/components/mutationMapper/MutationMapper";
-import {MutationTableDownloadDataFetcher} from "shared/lib/MutationTableDownloadDataFetcher";
-
+    IMutationMapperProps,
+    default as MutationMapper,
+} from 'shared/components/mutationMapper/MutationMapper';
+import { MutationTableDownloadDataFetcher } from 'shared/lib/MutationTableDownloadDataFetcher';
+import MutationMapperDataStore from 'shared/components/mutationMapper/MutationMapperDataStore';
 
 export interface IStandaloneMutationMapperProps extends IMutationMapperProps {
     // add standalone view specific props here if needed
-    downloadDataFetcher?:MutationTableDownloadDataFetcher;
+    downloadDataFetcher?: MutationTableDownloadDataFetcher;
+    generateGenomeNexusHgvsgUrl: (hgvsg: string) => string;
 }
 @observer
-export default class StandaloneMutationMapper extends MutationMapper<IStandaloneMutationMapperProps>
-{
+export default class StandaloneMutationMapper extends MutationMapper<
+    IStandaloneMutationMapperProps
+> {
     constructor(props: IMutationMapperProps) {
         super(props);
     }
 
-    protected get mutationTableComponent(): JSX.Element | null
-    {
+    protected get mutationTableComponent(): JSX.Element | null {
         return (
             <StandaloneMutationTable
-                uniqueSampleKeyToTumorType={this.props.store.uniqueSampleKeyToTumorType}
+                uniqueSampleKeyToTumorType={
+                    this.props.store.uniqueSampleKeyToTumorType
+                }
                 oncoKbCancerGenes={this.props.store.oncoKbCancerGenes}
-                indexedVariantAnnotations={this.props.store.indexedVariantAnnotations}
+                usingPublicOncoKbInstance={
+                    this.props.store.usingPublicOncoKbInstance
+                }
+                indexedVariantAnnotations={
+                    this.props.store.indexedVariantAnnotations
+                }
+                indexedMyVariantInfoAnnotations={
+                    this.props.store.indexedMyVariantInfoAnnotations
+                }
                 genomeNexusCache={this.props.genomeNexusCache}
-                oncoKbEvidenceCache={this.props.oncoKbEvidenceCache}
+                genomeNexusMutationAssessorCache={
+                    this.props.genomeNexusMutationAssessorCache
+                }
                 pubMedCache={this.props.pubMedCache}
-                dataStore={this.props.store.dataStore}
+                dataStore={
+                    this.props.store.dataStore as MutationMapperDataStore
+                }
                 itemsLabelPlural={this.itemsLabelPlural}
                 downloadDataFetcher={this.props.downloadDataFetcher}
-                myCancerGenomeData={this.props.myCancerGenomeData}
+                myCancerGenomeData={this.props.store.myCancerGenomeData}
                 hotspotData={this.props.store.indexedHotspotData}
                 oncoKbData={this.props.store.oncoKbData}
-                enableOncoKb={this.props.config.show_oncokb}
-                enableFunctionalImpact={this.props.config.show_genomenexus}
-                enableHotspot={this.props.config.show_hotspot}
-                enableMyCancerGenome={this.props.config.mycancergenome_show}
-                enableCivic={false}
+                civicVariants={this.props.store.civicVariants}
+                civicGenes={this.props.store.civicGenes}
+                enableOncoKb={this.props.enableOncoKb}
+                enableFunctionalImpact={this.props.enableGenomeNexus}
+                enableHotspot={this.props.enableHotspot}
+                enableMyCancerGenome={this.props.enableMyCancerGenome}
+                enableCivic={this.props.enableCivic}
+                generateGenomeNexusHgvsgUrl={
+                    this.props.generateGenomeNexusHgvsgUrl
+                }
+                selectedTranscriptId={this.props.store.activeTranscript.result}
             />
+        );
+    }
+
+    protected get isMutationTableDataLoading() {
+        return this.props.store.activeTranscript.isPending;
+    }
+
+    protected get mutationTable(): JSX.Element | null {
+        return (
+            <span>
+                {!this.isMutationTableDataLoading &&
+                    this.mutationTableComponent}
+            </span>
         );
     }
 }

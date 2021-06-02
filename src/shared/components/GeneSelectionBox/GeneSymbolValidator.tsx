@@ -6,10 +6,14 @@ import {
     normalizeQuery,
     Focus,
 } from 'shared/components/query/QueryStore';
-import { action, computed } from '../../../../node_modules/mobx';
-import { Gene } from 'shared/api/generated/CBioPortalAPI';
+import {
+    action,
+    computed,
+    makeObservable,
+} from '../../../../node_modules/mobx';
+import { Gene } from 'cbioportal-ts-api-client';
 import 'react-select1/dist/react-select.css';
-import { remoteData } from 'public-lib/api/remoteData';
+import { remoteData } from 'cbioportal-frontend-commons';
 import client from 'shared/api/cbioportalClientInstance';
 import memoize from 'memoize-weak-decorator';
 import { OQL } from 'shared/components/GeneSelectionBox/OQLTextArea';
@@ -33,6 +37,8 @@ export interface IGeneSymbolValidatorProps {
         oql: OQL
     ) => void;
     wrap?: boolean;
+    replaceGene: (oldSymbol: string, newSymbol: string) => void;
+    highlightError?: (oql: OQL) => void;
 }
 
 export type GeneValidationResult = {
@@ -49,6 +55,11 @@ export default class GeneSymbolValidator extends React.Component<
     IGeneSymbolValidatorProps,
     {}
 > {
+    constructor(props: any) {
+        super(props);
+        makeObservable(this);
+    }
+
     public static defaultProps = {
         errorMessageOnly: false,
     };
@@ -152,20 +163,7 @@ export default class GeneSymbolValidator extends React.Component<
         if (!this.oql.error) {
             return this.oql;
         }
-
-        if (this.props.focus !== null && this.props.focus !== undefined) {
-            if (this.props.focus === Focus.Unfocused) {
-                return new Error(
-                    "Please click 'Submit' to see location of error."
-                );
-            } else {
-                return new Error(
-                    'OQL syntax error at selected character; please fix and submit again.'
-                );
-            }
-        }
-
-        return new Error(this.oql.error.message);
+        return new Error(`OQL error at character ${this.oql.error.start}`);
     }
 
     render() {
@@ -188,30 +186,20 @@ export default class GeneSymbolValidator extends React.Component<
                         ? new Error('ERROR')
                         : this.genes.result
                 }
+                highlightError={() => {
+                    this.props.highlightError &&
+                        this.props.highlightError(this.oql);
+                }}
                 oql={this.oqlOrError}
                 validatingGenes={
                     this.props.skipGeneValidation ? false : this.genes.isPending
                 }
                 errorMessageOnly={this.props.errorMessageOnly}
                 wrapTheContent={this.props.wrap}
-                replaceGene={this.replaceGene}
+                replaceGene={this.props.replaceGene}
             >
                 {this.props.children}
             </GeneSymbolValidatorMessage>
         );
-    }
-
-    @autobind
-    @action
-    private replaceGene(oldSymbol: string, newSymbol: string) {
-        let updatedQuery = normalizeQuery(
-            this.props.geneQuery
-                .toUpperCase()
-                .replace(
-                    new RegExp(`\\b${oldSymbol.toUpperCase()}\\b`, 'g'),
-                    () => newSymbol.toUpperCase()
-                )
-        );
-        this.props.updateGeneQuery(updatedQuery);
     }
 }

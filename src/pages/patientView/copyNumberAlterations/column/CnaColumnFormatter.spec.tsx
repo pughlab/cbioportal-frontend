@@ -1,30 +1,32 @@
-import { default as CnaColumnFormatter, AlterationTypes } from './CnaColumnFormatter';
+import {
+    default as CnaColumnFormatter,
+    AlterationTypes,
+} from './CnaColumnFormatter';
 import React from 'react';
 import { assert } from 'chai';
-import { shallow, mount } from 'enzyme';
+import Enzyme, { shallow, mount } from 'enzyme';
+import Adapter from 'enzyme-adapter-react-16';
 import sinon from 'sinon';
-import {DiscreteCopyNumberData} from "../../../../shared/api/generated/CBioPortalAPI";
+
+Enzyme.configure({ adapter: new Adapter() });
+import { DiscreteCopyNumberData } from 'cbioportal-ts-api-client';
 
 describe('CnaColumnFormatter', () => {
-
-    before(() => {
-
-    });
-
-    after(() => {
-
-    });
-
     it('CNA column renderer shows correct text based on alteration value', () => {
-
-        let output = mount(CnaColumnFormatter.renderFunction([{alteration:-2} as DiscreteCopyNumberData]));
+        let output = mount(
+            CnaColumnFormatter.renderFunction([
+                { alteration: -2 } as DiscreteCopyNumberData,
+            ])
+        );
 
         assert.equal(output.text(), 'DeepDel');
 
-        output = mount(CnaColumnFormatter.renderFunction([{alteration:2} as DiscreteCopyNumberData]));
+        output = mount(
+            CnaColumnFormatter.renderFunction([
+                { alteration: 2 } as DiscreteCopyNumberData,
+            ])
+        );
 
         assert.equal(output.text(), 'AMP');
-
     });
-
 });

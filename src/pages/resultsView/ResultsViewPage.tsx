@@ -3,34 +3,37 @@ import * as _ from 'lodash';
 import $ from 'jquery';
 import URL from 'url';
 import { inject, observer } from 'mobx-react';
-import { computed, observable, reaction, runInAction } from 'mobx';
+import {
+    action,
+    computed,
+    observable,
+    reaction,
+    runInAction,
+    makeObservable,
+} from 'mobx';
 import { ResultsViewPageStore } from './ResultsViewPageStore';
 import CancerSummaryContainer from 'pages/resultsView/cancerSummary/CancerSummaryContainer';
 import Mutations from './mutation/Mutations';
 import MutualExclusivityTab from './mutualExclusivity/MutualExclusivityTab';
-import SurvivalTab from './survival/SurvivalTab';
 import DownloadTab from './download/DownloadTab';
 import AppConfig from 'appConfig';
 import CNSegments from './cnSegments/CNSegments';
 import './styles.scss';
-import Network from './network/Network';
+import ResultsViewPathwayMapper from './pathwayMapper/ResultsViewPathwayMapper';
 import ResultsViewOncoprint from 'shared/components/oncoprint/ResultsViewOncoprint';
 import QuerySummary from './querySummary/QuerySummary';
 import ExpressionWrapper from './expression/ExpressionWrapper';
-import EnrichmentsTab from 'pages/resultsView/enrichments/EnrichmentsTab';
 import PlotsTab from './plots/PlotsTab';
 import { MSKTab, MSKTabs } from '../../shared/components/MSKTabs/MSKTabs';
 import { PageLayout } from '../../shared/components/PageLayout/PageLayout';
 import autobind from 'autobind-decorator';
 import { ITabConfiguration } from '../../shared/model/ITabConfiguration';
-import getBrowserWindow from '../../public-lib/lib/getBrowserWindow';
+import { getBrowserWindow, remoteData } from 'cbioportal-frontend-commons';
 import CoExpressionTab from './coExpression/CoExpressionTab';
 import Helmet from 'react-helmet';
 import { showCustomTab } from '../../shared/lib/customTabs';
 import {
-    getTabId,
     parseConfigDisabledTabs,
-    parseSamplesSpecifications,
     ResultsViewTab,
 } from './ResultsViewPageHelpers';
 import {
@@ -38,117 +41,52 @@ import {
     doesQueryHaveCNSegmentData,
 } from './ResultsViewPageStoreUtils';
 import { AppStore } from '../../AppStore';
-import { updateResultsViewQuery } from './ResultsViewQuery';
 import { trackQuery } from '../../shared/lib/tracking';
-import { onMobxPromise } from '../../shared/lib/onMobxPromise';
 import QueryAndDownloadTabs from 'shared/components/query/QueryAndDownloadTabs';
-import { createQueryStore } from 'pages/home/HomePage';
 import ExtendedRouterStore from 'shared/lib/ExtendedRouterStore';
-import { CancerStudyQueryUrlParams } from '../../shared/components/query/QueryStore';
 import GeneSymbolValidationError from 'shared/components/query/GeneSymbolValidationError';
+import ResultsViewURLWrapper from 'pages/resultsView/ResultsViewURLWrapper';
+import setWindowVariable from 'shared/lib/setWindowVariable';
+import LoadingIndicator from 'shared/components/loadingIndicator/LoadingIndicator';
+import onMobxPromise from 'shared/lib/onMobxPromise';
+import { createQueryStore } from 'shared/lib/createQueryStore';
+import {
+    handleLegacySubmission,
+    handlePostedSubmission,
+} from 'shared/lib/redirectHelpers';
+import ComparisonTab from './comparison/ComparisonTab';
+import OQLTextArea, {
+    GeneBoxType,
+} from 'shared/components/GeneSelectionBox/OQLTextArea';
+import browser from 'bowser';
+import { QueryStore } from '../../shared/components/query/QueryStore';
+import UserMessager from 'shared/components/userMessager/UserMessage';
 
-function initStore(appStore: AppStore) {
-    const resultsViewPageStore = new ResultsViewPageStore(
-        appStore,
-        getBrowserWindow().globalStores.routing
-    );
+export function initStore(
+    appStore: AppStore,
+    urlWrapper: ResultsViewURLWrapper
+) {
+    const resultsViewPageStore = new ResultsViewPageStore(appStore, urlWrapper);
 
-    resultsViewPageStore.tabId = getTabId(
-        getBrowserWindow().globalStores.routing.location.pathname
-    );
+    setWindowVariable('resultsViewPageStore', resultsViewPageStore);
 
-    let lastQuery: any;
-    let lastPathname: string;
-
-    const queryReactionDisposer = reaction(
+    reaction(
+        () => [resultsViewPageStore.studyIds, resultsViewPageStore.oqlText],
         () => {
-            return [
-                getBrowserWindow().globalStores.routing.query,
-                getBrowserWindow().globalStores.routing.location.pathname,
-            ];
-        },
-        (x: any) => {
-            const query = x[0] as CancerStudyQueryUrlParams;
-            const pathname = x[1];
-
-            // escape from this if queryies are deeply equal
-            // TODO: see if we can figure out why query is getting changed and
-            // if there's any way to do shallow equality check to avoid this expensive operation
-            const queryChanged = !_.isEqual(lastQuery, query);
-            const pathnameChanged = pathname !== lastPathname;
-            if (!queryChanged && !pathnameChanged) {
-                return;
-            } else {
-                if (
-                    !getBrowserWindow().globalStores.routing.location.pathname.includes(
-                        '/results'
-                    )
-                ) {
-                    return;
-                }
-                runInAction(() => {
-                    // set query and pathname separately according to which changed, to avoid unnecessary
-                    //  recomputation by updating the query if only the pathname changed
-                    if (queryChanged) {
-                        // update query
-                        // normalize cancer_study_list this handles legacy sessions/urls where queries with single study had different param name
-                        const cancer_study_list =
-                            query.cancer_study_list || query.cancer_study_id;
-
-                        const cancerStudyIds: string[] = cancer_study_list.split(
-                            ','
-                        );
-
-                        const oql = decodeURIComponent(query.gene_list);
-
-                        let samplesSpecification = parseSamplesSpecifications(
-                            query,
-                            cancerStudyIds
-                        );
-
-                        const changes = updateResultsViewQuery(
-                            resultsViewPageStore.rvQuery,
-                            query,
-                            samplesSpecification,
-                            cancerStudyIds,
-                            oql
-                        );
-                        if (changes.cohortIdsList) {
-                            resultsViewPageStore.initDriverAnnotationSettings();
-                        }
-
-                        onMobxPromise(resultsViewPageStore.studyIds, () => {
-                            try {
-                                trackQuery(
-                                    resultsViewPageStore.studyIds.result!,
-                                    oql,
-                                    resultsViewPageStore.hugoGeneSymbols,
-                                    resultsViewPageStore.queriedVirtualStudies
-                                        .result!.length > 0
-                                );
-                            } catch {}
-                        });
-
-                        lastQuery = query;
-                    }
-                    if (pathnameChanged) {
-                        // need to set tab like this instead of with injected via params.tab because we need to set the tab
-                        //  at the same time as we set the query parameters, otherwise we get race conditions where the tab
-                        //  we're on at the time we update the query doesnt get unmounted because we change the query, causing
-                        //  MSKTabs unmounting, THEN change the tab.
-                        const tabId = getTabId(pathname);
-                        if (resultsViewPageStore.tabId !== tabId) {
-                            resultsViewPageStore.tabId = tabId;
-                        }
-                        lastPathname = pathname;
-                    }
-                });
+            if (
+                resultsViewPageStore.studyIds.isComplete &&
+                resultsViewPageStore.oqlText
+            ) {
+                trackQuery(
+                    resultsViewPageStore.studyIds.result!,
+                    resultsViewPageStore.oqlText,
+                    resultsViewPageStore.hugoGeneSymbols,
+                    resultsViewPageStore.queriedVirtualStudies.result!.length >
+                        0
+                );
             }
-        },
-        { fireImmediately: true }
+        }
     );
-
-    resultsViewPageStore.queryReactionDisposer = queryReactionDisposer;
 
     return resultsViewPageStore;
 }
@@ -171,18 +109,38 @@ export default class ResultsViewPage extends React.Component<
 > {
     private resultsViewPageStore: ResultsViewPageStore;
 
+    private urlWrapper: ResultsViewURLWrapper;
+
+    @observable.ref quickOQLQueryStore: QueryStore | null = null;
+
     @observable showTabs = true;
 
     constructor(props: IResultsViewPageProps) {
         super(props);
 
-        this.resultsViewPageStore = initStore(props.appStore);
+        makeObservable(this);
 
-        getBrowserWindow().resultsViewPageStore = this.resultsViewPageStore;
-    }
+        this.urlWrapper = new ResultsViewURLWrapper(props.routing);
 
-    private handleTabChange(id: string, replace?: boolean) {
-        this.props.routing.updateRoute({}, `results/${id}`, false, replace);
+        handleLegacySubmission(this.urlWrapper);
+
+        handlePostedSubmission(this.urlWrapper);
+
+        setWindowVariable('urlWrapper', this.urlWrapper);
+
+        if (this.urlWrapper.hasSessionId) {
+            onMobxPromise(this.urlWrapper.remoteSessionData, () => {
+                this.resultsViewPageStore = initStore(
+                    props.appStore,
+                    this.urlWrapper
+                );
+            });
+        } else {
+            this.resultsViewPageStore = initStore(
+                props.appStore,
+                this.urlWrapper
+            );
+        }
     }
 
     @autobind
@@ -201,7 +159,8 @@ export default class ResultsViewPage extends React.Component<
     }
 
     componentWillUnmount() {
-        this.resultsViewPageStore.queryReactionDisposer();
+        this.resultsViewPageStore.destroy();
+        this.urlWrapper.destroy();
     }
 
     @computed
@@ -221,8 +180,8 @@ export default class ResultsViewPage extends React.Component<
                             <ResultsViewOncoprint
                                 divId={'oncoprintDiv'}
                                 store={store}
+                                urlWrapper={store.urlWrapper}
                                 key={store.hugoGeneSymbols.join(',')}
-                                routing={this.props.routing}
                                 addOnBecomeVisibleListener={
                                     addOnBecomeVisibleListener
                                 }
@@ -277,15 +236,6 @@ export default class ResultsViewPage extends React.Component<
 
             {
                 id: ResultsViewTab.PLOTS,
-                hide: () => {
-                    if (!this.resultsViewPageStore.studies.isComplete) {
-                        return true;
-                    } else {
-                        return (
-                            this.resultsViewPageStore.studies.result!.length > 1
-                        );
-                    }
-                },
                 getTab: () => {
                     return (
                         <MSKTab
@@ -293,7 +243,10 @@ export default class ResultsViewPage extends React.Component<
                             id={ResultsViewTab.PLOTS}
                             linkText={'Plots'}
                         >
-                            <PlotsTab store={store} />
+                            <PlotsTab
+                                store={store}
+                                urlWrapper={this.urlWrapper}
+                            />
                         </MSKTab>
                     );
                 },
@@ -311,6 +264,7 @@ export default class ResultsViewPage extends React.Component<
                             <Mutations
                                 store={store}
                                 appStore={this.props.appStore}
+                                urlWrapper={this.urlWrapper}
                             />
                         </MSKTab>
                     );
@@ -349,46 +303,31 @@ export default class ResultsViewPage extends React.Component<
             },
 
             {
-                id: ResultsViewTab.ENRICHMENTS,
+                id: ResultsViewTab.COMPARISON,
                 hide: () => {
-                    return !this.resultsViewPageStore.studies.isComplete;
+                    return this.resultsViewPageStore.survivalClinicalDataExists
+                        .isPending;
                 },
                 getTab: () => {
+                    const text = this.resultsViewPageStore
+                        .survivalClinicalDataExists.result
+                        ? 'Comparison/Survival'
+                        : 'Comparison';
                     return (
                         <MSKTab
                             key={10}
-                            id={ResultsViewTab.ENRICHMENTS}
-                            linkText={'Enrichments'}
+                            id={ResultsViewTab.COMPARISON}
+                            linkText={text}
                         >
-                            <EnrichmentsTab store={store} />
+                            <ComparisonTab
+                                urlWrapper={this.urlWrapper}
+                                appStore={this.props.appStore}
+                                store={this.resultsViewPageStore}
+                            />
                         </MSKTab>
                     );
                 },
             },
-
-            {
-                id: ResultsViewTab.SURVIVAL,
-                hide: () => {
-                    return (
-                        !this.resultsViewPageStore.survivalClinicalDataExists
-                            .isComplete ||
-                        !this.resultsViewPageStore.survivalClinicalDataExists
-                            .result!
-                    );
-                },
-                getTab: () => {
-                    return (
-                        <MSKTab
-                            key={4}
-                            id={ResultsViewTab.SURVIVAL}
-                            linkText="Survival"
-                        >
-                            <SurvivalTab store={store} />
-                        </MSKTab>
-                    );
-                },
-            },
-
             {
                 id: ResultsViewTab.CN_SEGMENTS,
                 hide: () => {
@@ -417,13 +356,7 @@ export default class ResultsViewPage extends React.Component<
             {
                 id: ResultsViewTab.NETWORK,
                 hide: () => {
-                    if (!this.resultsViewPageStore.studies.isComplete) {
-                        return true;
-                    } else {
-                        return (
-                            this.resultsViewPageStore.studies.result!.length > 1
-                        );
-                    }
+                    return true;
                 },
                 getTab: () => {
                     return (
@@ -432,86 +365,64 @@ export default class ResultsViewPage extends React.Component<
                             id={ResultsViewTab.NETWORK}
                             linkText={'Network'}
                         >
-                            {store.studies.isComplete &&
-                                store.sampleLists.isComplete &&
-                                store.samples.isComplete && (
-                                    <Network
-                                        genes={store.genes.result!}
-                                        profileIds={
-                                            store.rvQuery
-                                                .selectedMolecularProfileIds
-                                        }
-                                        cancerStudyId={
-                                            store.studies.result.length > 0
-                                                ? store.studies.result![0]
-                                                      .studyId
-                                                : ''
-                                        }
-                                        zScoreThreshold={
-                                            store.rvQuery.zScoreThreshold
-                                        }
-                                        caseSetId={
-                                            store.sampleLists.result!.length > 0
-                                                ? store.sampleLists.result![0]
-                                                      .sampleListId
-                                                : '-1'
-                                        }
-                                        sampleIds={store.samples.result.map(
-                                            sample => sample.sampleId
-                                        )}
-                                        caseIdsKey={''}
-                                    />
-                                )}
+                            <div className="alert alert-info">
+                                The Network tab has been retired. For similar
+                                functionality, please visit{' '}
+                                <a
+                                    href="http://www.pathwaycommons.org/pcviz/"
+                                    target="_blank"
+                                >
+                                    http://www.pathwaycommons.org/pcviz/
+                                </a>
+                            </div>
                         </MSKTab>
                     );
                 },
             },
-
             {
-                id: ResultsViewTab.EXPRESSION,
-                hide: () => {
-                    return (
-                        this.resultsViewPageStore.expressionProfiles.result
-                            .length === 0 ||
-                        this.resultsViewPageStore.studies.result.length < 2
-                    );
-                },
+                id: ResultsViewTab.PATHWAY_MAPPER,
+                hide: () =>
+                    browser.name === 'Internet Explorer' ||
+                    !AppConfig.serverConfig.show_pathway_mapper ||
+                    !this.resultsViewPageStore.studies.isComplete,
                 getTab: () => {
+                    const showPM =
+                        store.filteredSequencedSampleKeysByGene.isComplete &&
+                        store.oqlFilteredCaseAggregatedDataByOQLLine
+                            .isComplete &&
+                        store.genes.isComplete &&
+                        store.samples.isComplete &&
+                        store.patients.isComplete &&
+                        store.coverageInformation.isComplete &&
+                        store.filteredSequencedSampleKeysByGene.isComplete &&
+                        store.filteredSequencedPatientKeysByGene.isComplete &&
+                        store.selectedMolecularProfiles.isComplete &&
+                        store.oqlFilteredCaseAggregatedDataByUnflattenedOQLLine
+                            .isComplete;
+
                     return (
                         <MSKTab
-                            key={8}
-                            id={ResultsViewTab.EXPRESSION}
-                            linkText={'Expression'}
+                            key={13}
+                            id={ResultsViewTab.PATHWAY_MAPPER}
+                            linkText={'Pathways'}
                         >
-                            {store.studyIdToStudy.isComplete &&
-                                store.filteredAndAnnotatedMutations
-                                    .isComplete &&
-                                store.genes.isComplete &&
-                                store.coverageInformation.isComplete && (
-                                    <ExpressionWrapper
-                                        store={store}
-                                        studyMap={store.studyIdToStudy.result}
-                                        genes={store.genes.result}
-                                        expressionProfiles={
-                                            store.expressionProfiles
-                                        }
-                                        numericGeneMolecularDataCache={
-                                            store.numericGeneMolecularDataCache
-                                        }
-                                        mutations={
-                                            store.filteredAndAnnotatedMutations
-                                                .result!
-                                        }
-                                        coverageInformation={
-                                            store.coverageInformation.result
-                                        }
-                                    />
-                                )}
+                            {showPM ? (
+                                <ResultsViewPathwayMapper
+                                    store={store}
+                                    appStore={this.props.appStore}
+                                    urlWrapper={this.urlWrapper}
+                                />
+                            ) : (
+                                <LoadingIndicator
+                                    isLoading={true}
+                                    size={'big'}
+                                    center={true}
+                                />
+                            )}
                         </MSKTab>
                     );
                 },
             },
-
             {
                 id: ResultsViewTab.DOWNLOAD,
                 getTab: () => {
@@ -571,33 +482,112 @@ export default class ResultsViewPage extends React.Component<
         return isRoutedTo || (!isExcludedInList && !isExcluded);
     }
 
-    public currentTab(tabId: string | undefined): string {
-        // if we have no tab defined (query submission, no tab click)
-        // we need to evaluate which should be the default tab
-        // this can only be determined by know the count of physical studies in the query
-        // (for virtual studies we need to fetch data determine constituent physical studies)
-        if (tabId === undefined) {
-            if (
-                this.resultsViewPageStore.studies.result!.length > 1 &&
-                this.resultsViewPageStore.hugoGeneSymbols.length === 1
-            ) {
-                return ResultsViewTab.CANCER_TYPES_SUMMARY; // cancer type study
-            } else {
-                return ResultsViewTab.ONCOPRINT; // this will resolve to first tab
-            }
-        } else {
-            return tabId;
+    @computed get quickOQLSubmitButton() {
+        if (this.quickOQLQueryStore) {
+            return (
+                <>
+                    <button
+                        className={'btn btn-primary btn-sm'}
+                        data-test="oqlQuickEditSubmitButton"
+                        style={{ marginLeft: 10 }}
+                        onClick={this.handleQuickOQLSubmission}
+                        disabled={!this.quickOQLQueryStore!.submitEnabled}
+                    >
+                        Submit Query
+                    </button>
+                    &nbsp;
+                    <button
+                        className={'btn btn-link btn-sm'}
+                        onClick={this.toggleOQLEditor}
+                    >
+                        Cancel
+                    </button>
+                </>
+            );
         }
+    }
+
+    @computed get showOQLEditor() {
+        return !!this.quickOQLQueryStore;
+    }
+    set showOQLEditor(s: boolean) {
+        if (s) {
+            this.quickOQLQueryStore = createQueryStore(
+                this.urlWrapper.query,
+                this.urlWrapper,
+                false
+            );
+        } else {
+            this.quickOQLQueryStore = null;
+        }
+    }
+
+    @action.bound
+    handleQuickOQLSubmission() {
+        this.quickOQLQueryStore!.submit();
+        this.showOQLEditor = false;
+    }
+
+    @action.bound
+    toggleOQLEditor() {
+        this.showOQLEditor = !this.showOQLEditor;
     }
 
     @autobind
     private getTabHref(tabId: string) {
         return URL.format({
             pathname: tabId,
-            query: this.props.routing.location.query,
+            query: this.props.routing.query,
             hash: this.props.routing.location.hash,
         });
     }
+
+    readonly userMessages = remoteData({
+        await: () => [
+            this.resultsViewPageStore.expressionProfiles,
+            this.resultsViewPageStore.studies,
+        ],
+        invoke: () => {
+            // TODO: This is only here temporarily to shepherd users from
+            //      now-deleted Expression tab to the Plots tab.
+            //  Remove a few months after 10/2020
+            if (
+                this.resultsViewPageStore.expressionProfiles.result.length >
+                    0 &&
+                this.resultsViewPageStore.studies.result.length > 1
+            ) {
+                return Promise.resolve([
+                    {
+                        dateEnd: 10000000000000000000,
+                        content: (
+                            <span>
+                                Looking for the <strong>Expression</strong> tab?
+                                {` `}
+                                That functionality is now available{` `}
+                                <a
+                                    style={{
+                                        color: 'white',
+                                        textDecoration: 'underline',
+                                    }}
+                                    onClick={() =>
+                                        this.urlWrapper.updateURL(
+                                            {},
+                                            `results/${ResultsViewTab.EXPRESSION_REDIRECT}`
+                                        )
+                                    }
+                                >
+                                    in the <strong>Plots</strong> tab.
+                                </a>
+                            </span>
+                        ),
+                        id: '2020_merge_expression_to_plots',
+                    },
+                ]);
+            } else {
+                return Promise.resolve([]);
+            }
+        },
+    });
 
     @computed get pageContent() {
         if (this.resultsViewPageStore.invalidStudyIds.result.length > 0) {
@@ -610,12 +600,22 @@ export default class ResultsViewPage extends React.Component<
                         showDownloadTab={false}
                         showAlerts={true}
                         getQueryStore={() =>
-                            createQueryStore(this.props.routing.query)
+                            createQueryStore(
+                                this.urlWrapper.query,
+                                this.urlWrapper
+                            )
                         }
                     />
                 </div>
             );
         } else {
+            // we don't show the result tabs if we don't have valid query
+            const tabsReady =
+                this.showTabs &&
+                !this.resultsViewPageStore.genesInvalid &&
+                !this.resultsViewPageStore.isQueryInvalid &&
+                this.resultsViewPageStore.customDriverAnnotationReport
+                    .isComplete;
             return (
                 <>
                     {// if query invalid(we only check gene count * sample count < 1,000,000 for now), return error page
@@ -639,43 +639,87 @@ export default class ResultsViewPage extends React.Component<
                             />
                         </div>
                     )}
-                    {this.resultsViewPageStore.studies.isComplete && (
-                        <Helmet>
-                            <title>
-                                {buildResultsViewPageTitle(
-                                    this.resultsViewPageStore.hugoGeneSymbols,
-                                    this.resultsViewPageStore.studies.result
-                                )}
-                            </title>
-                        </Helmet>
+
+                    {this.userMessages.isComplete &&
+                        this.userMessages.result.length > 0 && (
+                            <UserMessager messages={this.userMessages.result} />
+                        )}
+
+                    {(this.resultsViewPageStore.studies.isPending ||
+                        !tabsReady) && (
+                        <LoadingIndicator
+                            isLoading={true}
+                            center={true}
+                            noFade={true}
+                            size={'big'}
+                        ></LoadingIndicator>
                     )}
                     {this.resultsViewPageStore.studies.isComplete && (
-                        <div>
-                            <div className={'headBlock'}>
-                                <QuerySummary
-                                    routingStore={this.props.routing}
-                                    store={this.resultsViewPageStore}
-                                    onToggleQueryFormVisiblity={visible => {
-                                        this.showTabs = visible;
-                                    }}
-                                />
-                            </div>
-
-                            {// we don't show the result tabs if we don't have valid query
-                            this.showTabs &&
-                                !this.resultsViewPageStore.genesInvalid &&
-                                !this.resultsViewPageStore.isQueryInvalid && (
-                                    <MSKTabs
-                                        key={
-                                            this.resultsViewPageStore.rvQuery
-                                                .hash
+                        <>
+                            <Helmet>
+                                <title>
+                                    {buildResultsViewPageTitle(
+                                        this.resultsViewPageStore
+                                            .hugoGeneSymbols,
+                                        this.resultsViewPageStore.studies.result
+                                    )}
+                                </title>
+                            </Helmet>
+                            <div>
+                                <div className={'headBlock'}>
+                                    <QuerySummary
+                                        routingStore={this.props.routing}
+                                        store={this.resultsViewPageStore}
+                                        onToggleQueryFormVisibility={visible => {
+                                            runInAction(() => {
+                                                this.showTabs = visible;
+                                                this.showOQLEditor = false;
+                                            });
+                                        }}
+                                        onToggleOQLEditUIVisibility={
+                                            this.toggleOQLEditor
                                         }
-                                        activeTabId={this.currentTab(
+                                    />
+
+                                    {this.showOQLEditor && (
+                                        <div className={'quick_oql_edit'}>
+                                            <OQLTextArea
+                                                validateInputGeneQuery={true}
+                                                inputGeneQuery={
+                                                    this.quickOQLQueryStore!
+                                                        .geneQuery
+                                                }
+                                                callback={(...args) => {
+                                                    this.quickOQLQueryStore!.geneQuery =
+                                                        args[2];
+                                                }}
+                                                location={GeneBoxType.DEFAULT}
+                                                submitButton={
+                                                    this.quickOQLSubmitButton
+                                                }
+                                                error={
+                                                    this.quickOQLQueryStore!
+                                                        .submitError
+                                                }
+                                                messages={
+                                                    this.quickOQLQueryStore!
+                                                        .oqlMessages
+                                                }
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                                {tabsReady && (
+                                    <MSKTabs
+                                        key={this.urlWrapper.hash}
+                                        activeTabId={
                                             this.resultsViewPageStore.tabId
-                                        )}
+                                        }
                                         unmountOnHide={false}
                                         onTabClick={(id: string) =>
-                                            this.handleTabChange(id)
+                                            this.resultsViewPageStore.handleTabChange(
+                                                id
+                                            )
                                         }
                                         className="mainTabs"
                                         getTabHref={this.getTabHref}
@@ -683,7 +727,8 @@ export default class ResultsViewPage extends React.Component<
                                         {this.tabs}
                                     </MSKTabs>
                                 )}
-                        </div>
+                            </div>
+                        </>
                     )}
                 </>
             );
@@ -692,12 +737,27 @@ export default class ResultsViewPage extends React.Component<
 
     public render() {
         if (
+            this.urlWrapper.isTemporarySessionPendingSave ||
+            this.urlWrapper.isLoadingSession ||
+            !this.resultsViewPageStore.studies.isComplete
+        ) {
+            return (
+                <LoadingIndicator
+                    isLoading={true}
+                    center={true}
+                    noFade={true}
+                    size={'big'}
+                />
+            );
+        }
+
+        if (
             this.resultsViewPageStore.studies.isComplete &&
             !this.resultsViewPageStore.tabId
         ) {
             setTimeout(() => {
-                this.handleTabChange(
-                    this.currentTab(this.resultsViewPageStore.tabId),
+                this.resultsViewPageStore.handleTabChange(
+                    this.resultsViewPageStore.tabId,
                     true
                 );
             });

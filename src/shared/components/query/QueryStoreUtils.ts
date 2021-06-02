@@ -1,144 +1,205 @@
-import {CancerStudyQueryUrlParams, normalizeQuery, QueryStore} from "./QueryStore";
-import { MolecularProfile, SampleList } from "shared/api/generated/CBioPortalAPI";
-import { AlterationTypeConstants } from "pages/resultsView/ResultsViewPageStore";
-import * as _ from "lodash";
-import { VirtualStudy } from "shared/model/VirtualStudy";
+import {
+    CancerStudyQueryUrlParams,
+    normalizeQuery,
+    QueryStore,
+} from './QueryStore';
+import { MolecularProfile, SampleList } from 'cbioportal-ts-api-client';
+import * as _ from 'lodash';
+import { VirtualStudy } from 'shared/model/VirtualStudy';
+import { getSuffixOfMolecularProfile } from 'shared/lib/molecularProfileUtils';
 
-export type NonMolecularProfileQueryParams = Pick<CancerStudyQueryUrlParams,
-    'cancer_study_id' | 'cancer_study_list' | 'Z_SCORE_THRESHOLD' | 'RPPA_SCORE_THRESHOLD' | 'data_priority' |
-    'case_set_id' | 'case_ids' | 'gene_list' | 'geneset_list' | 'tab_index' | 'transpose_matrix' | 'Action'>;
-
-export type MolecularProfileQueryParams = Pick<CancerStudyQueryUrlParams,
-    'genetic_profile_ids_PROFILE_MUTATION_EXTENDED' | 'genetic_profile_ids_PROFILE_COPY_NUMBER_ALTERATION' |
-    'genetic_profile_ids_PROFILE_MRNA_EXPRESSION' | 'genetic_profile_ids_PROFILE_METHYLATION' |
-    'genetic_profile_ids_PROFILE_PROTEIN_EXPRESSION' | 'genetic_profile_ids_PROFILE_GENESET_SCORE' |
-    'genetic_profile_ids_PROFILE_GENERIC_ASSAY' >;
-
-
-export function currentQueryParams(store:QueryStore) {
-    let nonProfileParams = nonMolecularProfileParams(store);
-    let profileParams = molecularProfileParams(store);
-    return queryParams(nonProfileParams, profileParams);
+export enum MutationProfilesEnum {
+    mutations = 'mutations',
 }
 
-export function queryParams(nonMolecularProfileParams:NonMolecularProfileQueryParams,
-                            molecularProfileParams:MolecularProfileQueryParams) {
-    let params:CancerStudyQueryUrlParams = Object.assign({}, nonMolecularProfileParams, molecularProfileParams);
-
-    // Remove params with no value, because they may cause problems.
-    // For example, the server will always transpose if transpose_matrix is present, no matter the value.
-    for (let key in params) {
-        if (!(params as any)[key]) {
-            delete (params as any)[key];
-        }
-    }
-
-    return {query:params};
+export enum CNAProfilesEnum {
+    cna = 'cna',
+    gistic = 'gistic',
+    cna_rae = 'cna_rae',
+    cna_consensus = 'cna_consensus',
 }
 
-export function nonMolecularProfileParams(store:QueryStore, whitespace_separated_case_ids?:string):NonMolecularProfileQueryParams {
+export enum StructuralVariantProfilesEnum {
+    fusion = 'fusion', // TODO: should be removed once fusion profiles are removed from data files and database
+    structural_variants = 'structural_variants',
+}
+
+export enum GeneSetProfilesEnum {
+    gsva_scores = 'gsva_scores',
+}
+
+export function currentQueryParams(store: QueryStore) {
     const selectableSelectedStudyIds = store.selectableSelectedStudyIds;
 
     // case ids is of format study1:sample1+study2:sample2+...
-    const case_ids = whitespace_separated_case_ids ?
-                    whitespace_separated_case_ids.replace(/\s+/g, '+') :
-                    store.asyncCustomCaseSet.result.map(caseRow => (caseRow.studyId + ':' + caseRow.sampleId)).join('+');
+    const case_ids = store.asyncCustomCaseSet.result
+        .map(caseRow => caseRow.studyId + ':' + caseRow.sampleId)
+        .join('+');
 
-    let ret:NonMolecularProfileQueryParams = {
-        cancer_study_id: selectableSelectedStudyIds.length === 1 ? selectableSelectedStudyIds[0] : 'all',
+    let profileFilters: string[] = Object.keys(store.selectedProfileIdSet);
+
+    // If there is a single non-virtual study in selection, add profiles based on the alteration types in the OQL if they are not pre-selected.
+    // Example: If there are anything specific to mutation, ex: TP53: MUT = TRUNC INFRAME, then include/select mutation profile if it not selected in molecular profile slection section. Similarly even for other alteration type (Mutation, Structural Variant, Copy Number Alteration, mRNA Expression and Protein) in OQL
+    if (!store.isVirtualStudyQuery) {
+        // select default profiles for OQL alteration types
+        let selectedMutationProfileType = store.getSelectedProfileTypeFromMolecularAlterationType(
+            'MUTATION_EXTENDED'
+        );
+        if (
+            store.alterationTypesInOQL.haveMutInQuery &&
+            !selectedMutationProfileType &&
+            store.defaultMutationProfile
+        ) {
+            profileFilters.push(
+                getSuffixOfMolecularProfile(store.defaultMutationProfile)
+            );
+        }
+
+        let selectedStructuralVariantProfileType = store.getSelectedProfileTypeFromMolecularAlterationType(
+            'STRUCTURAL_VARIANT'
+        );
+        if (
+            store.alterationTypesInOQL.haveStructuralVariantInQuery &&
+            !selectedStructuralVariantProfileType &&
+            store.defaultStructuralVariantProfile
+        ) {
+            profileFilters.push(
+                getSuffixOfMolecularProfile(
+                    store.defaultStructuralVariantProfile
+                )
+            );
+        }
+
+        let selectedCNAProfileType = store.getSelectedProfileTypeFromMolecularAlterationType(
+            'COPY_NUMBER_ALTERATION'
+        );
+        if (
+            store.alterationTypesInOQL.haveCnaInQuery &&
+            !selectedCNAProfileType &&
+            store.defaultCnaProfile
+        ) {
+            profileFilters.push(
+                getSuffixOfMolecularProfile(store.defaultCnaProfile)
+            );
+        }
+
+        let selectedMRNAProfileType = store.getSelectedProfileTypeFromMolecularAlterationType(
+            'MRNA_EXPRESSION'
+        );
+        if (
+            store.alterationTypesInOQL.haveMrnaInQuery &&
+            !selectedMRNAProfileType &&
+            store.defaultMrnaProfile
+        ) {
+            profileFilters.push(
+                getSuffixOfMolecularProfile(store.defaultMrnaProfile)
+            );
+        }
+
+        let selectedProtienProfileType = store.getSelectedProfileTypeFromMolecularAlterationType(
+            'PROTEIN_LEVEL'
+        );
+        if (
+            store.alterationTypesInOQL.haveProtInQuery &&
+            !selectedProtienProfileType &&
+            store.defaultProtProfile
+        ) {
+            profileFilters.push(
+                getSuffixOfMolecularProfile(store.defaultProtProfile)
+            );
+        }
+    }
+
+    const ret: CancerStudyQueryUrlParams = {
+        cancer_study_id:
+            selectableSelectedStudyIds.length === 1
+                ? selectableSelectedStudyIds[0]
+                : 'all',
+        cancer_study_list: undefined,
         Z_SCORE_THRESHOLD: store.zScoreThreshold,
         RPPA_SCORE_THRESHOLD: store.rppaScoreThreshold,
-        data_priority: store.dataTypePriorityCode,
+        profileFilter: profileFilters.join(','),
         case_set_id: store.selectedSampleListId || '-1', // empty string won't work
         case_ids,
-        gene_list: encodeURIComponent(normalizeQuery(store.geneQuery) || ' '), // empty string won't work
+        gene_list: normalizeQuery(store.geneQuery) || ' ', // empty string won't work
         geneset_list: normalizeQuery(store.genesetQuery) || ' ', //empty string won't work
-        tab_index: store.forDownloadTab ? 'tab_download' : 'tab_visualize' as any,
+        tab_index: store.forDownloadTab
+            ? 'tab_download'
+            : ('tab_visualize' as any),
         transpose_matrix: store.transposeDataMatrix ? 'on' : undefined,
         Action: 'Submit',
     };
 
     if (selectableSelectedStudyIds.length !== 1) {
-        ret.cancer_study_list = selectableSelectedStudyIds.join(",");
+        ret.cancer_study_list = selectableSelectedStudyIds.join(',');
     }
 
-    return ret;
+    return { query: ret };
 }
 
-export function molecularProfileParams(store:QueryStore, molecularProfileIds?:ReadonlyArray<string>) {
-    return {
-        genetic_profile_ids_PROFILE_MUTATION_EXTENDED: store.getSelectedProfileIdFromMolecularAlterationType("MUTATION_EXTENDED", molecularProfileIds),
-        genetic_profile_ids_PROFILE_COPY_NUMBER_ALTERATION: store.getSelectedProfileIdFromMolecularAlterationType("COPY_NUMBER_ALTERATION", molecularProfileIds),
-        genetic_profile_ids_PROFILE_MRNA_EXPRESSION: store.getSelectedProfileIdFromMolecularAlterationType("MRNA_EXPRESSION", molecularProfileIds),
-        genetic_profile_ids_PROFILE_METHYLATION: store.getSelectedProfileIdFromMolecularAlterationType("METHYLATION", molecularProfileIds) || store.getSelectedProfileIdFromMolecularAlterationType("METHYLATION_BINARY", molecularProfileIds),
-        genetic_profile_ids_PROFILE_PROTEIN_EXPRESSION: store.getSelectedProfileIdFromMolecularAlterationType("PROTEIN_LEVEL", molecularProfileIds),
-        genetic_profile_ids_PROFILE_GENESET_SCORE: store.getSelectedProfileIdFromMolecularAlterationType("GENESET_SCORE", molecularProfileIds),
-        genetic_profile_ids_PROFILE_GENERIC_ASSAY: store.getSelectedProfileIdFromMolecularAlterationType("GENERIC_ASSAY", molecularProfileIds)
-    };
-}
-
-
-export function profileAvailability(molecularProfiles:MolecularProfile[]) {
-	let hasMutationProfile = false;
-	let hasCNAProfile = false;
-	for (const profile of molecularProfiles) {
-		if (!profile.showProfileInAnalysisTab)
-			continue;
-
-		switch (profile.molecularAlterationType) {
-			case AlterationTypeConstants.MUTATION_EXTENDED:
-				hasMutationProfile = true;
-				break;
-			case AlterationTypeConstants.COPY_NUMBER_ALTERATION:
-				hasCNAProfile = true;
-				break;
-		}
-
-		if (hasMutationProfile && hasCNAProfile)
-			break;
-	}
-	return {
-		mutation: hasMutationProfile,
-		cna: hasCNAProfile
-	};
-}
-
-export function categorizedSamplesCount(sampleLists: SampleList[], selectedStudies: string[], selectedVirtualStudies: VirtualStudy[]) {
-    let mutationSamples: { [studyId: string]: { [sampleId: string]: string } } = {};
+export function categorizedSamplesCount(
+    sampleLists: SampleList[],
+    selectedStudies: string[],
+    selectedVirtualStudies: VirtualStudy[]
+) {
+    let mutationSamples: {
+        [studyId: string]: { [sampleId: string]: string };
+    } = {};
     let cnaSamples: { [studyId: string]: { [sampleId: string]: string } } = {};
-    let mutationCnaSamples: { [studyId: string]: { [sampleId: string]: string } } = {};
+    let mutationCnaSamples: {
+        [studyId: string]: { [sampleId: string]: string };
+    } = {};
     let allSamples: { [studyId: string]: { [sampleId: string]: string } } = {};
 
-    let filteredMutationSamples: { [studyId: string]: { [sampleId: string]: string } } = {};
-    let filteredCnaSamples: { [studyId: string]: { [sampleId: string]: string } } = {};
-    let filteredMutationCnaSamples: { [studyId: string]: { [sampleId: string]: string } } = {};
-    let filteredallSamples: { [studyId: string]: { [sampleId: string]: string } } = {};
+    let filteredMutationSamples: {
+        [studyId: string]: { [sampleId: string]: string };
+    } = {};
+    let filteredCnaSamples: {
+        [studyId: string]: { [sampleId: string]: string };
+    } = {};
+    let filteredMutationCnaSamples: {
+        [studyId: string]: { [sampleId: string]: string };
+    } = {};
+    let filteredallSamples: {
+        [studyId: string]: { [sampleId: string]: string };
+    } = {};
 
     _.each(sampleLists, sampleList => {
         switch (sampleList.category) {
-            case "all_cases_with_mutation_and_cna_data":
-                mutationCnaSamples[sampleList.studyId] = _.keyBy(sampleList.sampleIds);
+            case 'all_cases_with_mutation_and_cna_data':
+                mutationCnaSamples[sampleList.studyId] = _.keyBy(
+                    sampleList.sampleIds
+                );
                 break;
-            case "all_cases_with_mutation_data":
-                mutationSamples[sampleList.studyId] = _.keyBy(sampleList.sampleIds);
+            case 'all_cases_with_mutation_data':
+                mutationSamples[sampleList.studyId] = _.keyBy(
+                    sampleList.sampleIds
+                );
                 break;
-            case "all_cases_with_cna_data":
+            case 'all_cases_with_cna_data':
                 cnaSamples[sampleList.studyId] = _.keyBy(sampleList.sampleIds);
                 break;
-            case "all_cases_in_study":
+            case 'all_cases_in_study':
                 allSamples[sampleList.studyId] = _.keyBy(sampleList.sampleIds);
                 break;
             default: {
                 // this in case if the all cases list is tagged under other category
                 if (sampleList.sampleListId === sampleList.studyId + '_all') {
-                    allSamples[sampleList.studyId] = _.keyBy(sampleList.sampleIds);
+                    allSamples[sampleList.studyId] = _.keyBy(
+                        sampleList.sampleIds
+                    );
                 }
             }
         }
     });
 
-    const selectedVirtualStudyIds = _.map(selectedVirtualStudies, virtualStudy => virtualStudy.id);
-    const selectedPhysicalStudyIds = selectedStudies.filter(id => !_.includes(selectedVirtualStudyIds, id));
+    const selectedVirtualStudyIds = _.map(
+        selectedVirtualStudies,
+        virtualStudy => virtualStudy.id
+    );
+    const selectedPhysicalStudyIds = selectedStudies.filter(
+        id => !_.includes(selectedVirtualStudyIds, id)
+    );
 
     //add all samples from selected physical studies
     _.forEach(selectedPhysicalStudyIds, studyId => {
@@ -150,26 +211,43 @@ export function categorizedSamplesCount(sampleLists: SampleList[], selectedStudi
 
     _.forEach(selectedVirtualStudies, virtualStudy => {
         _.forEach(virtualStudy.data.studies, study => {
-
             // check if the study in this virtual study is already in the selected studies list
             // and only add the samples if its not already present
             if (!_.includes(selectedPhysicalStudyIds, study.id)) {
-                filteredMutationSamples[study.id] = filteredMutationSamples[study.id] || {};
-                filteredCnaSamples[study.id] = filteredCnaSamples[study.id] || {};
-                filteredMutationCnaSamples[study.id] = filteredMutationCnaSamples[study.id] || {};
-                filteredallSamples[study.id] = filteredallSamples[study.id] || {};
+                filteredMutationSamples[study.id] =
+                    filteredMutationSamples[study.id] || {};
+                filteredCnaSamples[study.id] =
+                    filteredCnaSamples[study.id] || {};
+                filteredMutationCnaSamples[study.id] =
+                    filteredMutationCnaSamples[study.id] || {};
+                filteredallSamples[study.id] =
+                    filteredallSamples[study.id] || {};
 
                 _.forEach(study.samples, sampleId => {
-                    if (mutationSamples[study.id] && mutationSamples[study.id][sampleId]) {
+                    if (
+                        mutationSamples[study.id] &&
+                        mutationSamples[study.id][sampleId]
+                    ) {
                         filteredMutationSamples[study.id][sampleId] = sampleId;
                     }
-                    if (cnaSamples[study.id] && cnaSamples[study.id][sampleId]) {
+                    if (
+                        cnaSamples[study.id] &&
+                        cnaSamples[study.id][sampleId]
+                    ) {
                         filteredCnaSamples[study.id][sampleId] = sampleId;
                     }
-                    if (mutationCnaSamples[study.id] && mutationCnaSamples[study.id][sampleId]) {
-                        filteredMutationCnaSamples[study.id][sampleId] = sampleId;
+                    if (
+                        mutationCnaSamples[study.id] &&
+                        mutationCnaSamples[study.id][sampleId]
+                    ) {
+                        filteredMutationCnaSamples[study.id][
+                            sampleId
+                        ] = sampleId;
                     }
-                    if (allSamples[study.id] && allSamples[study.id][sampleId]) {
+                    if (
+                        allSamples[study.id] &&
+                        allSamples[study.id][sampleId]
+                    ) {
                         filteredallSamples[study.id][sampleId] = sampleId;
                     }
                 });
@@ -178,9 +256,67 @@ export function categorizedSamplesCount(sampleLists: SampleList[], selectedStudi
     });
 
     return {
-        w_mut: _.reduce(filteredMutationSamples, (acc: number, next) => acc + Object.keys(next).length, 0),
-        w_cna: _.reduce(filteredCnaSamples, (acc: number, next) => acc + Object.keys(next).length, 0),
-        w_mut_cna: _.reduce(filteredMutationCnaSamples, (acc: number, next) => acc + Object.keys(next).length, 0),
-        all: _.reduce(filteredallSamples, (acc: number, next) => acc + Object.keys(next).length, 0)
+        w_mut: _.reduce(
+            filteredMutationSamples,
+            (acc: number, next) => acc + Object.keys(next).length,
+            0
+        ),
+        w_cna: _.reduce(
+            filteredCnaSamples,
+            (acc: number, next) => acc + Object.keys(next).length,
+            0
+        ),
+        w_mut_cna: _.reduce(
+            filteredMutationCnaSamples,
+            (acc: number, next) => acc + Object.keys(next).length,
+            0
+        ),
+        all: _.reduce(
+            filteredallSamples,
+            (acc: number, next) => acc + Object.keys(next).length,
+            0
+        ),
+    };
+}
+
+export function getMolecularProfileOptions(molecularProfileIdSet: {
+    [profileType: string]: boolean;
+}) {
+    const molecularProfileOptions: {
+        label: string;
+        id: string;
+        profileTypes: string[];
+    }[] = [];
+
+    if (molecularProfileIdSet[MutationProfilesEnum.mutations]) {
+        molecularProfileOptions.push({
+            label: 'Mutations',
+            id: MutationProfilesEnum.mutations,
+            profileTypes: [MutationProfilesEnum.mutations],
+        });
     }
+
+    const structuralVariantProfileTypes = Object.keys(
+        StructuralVariantProfilesEnum
+    ).filter(profileType => molecularProfileIdSet[profileType] !== undefined);
+    if (structuralVariantProfileTypes.length > 0) {
+        molecularProfileOptions.push({
+            label: 'Structural variants',
+            id: structuralVariantProfileTypes.join('-'),
+            profileTypes: structuralVariantProfileTypes,
+        });
+    }
+
+    const cnaProfileTypes = Object.keys(CNAProfilesEnum).filter(
+        profileType => molecularProfileIdSet[profileType] !== undefined
+    );
+    if (cnaProfileTypes.length > 0) {
+        molecularProfileOptions.push({
+            label: 'Copy number alterations',
+            id: cnaProfileTypes.join('-'),
+            profileTypes: cnaProfileTypes,
+        });
+    }
+
+    return molecularProfileOptions;
 }

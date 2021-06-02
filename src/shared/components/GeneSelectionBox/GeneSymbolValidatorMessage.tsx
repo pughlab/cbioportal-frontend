@@ -6,6 +6,8 @@ import { OQL } from 'shared/components/GeneSelectionBox/OQLTextArea';
 import { GeneReplacement } from 'shared/components/query/QueryStore';
 import ReactSelect from 'react-select1';
 import classNames from 'classnames';
+import * as _ from 'lodash';
+import { DropdownButton, MenuItem } from 'react-bootstrap';
 
 export type GeneSymbolValidatorMessageProps = {
     errorMessageOnly?: boolean;
@@ -14,6 +16,7 @@ export type GeneSymbolValidatorMessageProps = {
     genes: GeneValidationResult | Error;
     wrapTheContent?: boolean;
     replaceGene: ReplaceGene;
+    highlightError?: () => void;
 };
 
 export type ReplaceGene = (oldSymbol: string, newSymbol: string) => void;
@@ -66,15 +69,26 @@ const RenderSuggestion = function(props: RenderSuggestionProps) {
         <div className={styles.suggestionBubble} title={title}>
             <FontAwesome className={styles.icon} name="question" />
             <span className={styles.multiChoiceLabel}>{props.alias}</span>
-            <span>{': '}</span>
-            <ReactSelect
-                placeholder="select a symbol"
-                options={options}
-                onChange={(option: any) =>
-                    option && props.replaceGene(props.alias, option.value)
-                }
-                autosize
-            />
+            <span>{':'}&nbsp;</span>
+            <DropdownButton
+                bsStyle={title.toLowerCase()}
+                bsSize="xsmall"
+                title="Select symbol"
+                id={`geneReplace_${props.alias}`}
+            >
+                {options.map((item, i) => {
+                    return (
+                        <MenuItem
+                            onClick={() => {
+                                props.replaceGene(props.alias, item.value);
+                            }}
+                            eventKey={i + 1}
+                        >
+                            {item.label}
+                        </MenuItem>
+                    );
+                })}
+            </DropdownButton>
         </div>
     );
 };
@@ -86,7 +100,17 @@ const GeneSymbolValidatorMessageChild = (
         return (
             <div className={styles.GeneSymbolValidator}>
                 <span className={styles.errorMessage}>
-                    {`Cannot validate gene symbols because of invalid OQL. ${props.oql.message}`}
+                    {`Cannot validate gene symbols because of invalid OQL.`}
+                    &nbsp;&nbsp;
+                    <a
+                        className={'underline'}
+                        onMouseDown={e => {
+                            e.preventDefault();
+                            props.highlightError!();
+                        }}
+                    >
+                        Click to highlight error
+                    </a>
                 </span>
             </div>
         );
@@ -141,6 +165,52 @@ const GeneSymbolValidatorMessageChild = (
             </div>
         );
     }
+
+    // TDOD: remove this condition once multiple entrez gene ids is supported
+    const hugoGeneSymbolSet = _.groupBy(
+        props.genes.found,
+        gene => gene.hugoGeneSymbol
+    );
+    const genesWithMultipleEntrezGeneIds = _.reduce(
+        hugoGeneSymbolSet,
+        (acc, genes, hugoGeneSymbol) => {
+            if (genes.length > 1) {
+                acc.push(hugoGeneSymbol);
+            }
+            return acc;
+        },
+        [] as string[]
+    );
+
+    if (genesWithMultipleEntrezGeneIds.length > 0) {
+        return (
+            <div className={styles.GeneSymbolValidator}>
+                <div
+                    className={styles.invalidBubble}
+                    title="Please edit the gene symbols."
+                >
+                    <FontAwesome
+                        className={styles.icon}
+                        name="exclamation-circle"
+                    />
+                    <span>
+                        The portal does not currently support the following
+                        gene(s):
+                    </span>
+                </div>
+
+                {genesWithMultipleEntrezGeneIds.map((gene, index) => (
+                    <RenderSuggestion
+                        key={index}
+                        genes={[]}
+                        alias={gene}
+                        replaceGene={props.replaceGene}
+                    />
+                ))}
+            </div>
+        );
+    }
+
     if (props.errorMessageOnly) {
         return null;
     }
@@ -161,7 +231,7 @@ const GeneSymbolValidatorMessageChild = (
     );
 };
 
-class GeneSymbolValidatorMessage extends React.Component<
+export default class GeneSymbolValidatorMessage extends React.Component<
     GeneSymbolValidatorMessageProps,
     {}
 > {
@@ -181,5 +251,3 @@ class GeneSymbolValidatorMessage extends React.Component<
         );
     }
 }
-
-export default React.memo(GeneSymbolValidatorMessage);

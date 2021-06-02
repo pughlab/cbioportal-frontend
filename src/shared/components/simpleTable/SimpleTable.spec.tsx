@@ -1,47 +1,69 @@
 import React from 'react';
 import { assert } from 'chai';
-import { shallow } from 'enzyme';
-import sinon from 'sinon';
-import SimpleTable from "./SimpleTable";
+import Enzyme, { mount } from 'enzyme';
+import SimpleTable from './SimpleTable';
+import Adapter from 'enzyme-adapter-react-16';
+
+Enzyme.configure({ adapter: new Adapter() });
 
 describe('SimpleTable', () => {
+    let table: any;
 
-    let table:any;
+    const headers: any = [<th>one</th>];
+    const rows: any = [
+        <tr>
+            <td>data</td>
+        </tr>,
+        <tr>
+            <td>data</td>
+        </tr>,
+    ];
+    const classNameTrue: string = 'test-class';
+    const classNameFalse: undefined = undefined;
 
-    const headers:any = [<th>one</th>];
-    const rows:any = [<tr><td>data</td></tr>, <tr><td>data</td></tr>];
-    const classNameTrue:string = 'test-class';
-    const classNameFalse:undefined = undefined;
-
-    before(()=> {
-
-        table = shallow(<SimpleTable headers={headers} rows={rows} />);
-
+    before(() => {
+        table = mount(<SimpleTable headers={headers} rows={rows} />);
     });
 
-    after(()=> {
-
+    it('renders 3 rows if passed headers and two rows', () => {
+        assert.equal(table.find('tr').length, 3);
     });
 
-    it('renders 3 rows if passed headers and two rows', ()=> {
-        assert.equal( table.find('tr').length, 3);
+    it('renders no result message when rows is empty array', () => {
+        table.setProps({ rows: [] });
+        assert.isTrue(
+            table.containsMatchingElement(
+                <td colSpan={1}>There are no results.</td>
+            )
+        );
+
+        table.setProps({ rows: [], noRowsText: 'Hello there!!!!' });
+        assert.isTrue(
+            table.containsMatchingElement(<td colSpan={1}>Hello there!!!!</td>)
+        );
     });
 
-    it('renders no result message when rows is empty array', ()=> {
-        table.setProps({rows:[]})
-        assert.isTrue( table.containsMatchingElement(<td colSpan={1}>There are no results.</td>));
-
-        table.setProps({rows:[], noRowsText:"Hello there!!!!"})
-        assert.isTrue( table.containsMatchingElement(<td colSpan={1}>Hello there!!!!</td>));
+    it('has class name of className prop if provided', () => {
+        assert.isTrue(
+            mount(
+                <SimpleTable
+                    className={classNameTrue}
+                    headers={headers}
+                    rows={rows}
+                />
+            ).hasClass('test-class')
+        );
     });
 
-    it('has class name of className prop if provided', ()=> {
-        assert.isTrue(shallow(<SimpleTable className={classNameTrue} headers={headers} rows={rows}/>).hasClass('test-class'));
+    it("does not have class name of 'undefined' if className prop is undefined", () => {
+        assert.isFalse(
+            mount(
+                <SimpleTable
+                    className={classNameFalse}
+                    headers={headers}
+                    rows={rows}
+                />
+            ).hasClass('undefined')
+        );
     });
-
-    it('does not have class name of \'undefined\' if className prop is undefined', ()=> {
-        assert.isFalse(shallow(<SimpleTable className={classNameFalse} headers={headers} rows={rows}/>).hasClass('undefined'));
-    });
-
-
 });

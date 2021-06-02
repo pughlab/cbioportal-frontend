@@ -1,19 +1,22 @@
-import * as React from "react";
-import {assert} from 'chai';
-import { mount, shallow } from 'enzyme';
-import ExpressionWrapper, {ExpressionWrapperProps} from './ExpressionWrapper';
+import * as React from 'react';
+import Enzyme, { shallow } from 'enzyme';
+import ExpressionWrapper, { ExpressionWrapperProps } from './ExpressionWrapper';
+import Adapter from 'enzyme-adapter-react-16';
 
 const expressionTestData: ExpressionWrapperProps = require('./expressionTestData.json');
 
-describe('Expression Wrapper',()=>{
+Enzyme.configure({ adapter: new Adapter() });
 
+describe('Expression Wrapper', () => {
     let wrapper: any;
     let instance: ExpressionWrapper;
 
-    beforeEach(()=>{
-        wrapper = shallow(<ExpressionWrapper
-            {...expressionTestData as ExpressionWrapperProps}
-        />);
+    beforeEach(() => {
+        wrapper = shallow(
+            <ExpressionWrapper
+                {...(expressionTestData as ExpressionWrapperProps)}
+            />
+        );
         instance = wrapper.instance() as ExpressionWrapper;
     });
 
@@ -27,5 +30,4 @@ describe('Expression Wrapper',()=>{
         assert.equal(instance.sortedData[2][0].studyId,  'laml_tcga', 'sort according to median values');
 
     });*/
-
 });

@@ -1,127 +1,135 @@
-import _ from "lodash";
-import * as React from "react";
-import {observer, Observer} from "mobx-react";
-import bind from "bind-decorator";
-import {computed, observable} from "mobx";
-import CBIOPORTAL_VICTORY_THEME, {baseLabelStyles} from "../../theme/cBioPoralTheme";
-import Timer = NodeJS.Timer;
-import {VictoryChart, VictoryAxis, VictoryScatter, VictoryLegend, VictoryLabel, VictoryLine} from "victory";
-import jStat from "jStat";
-import ScatterPlotTooltip from "./ScatterPlotTooltip";
-import ifndef from "shared/lib/ifndef";
-import {tickFormatNumeral} from "./TickUtils";
-import {computeCorrelationPValue, makeScatterPlotSizeFunction, separateScatterDataByAppearance, dataPointIsLimited as dataPointIsLimited} from "./PlotUtils";
-import {toConditionalPrecision} from "../../lib/NumberUtils";
-import {getRegressionComputations} from "./ScatterPlotUtils";
-import { IAxisLogScaleParams, IPlotSampleData } from 'pages/resultsView/plots/PlotsTabUtils';
+import _ from 'lodash';
+import * as React from 'react';
+import { observer, Observer } from 'mobx-react';
+import { computed, makeObservable, observable } from 'mobx';
+import {
+    VictoryChart,
+    VictoryAxis,
+    VictoryScatter,
+    VictoryLegend,
+    VictoryLabel,
+    VictoryLine,
+} from 'victory';
+import jStat from 'jStat';
+import { tickFormatNumeral } from 'cbioportal-frontend-commons';
+import {
+    computeCorrelationPValue,
+    makeScatterPlotSizeFunction,
+    separateScatterDataByAppearance,
+    dataPointIsLimited,
+    LegendDataWithId,
+    getBottomLegendHeight,
+    getMaxLegendLabelWidth,
+    getLegendItemsPerRow,
+} from './PlotUtils';
+import { toConditionalPrecision } from '../../lib/NumberUtils';
+import {
+    getNumberOfNewlines,
+    getRegressionComputations,
+    makeMultilineAxisLabel,
+} from './ScatterPlotUtils';
+import {
+    IAxisLogScaleParams,
+    IPlotSampleData,
+} from 'pages/resultsView/plots/PlotsTabUtils';
+import ifNotDefined from '../../lib/ifNotDefined';
+import {
+    CBIOPORTAL_VICTORY_THEME,
+    baseLabelStyles,
+    ScatterPlotTooltip,
+    ScatterPlotTooltipHelper,
+    wrapText,
+} from 'cbioportal-frontend-commons';
+import LegendDataComponent from './LegendDataComponent';
+import LegendLabelComponent from './LegendLabelComponent';
+import autobind from 'autobind-decorator';
 
 export interface IBaseScatterPlotData {
-    x:number;
-    y:number;
+    x: number;
+    y: number;
 }
 
 export interface IScatterPlotProps<D extends IBaseScatterPlotData> {
-    svgId?:string;
-    title?:string;
+    svgId?: string;
+    svgRef?: (elt: SVGElement | null) => void;
+    title?: string;
     data: D[];
-    chartWidth:number;
-    chartHeight:number;
-    highlight?:(d:D)=>boolean;
-    fill?:string | ((d:D)=>string);
-    stroke?:string | ((d:D)=>string);
-    size?:number | ((d:D, active:boolean, isHighlighted?:boolean)=>number);
-    fillOpacity?:number | ((d:D)=>number);
-    strokeOpacity?:number | ((d:D)=>number);
-    strokeWidth?:number | ((d:D)=>number);
-    zIndexSortBy?:((d:D)=>any)[]; // second argument to _.sortBy
-    symbol?: string | ((d:D)=>string); // see http://formidable.com/open-source/victory/docs/victory-scatter/#symbol for options
-    tooltip?:(d:D)=>JSX.Element;
-    legendData?:{name:string|string[], symbol:any}[]; // see http://formidable.com/open-source/victory/docs/victory-legend/#data
+    chartWidth: number;
+    chartHeight: number;
+    highlight?: (d: D) => boolean;
+    fill?: string | ((d: D) => string);
+    stroke?: string | ((d: D) => string);
+    size?:
+        | number
+        | ((d: D, active: boolean, isHighlighted?: boolean) => number);
+    fillOpacity?: number | ((d: D) => number);
+    strokeOpacity?: number | ((d: D) => number);
+    strokeWidth?: number | ((d: D) => number);
+    zIndexSortBy?: ((d: D) => any)[]; // second argument to _.sortBy
+    symbol?: string | ((d: D) => string); // see http://formidable.com/open-source/victory/docs/victory-scatter/#symbol for options
+    tooltip?: (d: D) => JSX.Element;
+    legendData?: LegendDataWithId<D>[];
     correlation?: {
         pearson: number;
         spearman: number;
     };
-    showRegressionLine?:boolean;
-    logX?:IAxisLogScaleParams|undefined;
-    logY?:IAxisLogScaleParams|undefined;
-    excludeLimitValuesFromCorrelation?:boolean; // if true, data points that are beyond threshold (e.g., '>8', have a `xThresholdType` or `yThresholdType` attribute) are not included in caluculation of the corr. efficient
-    useLogSpaceTicks?:boolean; // if log scale for an axis, then this prop determines whether the ticks are shown in post-log coordinate, or original data coordinate space
-    axisLabelX?:string;
-    axisLabelY?:string;
-    fontFamily?:string;
+    showRegressionLine?: boolean;
+    logX?: IAxisLogScaleParams | undefined;
+    logY?: IAxisLogScaleParams | undefined;
+    excludeLimitValuesFromCorrelation?: boolean; // if true, data points that are beyond threshold (e.g., '>8', have a `xThresholdType` or `yThresholdType` attribute) are not included in caluculation of the corr. efficient
+    useLogSpaceTicks?: boolean; // if log scale for an axis, then this prop determines whether the ticks are shown in post-log coordinate, or original data coordinate space
+    axisLabelX?: string;
+    axisLabelY?: string;
+    fontFamily?: string;
+    legendTitle?: string | string[];
 }
 // constants related to the gutter
-const GUTTER_TEXT_STYLE = {fontFamily: baseLabelStyles.fontFamily, fontSize: baseLabelStyles.fontSize};
+const GUTTER_TEXT_STYLE = {
+    fontFamily: baseLabelStyles.fontFamily,
+    fontSize: baseLabelStyles.fontSize,
+};
+const LEGEND_COLUMN_PADDING = 45;
 const CORRELATION_INFO_Y = 100; // experimentally determined
-const REGRESSION_STROKE = "#c43a31";
+const REGRESSION_STROKE = '#c43a31';
 const REGRESSION_STROKE_WIDTH = 2;
 const REGRESSION_EQUATION_Y = CORRELATION_INFO_Y + 95; // 95 ~= correlation height
 const LEGEND_TEXT_WIDTH = 107; // experimentally determined
 
-const DEFAULT_FONT_FAMILY = "Verdana,Arial,sans-serif";
-const RIGHT_PADDING = 120; // room for correlation info and legend
+const DEFAULT_FONT_FAMILY = 'Verdana,Arial,sans-serif';
+const RIGHT_GUTTER = 120; // room for correlation info and legend
 const NUM_AXIS_TICKS = 8;
 const PLOT_DATA_PADDING_PIXELS = 50;
-const LEFT_PADDING = 25;
+const BASE_LEFT_PADDING = 25;
+const VICTORY_LABEL_TEXT_HEIGHT = 15.02;
+const VICTORY_LABEL_CUSTOM_CHAR_LIMIT = 60;
 
 @observer
-export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.Component<IScatterPlotProps<D>, {}> {
-    @observable.ref tooltipModel:any|null = null;
-    @observable pointHovered:boolean = false;
-    private mouseEvents:any = this.makeMouseEvents();
+export default class ScatterPlot<
+    D extends IBaseScatterPlotData
+> extends React.Component<IScatterPlotProps<D>, {}> {
+    @observable.ref private container: HTMLDivElement;
+    private tooltipHelper: ScatterPlotTooltipHelper = new ScatterPlotTooltipHelper();
 
-    @observable.ref private container:HTMLDivElement;
+    constructor(props: any) {
+        super(props);
+        makeObservable(this);
+    }
 
-    @bind
-    private containerRef(container:HTMLDivElement) {
+    @autobind
+    private containerRef(container: HTMLDivElement) {
         this.container = container;
     }
 
-    private makeMouseEvents() {
-        let disappearTimeout:Timer | null = null;
-        const disappearDelayMs = 250;
+    get mouseEvents() {
+        return this.tooltipHelper.mouseEvents;
+    }
 
-        return [{
-            target: "data",
-            eventHandlers: {
-                onMouseOver: () => {
-                    return [
-                        {
-                            target: "data",
-                            mutation: (props: any) => {
-                                this.tooltipModel = props;
-                                this.pointHovered = true;
+    get tooltipModel() {
+        return this.tooltipHelper.tooltipModel;
+    }
 
-                                if (disappearTimeout !== null) {
-                                    clearTimeout(disappearTimeout);
-                                    disappearTimeout = null;
-                                }
-
-                                return { active: true };
-                            }
-                        }
-                    ];
-                },
-                onMouseOut: () => {
-                    return [
-                        {
-                            target: "data",
-                            mutation: () => {
-                                if (disappearTimeout !== null) {
-                                    clearTimeout(disappearTimeout);
-                                }
-
-                                disappearTimeout = setTimeout(()=>{
-                                    this.pointHovered = false;
-                                }, disappearDelayMs);
-
-                                return { active: false };
-                            }
-                        }
-                    ];
-                }
-            }
-        }];
+    get pointHovered() {
+        return this.tooltipHelper.pointHovered;
     }
 
     @computed get fontFamily() {
@@ -130,16 +138,22 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
 
     private get title() {
         if (this.props.title) {
+            const text = wrapText(
+                this.props.title,
+                this.props.chartWidth,
+                this.fontFamily,
+                '14px'
+            );
             return (
                 <VictoryLabel
                     style={{
-                        fontWeight:"bold",
+                        fontWeight: 'bold',
                         fontFamily: this.fontFamily,
-                        textAnchor: "middle"
+                        textAnchor: 'middle',
                     }}
-                    x={this.svgWidth/2}
+                    x={this.props.chartWidth / 2}
                     y="1.2em"
-                    text={this.props.title}
+                    text={text}
                 />
             );
         } else {
@@ -147,11 +161,11 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
         }
     }
 
-    @computed get legendX() {
+    @computed get sideLegendX() {
         return this.props.chartWidth - 20;
     }
 
-    @computed get legendY() {
+    @computed get sideLegendY() {
         const correlationInfo = 90;
         const regressionEqation = 45;
 
@@ -162,16 +176,130 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
         }
     }
 
+    @computed get legendLocation() {
+        if (this.props.legendData && this.props.legendData.length > 7) {
+            return 'bottom';
+        } else {
+            return 'right';
+        }
+    }
+
+    @computed get bottomLegendHeight() {
+        if (
+            !this.props.legendData ||
+            !this.props.legendData.length ||
+            this.legendLocation !== 'bottom'
+        ) {
+            return 0;
+        } else {
+            return getBottomLegendHeight(
+                this.legendItemsPerRow,
+                this.props.legendData,
+                this.props.legendTitle
+            );
+        }
+    }
+
+    @computed get maxLegendLabelWidth() {
+        if (this.props.legendData) {
+            return getMaxLegendLabelWidth(this.props.legendData);
+        }
+
+        return 0;
+    }
+
+    @computed get legendItemsPerRow() {
+        return getLegendItemsPerRow(
+            this.maxLegendLabelWidth,
+            this.svgWidth,
+            LEGEND_COLUMN_PADDING,
+            this.props.legendTitle
+        );
+    }
+
     private get legend() {
-        const x = this.legendX;
         if (this.props.legendData && this.props.legendData.length) {
+            let legendData = this.props.legendData;
+            if (this.legendLocation === 'bottom') {
+                // if legend is at bottom then flatten labels
+                legendData = legendData.map(x => {
+                    let { name, ...rest } = x;
+                    if (Array.isArray(name)) {
+                        name = (name as string[]).join(' '); // flatten labels by joining with space
+                    }
+                    return {
+                        name,
+                        ...rest,
+                    };
+                });
+            }
+            const orientation =
+                this.legendLocation === 'right' ? 'vertical' : 'horizontal';
+
             return (
                 <VictoryLegend
-                    orientation="vertical"
-                    data={this.props.legendData}
-                    x={x}
-                    y={this.legendY}
-                    width={RIGHT_PADDING}
+                    dataComponent={
+                        <LegendDataComponent orientation={orientation} />
+                    }
+                    labelComponent={
+                        <LegendLabelComponent orientation={orientation} />
+                    }
+                    events={[
+                        {
+                            childName: 'all',
+                            target: ['data', 'labels'],
+                            eventHandlers: {
+                                onClick: () => [
+                                    {
+                                        target: 'data',
+                                        mutation: (props: any) => {
+                                            const datum: LegendDataWithId<D> =
+                                                props.data[props.index];
+                                            if (datum.highlighting) {
+                                                datum.highlighting.onClick(
+                                                    datum
+                                                );
+                                            }
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    ]}
+                    orientation={orientation}
+                    itemsPerRow={
+                        this.legendLocation === 'right'
+                            ? undefined
+                            : this.legendItemsPerRow
+                    }
+                    rowGutter={this.legendLocation === 'right' ? undefined : -5}
+                    gutter={
+                        this.legendLocation === 'right'
+                            ? undefined
+                            : LEGEND_COLUMN_PADDING
+                    }
+                    data={legendData}
+                    x={this.legendLocation === 'right' ? this.sideLegendX : 0}
+                    y={
+                        this.legendLocation === 'right'
+                            ? this.sideLegendY
+                            : this.svgHeight - this.bottomLegendHeight
+                    }
+                    title={this.props.legendTitle}
+                    titleOrientation={
+                        this.legendLocation === 'right' ? 'top' : 'left'
+                    }
+                    style={{
+                        title: {
+                            fontSize: 15,
+                            fontWeight: 'bold',
+                        },
+                    }}
+                    titleComponent={
+                        <VictoryLabel
+                            dx={this.legendLocation === 'right' ? 0 : -10}
+                        />
+                    }
                 />
             );
         } else {
@@ -180,36 +308,52 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
     }
 
     private get correlationInfo() {
-        const x = this.legendX;
+        const x = this.sideLegendX;
         return (
             <g>
-                <VictoryLabel  x={x + LEGEND_TEXT_WIDTH}
-                               y={CORRELATION_INFO_Y}
-                               textAnchor="end"
-                               text={`Spearman: ${this.spearmanCorr.toFixed(2)}`}
-                               style={GUTTER_TEXT_STYLE}
+                <VictoryLabel
+                    x={x + LEGEND_TEXT_WIDTH}
+                    y={CORRELATION_INFO_Y}
+                    textAnchor="end"
+                    text={`Spearman: ${this.spearmanCorr.toFixed(2)}`}
+                    style={GUTTER_TEXT_STYLE}
                 />
-                { (this.spearmanPval !== null) && <VictoryLabel  x={x + LEGEND_TEXT_WIDTH}
-                                                                 y={CORRELATION_INFO_Y}
-                                                                 textAnchor="end"
-                                                                 dy="2"
-                                                                 text={`(p = ${toConditionalPrecision(this.spearmanPval, 3, 0.01)})`}
-                                                                 style={GUTTER_TEXT_STYLE}
-                />}
-                <VictoryLabel  x={x + LEGEND_TEXT_WIDTH}
-                               y={CORRELATION_INFO_Y}
-                               textAnchor="end"
-                               dy="5"
-                               text={`Pearson: ${this.pearsonCorr.toFixed(2)}`}
-                               style={GUTTER_TEXT_STYLE}
+                {this.spearmanPval !== null && (
+                    <VictoryLabel
+                        x={x + LEGEND_TEXT_WIDTH}
+                        y={CORRELATION_INFO_Y}
+                        textAnchor="end"
+                        dy="2"
+                        text={`(p = ${toConditionalPrecision(
+                            this.spearmanPval,
+                            3,
+                            0.01
+                        )})`}
+                        style={GUTTER_TEXT_STYLE}
+                    />
+                )}
+                <VictoryLabel
+                    x={x + LEGEND_TEXT_WIDTH}
+                    y={CORRELATION_INFO_Y}
+                    textAnchor="end"
+                    dy="5"
+                    text={`Pearson: ${this.pearsonCorr.toFixed(2)}`}
+                    style={GUTTER_TEXT_STYLE}
                 />
-                { (this.pearsonPval !== null) && <VictoryLabel  x={x + LEGEND_TEXT_WIDTH}
-                                                                 y={CORRELATION_INFO_Y}
-                                                                 textAnchor="end"
-                                                                 dy="7"
-                                                                 text={`(p = ${toConditionalPrecision(this.pearsonPval, 3, 0.01)})`}
-                                                                 style={GUTTER_TEXT_STYLE}
-                />}
+                {this.pearsonPval !== null && (
+                    <VictoryLabel
+                        x={x + LEGEND_TEXT_WIDTH}
+                        y={CORRELATION_INFO_Y}
+                        textAnchor="end"
+                        dy="7"
+                        text={`(p = ${toConditionalPrecision(
+                            this.pearsonPval,
+                            3,
+                            0.01
+                        )})`}
+                        style={GUTTER_TEXT_STYLE}
+                    />
+                )}
             </g>
         );
     }
@@ -217,7 +361,7 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
     private get regressionLineEquation(): JSX.Element | null {
         if (!this.props.showRegressionLine) {
             return null;
-        }        
+        }
 
         const equation = this.regressionLineComputations.string;
         const r2 = `R² = ${this.regressionLineComputations.r2}`;
@@ -230,14 +374,19 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
                 <line
                     stroke={REGRESSION_STROKE}
                     strokeWidth={REGRESSION_STROKE_WIDTH}
-                    x1={this.legendX + legendPadding}
+                    x1={this.sideLegendX + legendPadding}
                     y1={REGRESSION_EQUATION_Y}
-                    x2={this.legendX + legendPadding + lineLength}
+                    x2={this.sideLegendX + legendPadding + lineLength}
                     y2={REGRESSION_EQUATION_Y}
                     dy="0"
                 />
                 <VictoryLabel
-                    x={this.legendX + legendPadding + lineLength + linePadding}
+                    x={
+                        this.sideLegendX +
+                        legendPadding +
+                        lineLength +
+                        linePadding
+                    }
                     y={REGRESSION_EQUATION_Y}
                     dy="0"
                     textAnchor="start"
@@ -245,7 +394,12 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
                     style={GUTTER_TEXT_STYLE}
                 />
                 <VictoryLabel
-                    x={this.legendX + legendPadding + lineLength + linePadding}
+                    x={
+                        this.sideLegendX +
+                        legendPadding +
+                        lineLength +
+                        linePadding
+                    }
                     y={REGRESSION_EQUATION_Y}
                     dy="2"
                     textAnchor="start"
@@ -254,15 +408,17 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
                 />
             </g>
         );
-    } 
+    }
 
     @computed get splitData() {
-
         // when limit values are shown in the legend, exclude
         // these points from calculations of correlation coefficients
-        const data = this.props.excludeLimitValuesFromCorrelation?
-            _.filter(this.props.data, (d:IPlotSampleData)=>!dataPointIsLimited(d)):
-            this.props.data;
+        const data = this.props.excludeLimitValuesFromCorrelation
+            ? _.filter(
+                  this.props.data,
+                  (d: IPlotSampleData) => !dataPointIsLimited(d)
+              )
+            : this.props.data;
 
         const x = [];
         const y = [];
@@ -275,8 +431,14 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
 
     @computed get plotDomain() {
         // data extremes
-        const max = {x:Number.NEGATIVE_INFINITY, y:Number.NEGATIVE_INFINITY};
-        const min = {x:Number.POSITIVE_INFINITY, y:Number.POSITIVE_INFINITY};
+        const max = {
+            x: Number.NEGATIVE_INFINITY,
+            y: Number.NEGATIVE_INFINITY,
+        };
+        const min = {
+            x: Number.POSITIVE_INFINITY,
+            y: Number.POSITIVE_INFINITY,
+        };
         for (const d of this.props.data) {
             max.x = Math.max(d.x, max.x);
             max.y = Math.max(d.y, max.y);
@@ -293,7 +455,7 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
         }
         return {
             x: [min.x, max.x],
-            y: [min.y, max.y]
+            y: [min.y, max.y],
         };
     }
 
@@ -304,10 +466,10 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
             let x = this.splitData.x;
             let y = this.splitData.y;
             if (this.props.logX) {
-                x = x.map(d=>this.props.logX!.fLogScale(d, 0));
+                x = x.map(d => this.props.logX!.fLogScale(d, 0));
             }
             if (this.props.logY) {
-                y = y.map(d=>this.props.logY!.fLogScale(d, 0));
+                y = y.map(d => this.props.logY!.fLogScale(d, 0));
             }
             return jStat.corrcoeff(x, y);
         }
@@ -323,27 +485,74 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
     }
 
     @computed get spearmanPval() {
-        return computeCorrelationPValue(this.spearmanCorr, this.splitData.x.length);
+        return computeCorrelationPValue(
+            this.spearmanCorr,
+            this.splitData.x.length
+        );
     }
 
     @computed get pearsonPval() {
-        return computeCorrelationPValue(this.pearsonCorr, this.splitData.x.length);
+        return computeCorrelationPValue(
+            this.pearsonCorr,
+            this.splitData.x.length
+        );
     }
 
     @computed get rightPadding() {
-        return RIGHT_PADDING;
+        if (
+            this.props.legendData &&
+            this.props.legendData.length > 0 &&
+            this.legendLocation === 'right'
+        ) {
+            // make room for legend
+            return Math.max(RIGHT_GUTTER, this.maxLegendLabelWidth + 50); // + 50 makes room for circle and padding
+        } else {
+            return RIGHT_GUTTER;
+        }
     }
 
-    @computed get svgWidth() {
-        return LEFT_PADDING + this.props.chartWidth + this.rightPadding;
+    @computed get leftPadding(): number {
+        return BASE_LEFT_PADDING + this.axisLabelYHeight;
     }
 
-    @computed get svgHeight() {
-        return this.props.chartHeight;
+    @computed get svgWidth(): number {
+        return this.leftPadding + this.props.chartWidth + this.rightPadding;
     }
 
-    @bind
-    private x(d:D) {
+    @computed get svgHeight(): number {
+        return (
+            this.props.chartHeight +
+            this.bottomLegendHeight +
+            this.axisLabelXHeight
+        );
+    }
+
+    @computed get axisLabelYHeight(): number {
+        return VICTORY_LABEL_TEXT_HEIGHT * getNumberOfNewlines(this.axisLabelY);
+    }
+
+    @computed get axisLabelXHeight(): number {
+        return VICTORY_LABEL_TEXT_HEIGHT * getNumberOfNewlines(this.axisLabelX);
+    }
+
+    @computed get axisLabelX(): string {
+        const label = makeMultilineAxisLabel(
+            this.props.axisLabelX,
+            VICTORY_LABEL_CUSTOM_CHAR_LIMIT
+        );
+        return label;
+    }
+
+    @computed get axisLabelY(): string {
+        const label = makeMultilineAxisLabel(
+            this.props.axisLabelY,
+            VICTORY_LABEL_CUSTOM_CHAR_LIMIT
+        );
+        return label;
+    }
+
+    @autobind
+    private x(d: D) {
         if (this.props.logX) {
             return this.props.logX!.fLogScale(d.x, 0);
         } else {
@@ -351,8 +560,8 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
         }
     }
 
-    @bind
-    private y(d:D) {
+    @autobind
+    private y(d: D) {
         if (this.props.logY) {
             return this.props.logY!.fLogScale(d.y, 0);
         } else {
@@ -367,101 +576,115 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
         return makeScatterPlotSizeFunction(highlight, size);
     }
 
-    private tickFormat(t:number, ticks:number[], logScaleFunc:IAxisLogScaleParams|undefined) {
+    private tickFormat(
+        t: number,
+        ticks: number[],
+        logScaleFunc: IAxisLogScaleParams | undefined
+    ) {
         if (logScaleFunc && !this.props.useLogSpaceTicks) {
             t = logScaleFunc.fInvLogScale(t);
-            ticks = ticks.map(x=>logScaleFunc.fInvLogScale(x));
+            ticks = ticks.map(x => logScaleFunc.fInvLogScale(x));
         }
         return tickFormatNumeral(t, ticks);
     }
 
-    @bind
-    private tickFormatX(t:number, i:number, ticks:number[]) {
+    @autobind
+    private tickFormatX(t: number, i: number, ticks: number[]) {
         return this.tickFormat(t, ticks, this.props.logX);
     }
 
-    @bind
-    private tickFormatY(t:number, i:number, ticks:number[]) {
+    @autobind
+    private tickFormatY(t: number, i: number, ticks: number[]) {
         return this.tickFormat(t, ticks, this.props.logY);
     }
 
     @computed get data() {
         return separateScatterDataByAppearance(
             this.props.data,
-            ifndef(this.props.fill, "0x000000"),
-            ifndef(this.props.stroke, "0x000000"),
-            ifndef(this.props.strokeWidth, 0),
-            ifndef(this.props.strokeOpacity, 1),
-            ifndef(this.props.fillOpacity, 1),
-            ifndef(this.props.symbol, "circle"),
+            ifNotDefined(this.props.fill, '0x000000'),
+            ifNotDefined(this.props.stroke, '0x000000'),
+            ifNotDefined(this.props.strokeWidth, 0),
+            ifNotDefined(this.props.strokeOpacity, 1),
+            ifNotDefined(this.props.fillOpacity, 1),
+            ifNotDefined(this.props.symbol, 'circle'),
             this.props.zIndexSortBy
         );
     }
 
     @computed private get regressionLineComputations() {
-        const data = this.props.data.map(d=>([this.x(d), this.y(d)] as [number, number]));
+        const data = this.props.data.map(
+            d => [this.x(d), this.y(d)] as [number, number]
+        );
         return getRegressionComputations(data);
     }
 
     private get regressionLine() {
         // when limit values are shown in the legend, exclude
         // these points from calculation of regression line
-        const regressionData:D[] = this.props.excludeLimitValuesFromCorrelation?
-        _.filter(this.props.data, (d:IPlotSampleData)=>!dataPointIsLimited(d)):
-        this.props.data;
+        const regressionData: D[] = this.props.excludeLimitValuesFromCorrelation
+            ? _.filter(
+                  this.props.data,
+                  (d: IPlotSampleData) => !dataPointIsLimited(d)
+              )
+            : this.props.data;
 
         if (this.props.showRegressionLine && regressionData.length >= 2) {
             const regressionLineComputations = this.regressionLineComputations;
-            const y = (x:number)=>regressionLineComputations.predict(x)[1];
+            const y = (x: number) => regressionLineComputations.predict(x)[1];
             const labelX = 0.7;
-            const xPoints = [this.plotDomain.x[0], this.plotDomain.x[0]*(1-labelX) + this.plotDomain.x[1]*labelX, this.plotDomain.x[1]];
-            const data:any[] = xPoints.map(x=>({ x, y:y(x), label:""}));
+            const xPoints = [
+                this.plotDomain.x[0],
+                this.plotDomain.x[0] * (1 - labelX) +
+                    this.plotDomain.x[1] * labelX,
+                this.plotDomain.x[1],
+            ];
+            const data: any[] = xPoints.map(x => ({ x, y: y(x), label: '' }));
             return [
                 <VictoryLine
                     style={{
                         data: {
-                            stroke: REGRESSION_STROKE, strokeWidth: REGRESSION_STROKE_WIDTH
+                            stroke: REGRESSION_STROKE,
+                            strokeWidth: REGRESSION_STROKE_WIDTH,
                         },
                         labels: {
                             fontSize: 15,
-                            fill: "#000000",
-                            stroke: "#ffffff",
-                            strokeWidth:6,
-                            fontWeight:"bold",
-                            paintOrder:"stroke"
-                        }
+                            fill: '#000000',
+                            stroke: '#ffffff',
+                            strokeWidth: 6,
+                            fontWeight: 'bold',
+                            paintOrder: 'stroke',
+                        },
                     }}
                     data={data}
-                    labelComponent={<VictoryLabel lineHeight={1.3}/>}
-                />
+                    labelComponent={<VictoryLabel lineHeight={1.3} />}
+                />,
             ];
         } else {
             return null;
         }
     }
 
-    @bind
+    @autobind
     private getChart() {
         return (
             <div
                 ref={this.containerRef}
-                style={{width: this.svgWidth, height: this.svgHeight}}
+                style={{ width: this.svgWidth, height: this.svgHeight }}
             >
                 <svg
-                    id={this.props.svgId || ""}
+                    id={this.props.svgId || ''}
+                    ref={this.props.svgRef}
                     style={{
                         width: this.svgWidth,
                         height: this.svgHeight,
-                        pointerEvents: "all"
+                        pointerEvents: 'all',
                     }}
                     height={this.svgHeight}
                     width={this.svgWidth}
                     role="img"
                     viewBox={`0 0 ${this.svgWidth} ${this.svgHeight}`}
                 >
-                    <g
-                        transform={`translate(${LEFT_PADDING},0)`}
-                    >
+                    <g transform={`translate(${this.leftPadding},0)`}>
                         <VictoryChart
                             theme={CBIOPORTAL_VICTORY_THEME}
                             width={this.props.chartWidth}
@@ -479,8 +702,8 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
                                 crossAxis={false}
                                 tickCount={NUM_AXIS_TICKS}
                                 tickFormat={this.tickFormatX}
-                                axisLabelComponent={<VictoryLabel dy={25}/>}
-                                label={this.props.axisLabelX}
+                                axisLabelComponent={<VictoryLabel dy={25} />}
+                                label={this.axisLabelX}
                             />
                             <VictoryAxis
                                 domain={this.plotDomain.y}
@@ -490,20 +713,23 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
                                 tickCount={NUM_AXIS_TICKS}
                                 tickFormat={this.tickFormatY}
                                 dependentAxis={true}
-                                axisLabelComponent={<VictoryLabel dy={-35}/>}
-                                label={this.props.axisLabelY}
+                                axisLabelComponent={<VictoryLabel dy={-35} />}
+                                label={this.axisLabelY}
                             />
-                            { this.data.map(dataWithAppearance=>(
+                            {this.data.map(dataWithAppearance => (
                                 <VictoryScatter
                                     key={`${dataWithAppearance.fill},${dataWithAppearance.stroke},${dataWithAppearance.strokeWidth},${dataWithAppearance.strokeOpacity},${dataWithAppearance.fillOpacity},${dataWithAppearance.symbol}`}
                                     style={{
                                         data: {
                                             fill: dataWithAppearance.fill,
                                             stroke: dataWithAppearance.stroke,
-                                            strokeWidth: dataWithAppearance.strokeWidth,
-                                            strokeOpacity: dataWithAppearance.strokeOpacity,
-                                            fillOpacity: dataWithAppearance.fillOpacity
-                                        }
+                                            strokeWidth:
+                                                dataWithAppearance.strokeWidth,
+                                            strokeOpacity:
+                                                dataWithAppearance.strokeOpacity,
+                                            fillOpacity:
+                                                dataWithAppearance.fillOpacity,
+                                        },
                                     }}
                                     size={this.size}
                                     symbol={dataWithAppearance.symbol}
@@ -529,14 +755,15 @@ export default class ScatterPlot<D extends IBaseScatterPlotData> extends React.C
         }
         return (
             <div>
-                <Observer>
-                    {this.getChart}
-                </Observer>
+                <Observer>{this.getChart}</Observer>
                 {this.container && this.tooltipModel && this.props.tooltip && (
                     <ScatterPlotTooltip
                         container={this.container}
                         targetHovered={this.pointHovered}
-                        targetCoords={{x: this.tooltipModel.x + LEFT_PADDING, y: this.tooltipModel.y}}
+                        targetCoords={{
+                            x: this.tooltipModel.x + BASE_LEFT_PADDING,
+                            y: this.tooltipModel.y,
+                        }}
                         overlay={this.props.tooltip(this.tooltipModel.datum)}
                     />
                 )}

@@ -1,19 +1,19 @@
 import * as React from 'react';
 import Tracks from './Tracks';
-import { shallow, mount } from 'enzyme';
 import { assert } from 'chai';
+import Enzyme, { shallow, mount } from 'enzyme';
+import Adapter from 'enzyme-adapter-react-16';
+import sinon from 'sinon';
 
-describe('Tracks', ()=>{
+Enzyme.configure({ adapter: new Adapter() });
 
-   // it('', ()=>{
-   //
-   //     const wrapper = mount(<Tracks data={mockData} />);
-   //     //console.log(mockData);
-   //
-   //
-   //
-   // })
-
-
-
+describe('Tracks', () => {
+    // it('', ()=>{
+    //
+    //     const wrapper = mount(<Tracks data={mockData} />);
+    //     //console.log(mockData);
+    //
+    //
+    //
+    // })
 });

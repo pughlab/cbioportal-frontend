@@ -1,43 +1,91 @@
 import * as _ from 'lodash';
-import {action, computed, observable} from "mobx";
-import autobind from "autobind-decorator";
+import { action, computed, observable, makeObservable } from 'mobx';
+import autobind from 'autobind-decorator';
 import {
+    applyDataFiltersOnDatum,
     DataFilter,
+    DataFilterType,
     DataStore,
-    findAllUniquePositions
-} from "react-mutation-mapper";
+    FilterApplier,
+    findAllUniquePositions,
+    groupDataByGroupFilters,
+} from 'react-mutation-mapper';
+import { SimpleLazyMobXTableApplicationDataStore } from 'shared/lib/ILazyMobXTableApplicationDataStore';
+import { Mutation } from 'cbioportal-ts-api-client';
 import {
-    SimpleLazyMobXTableApplicationDataStore
-} from "shared/lib/ILazyMobXTableApplicationDataStore";
-import {Mutation} from "shared/api/generated/CBioPortalAPI";
-import {countDuplicateMutations, groupMutationsByGeneAndPatientAndProteinChange} from "shared/lib/MutationUtils";
+    ANNOTATED_PROTEIN_IMPACT_TYPE_FILTER_ID,
+    countDuplicateMutations,
+    groupMutationsByGeneAndPatientAndProteinChange,
+} from 'shared/lib/MutationUtils';
 
+type GroupedData = { group: string; data: Mutation[][] }[];
 
-type CustomFilterApplier = (filter: DataFilter,
-                            mutation: Mutation,
-                            positions: {[position: string]: {position: number}}) => boolean;
+export const PROTEIN_IMPACT_TYPE_FILTER_ID =
+    '_cBioPortalProteinImpactTypeFilter_';
+export const MUTATION_STATUS_FILTER_ID = '_cBioPortalMutationStatusFilter_';
 
-// TODO this is now mostly duplicate of DefaultMutationMapperDataStore in react-mutation-mapper, reuse DefaultMutationMapperDataStore instead
+export function findProteinImpactTypeFilter(dataFilters: DataFilter[]) {
+    // there are two types of filters (with putative driver, without putative driver)
+    return dataFilters.find(
+        f =>
+            f.id === PROTEIN_IMPACT_TYPE_FILTER_ID ||
+            f.id === ANNOTATED_PROTEIN_IMPACT_TYPE_FILTER_ID
+    );
+}
+
+// TODO this is now mostly duplicate of DefaultMutationMapperDataStore in react-mutation-mapper,
+//  we should reuse DefaultMutationMapperDataStore instead
 export default class MutationMapperDataStore
     extends SimpleLazyMobXTableApplicationDataStore<Mutation[]>
-    implements DataStore
-{
+    implements DataStore {
     @observable public dataFilters: DataFilter[] = [];
     @observable public selectionFilters: DataFilter[] = [];
     @observable public highlightFilters: DataFilter[] = [];
+    @observable.ref public groupFilters: {
+        group: string;
+        filter: DataFilter;
+    }[];
+
+    private lazyMobXTableFilter:
+        | ((
+              d: Mutation[],
+              filterString?: string,
+              filterStringUpper?: string,
+              filterStringLower?: string
+          ) => boolean)
+        | undefined;
 
     // this custom filter applier allows us to interpret selection and highlight filters in a customized way,
     // by default only position filters are taken into account
-    protected applyCustomFilter: CustomFilterApplier | undefined;
+    protected customFilterApplier: FilterApplier | undefined;
+
+    @computed
+    public get sortedFilteredGroupedData(): GroupedData {
+        return groupDataByGroupFilters(
+            this.groupFilters,
+            this.sortedFilteredData,
+            this.applyFilter
+        );
+    }
 
     @computed
     public get selectedPositions() {
-        return _.keyBy(findAllUniquePositions(this.selectionFilters).map(p => ({position: p})), 'position');
+        return _.keyBy(
+            findAllUniquePositions(this.selectionFilters).map(p => ({
+                position: p,
+            })),
+            'position'
+        );
     }
 
     @computed
     public get highlightedPositions() {
-        return _.keyBy(findAllUniquePositions(this.highlightFilters).map(p => ({position: p})), 'position');
+        return _.keyBy(
+            findAllUniquePositions(this.highlightFilters).map(p => ({
+                position: p,
+            })),
+            'position'
+        );
     }
 
     @action
@@ -56,6 +104,11 @@ export default class MutationMapperDataStore
     }
 
     @action
+    public setDataFilters(filters: DataFilter[]) {
+        this.dataFilters = filters;
+    }
+
+    @action
     public setHighlightFilters(filters: DataFilter[]) {
         this.highlightFilters = filters;
     }
@@ -63,25 +116,79 @@ export default class MutationMapperDataStore
     @action
     public setSelectionFilters(filters: DataFilter[]) {
         this.selectionFilters = filters;
-    };
-
-    public isPositionSelected(position: number) {
-        return !!this.selectedPositions[position+""];
-    }
-
-    public isPositionHighlighted(position: number) {
-        return !!this.highlightedPositions[position+""];
     }
 
     @action
-    public resetFilterAndSelection() {
+    public setGroupFilters(filters: { group: string; filter: DataFilter }[]) {
+        this.groupFilters = filters;
+    }
+
+    public isPositionSelected(position: number) {
+        return !!this.selectedPositions[position + ''];
+    }
+
+    public isPositionHighlighted(position: number) {
+        return !!this.highlightedPositions[position + ''];
+    }
+
+    // override the parent method to always keep the default main filter (this allows multiple filtering)
+    @action
+    public setFilter(
+        fn?: (
+            d: Mutation[],
+            filterString?: string,
+            filterStringUpper?: string,
+            filterStringLower?: string
+        ) => boolean
+    ) {
+        super.setFilter(
+            (
+                d: Mutation[],
+                filterString?: string,
+                filterStringUpper?: string,
+                filterStringLower?: string
+            ) =>
+                (!fn ||
+                    fn(
+                        d,
+                        filterString,
+                        filterStringUpper,
+                        filterStringLower
+                    )) &&
+                (this.dataFilters.length === 0 || this.dataMainFilter(d))
+        );
+
+        // we also need to keep a reference to the original function to be able to apply it individually when necessary
+        this.lazyMobXTableFilter = fn;
+    }
+
+    // override the parent method to always keep the default main filter
+    @action
+    public resetFilter() {
         super.resetFilter();
-        this.clearPositionFilters();
+        this.dataFilter = (d: Mutation[]) =>
+            this.dataFilters.length === 0 || this.dataMainFilter(d);
+        this.lazyMobXTableFilter = undefined;
+    }
+
+    @action
+    public resetFilters() {
+        this.resetFilter();
+        this.resetDataFilters();
+    }
+
+    @action
+    public resetDataFilters() {
+        this.clearDataFilters();
+        this.clearHighlightFilters();
+        this.clearSelectionFilters();
     }
 
     @computed
     get tableDataGroupedByPatients() {
-        return groupMutationsByGeneAndPatientAndProteinChange(_.flatten(this.tableData));
+        return groupMutationsByGeneAndPatientAndProteinChange(
+            _.flatten(this.tableData)
+        );
     }
 
     @computed
@@ -89,51 +196,78 @@ export default class MutationMapperDataStore
         return countDuplicateMutations(this.tableDataGroupedByPatients);
     }
 
-    constructor(data: Mutation[][], applyCustomFilter?: CustomFilterApplier) {
+    constructor(
+        data: Mutation[][],
+        customFilterApplier?: FilterApplier,
+        dataFilters: DataFilter[] = [],
+        selectionFilters: DataFilter[] = [],
+        highlightFilters: DataFilter[] = [],
+        groupFilters: { group: string; filter: DataFilter }[] = []
+    ) {
         super(data);
+
+        makeObservable(this);
+
+        this.dataFilters = dataFilters;
+        this.selectionFilters = selectionFilters;
+        this.highlightFilters = highlightFilters;
+        this.groupFilters = groupFilters;
+
         this.dataSelector = (d: Mutation[]) => this.dataSelectFilter(d);
-        this.dataHighlighter = (d:Mutation[]) => this.dataHighlightFilter(d);
-        this.applyCustomFilter = applyCustomFilter;
-    }
-
-    @action
-    private clearPositionFilters() {
-        // remove only filters with defined position field
-        this.selectionFilters = this.selectionFilters.filter(f => f.position === undefined);
+        this.dataHighlighter = (d: Mutation[]) => this.dataHighlightFilter(d);
+        this.customFilterApplier = customFilterApplier;
+        this.setFilter();
     }
 
     @autobind
-    public dataSelectFilter(d: Mutation[]): boolean
-    {
-        return (
-            this.selectionFilters.length > 0 &&
-            !this.selectionFilters
-                .map(dataFilter => this.applyFilter(dataFilter, d[0], this.selectedPositions))
-                .includes(false)
+    public dataMainFilter(d: Mutation[]): boolean {
+        return applyDataFiltersOnDatum(d, this.dataFilters, this.applyFilter);
+    }
+
+    @autobind
+    public dataSelectFilter(d: Mutation[]): boolean {
+        return applyDataFiltersOnDatum(
+            d,
+            this.selectionFilters,
+            this.applyFilter
         );
     }
 
     @autobind
-    public dataHighlightFilter(d: Mutation[]): boolean
-    {
-        return (
-            this.highlightFilters.length > 0 &&
-            !this.highlightFilters
-                .map(dataFilter => this.applyFilter(dataFilter, d[0], this.highlightedPositions))
-                .includes(false)
+    public dataHighlightFilter(d: Mutation[]): boolean {
+        return applyDataFiltersOnDatum(
+            d,
+            this.highlightFilters,
+            this.applyFilter
         );
     }
 
     @autobind
-    public applyFilter(filter: DataFilter, mutation: Mutation, positions: {[position: string]: {position: number}})
-    {
-        if (this.applyCustomFilter) {
+    public applyFilter(filter: DataFilter, d: Mutation | Mutation[]): boolean {
+        const mutation = _.flatten([d])[0];
+
+        if (this.customFilterApplier) {
             // let the custom filter applier decide how to apply the given filter
-            return this.applyCustomFilter(filter, mutation, positions);
-        }
-        else {
+            return this.customFilterApplier.applyFilter(filter, mutation);
+        } else {
             // by default only filter by position
-            return !!positions[mutation.proteinPosStart+""];
+            return (
+                filter.type !== DataFilterType.POSITION ||
+                filter.values.includes(mutation.proteinPosStart)
+            );
         }
+    }
+
+    @autobind
+    public applyLazyMobXTableFilter(d: Mutation | Mutation[]): boolean {
+        return (
+            !this.filterString ||
+            !this.lazyMobXTableFilter ||
+            this.lazyMobXTableFilter(
+                [_.flatten([d])[0]],
+                this.filterString.toLowerCase(),
+                this.filterString.toUpperCase()
+            )
+        );
     }
 }

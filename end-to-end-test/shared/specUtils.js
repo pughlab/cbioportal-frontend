@@ -1,13 +1,17 @@
 const clipboardy = require('clipboardy');
 
 function waitForStudyQueryPage(timeout) {
-    $('div[data-test="cancerTypeListContainer"]').waitForExist(timeout || 10000);
+    $('div[data-test="cancerTypeListContainer"]').waitForExist(
+        timeout || 10000
+    );
 }
 
 function waitForGeneQueryPage(timeout) {
     // wait until fade effect on studyList has finished (if running in forkedMode)
-    $("[data-test=studyList]").waitForExist(timeout, true);
-    $('div[data-test="molecularProfileSelector"]').waitForExist(timeout || 10000);
+    $('[data-test=studyList]').waitForExist(timeout, true);
+    $('div[data-test="molecularProfileSelector"]').waitForExist(
+        timeout || 10000
+    );
 }
 
 function waitForPlotsTab(timeout) {
@@ -15,50 +19,120 @@ function waitForPlotsTab(timeout) {
 }
 
 function waitForCoExpressionTab(timeout) {
-    $('//*[@id="coexpressionTabGeneTabs"]').waitForExist(timeout || 20000);
+    $('#coexpressionTabGeneTabs').waitForExist(timeout || 20000);
+}
+
+function waitForPatientView(timeout) {
+    $('#patientViewPageTabs').waitForExist(timeout || 20000);
+    $('[data-test=patientview-copynumber-table]').waitForVisible(
+        timeout || 20000
+    );
+    $('[data-test=patientview-mutation-table]').waitForVisible(
+        timeout || 20000
+    );
 }
 
 function waitForOncoprint(timeout) {
     browser.pause(100); // give oncoprint time to disappear
-    browser.waitUntil(()=>{
-        return !browser.isExisting(".oncoprintLoadingIndicator") // wait for loading indicator to hide, and
-            && browser.isExisting('#oncoprintDiv svg rect')// as a proxy for oncoprint being rendered, wait for an svg rectangle to appear in the legend
-            && (browser.getCssProperty(".oncoprintContainer", "opacity").value === 1) // oncoprint has faded in
-            && $('.oncoprint__controls').isExisting(); // oncoprint controls are showing
+    browser.waitUntil(() => {
+        return (
+            !browser.isExisting('.oncoprintLoadingIndicator') && // wait for loading indicator to hide, and
+            browser.isExisting('#oncoprintDiv svg rect') && // as a proxy for oncoprint being rendered, wait for an svg rectangle to appear in the legend
+            browser.getCssProperty('.oncoprintContainer', 'opacity').value ===
+                1 && // oncoprint has faded in
+            $('.oncoprint__controls').isExisting()
+        ); // oncoprint controls are showing
     }, timeout);
 }
 
 function getTextInOncoprintLegend() {
-    return browser.getText("#oncoprintDiv .oncoprint-legend-div svg");
+    return browser.getText('#oncoprintDiv .oncoprint-legend-div svg');
+}
+
+function setResultsPageSettingsMenuOpen(open) {
+    const button = 'button[data-test="GlobalSettingsButton"]';
+    const dropdown = 'div[data-test="GlobalSettingsDropdown"]';
+    browser.waitForVisible(button);
+    browser.waitUntil(
+        () => {
+            if (open === browser.isVisible(dropdown)) {
+                return true;
+            } else {
+                browser.click(button);
+                return false;
+            }
+        },
+        10000,
+        `Couldn't ${open ? 'open' : 'close'} results page settings menu`,
+        2000
+    );
 }
 
 function setOncoprintMutationsMenuOpen(open) {
-    const mutationColorMenuButton = "#mutationColorDropdown";
-    const mutationColorMenuDropdown = "div.oncoprint__controls__mutation_color_menu";
-    browser.moveToObject("div.oncoprint__controls");
+    const mutationColorMenuButton = '#mutationColorDropdown';
+    const mutationColorMenuDropdown =
+        'div.oncoprint__controls__mutation_color_menu';
+    browser.moveToObject('div.oncoprint__controls');
     browser.waitForVisible(mutationColorMenuButton);
-    browser.waitUntil(()=>{
-        if (open === browser.isVisible(mutationColorMenuDropdown)) {
-            return true;
-        } else {
-            browser.click(mutationColorMenuButton);
-            return false;
-        }
-    }, 10000, `Couldn't ${open ? "open" : "close"} Mutations menu in Oncoprint`, 2000);
+    browser.waitUntil(
+        () => {
+            if (open === browser.isVisible(mutationColorMenuDropdown)) {
+                return true;
+            } else {
+                browser.click(mutationColorMenuButton);
+                return false;
+            }
+        },
+        10000,
+        `Couldn't ${open ? 'open' : 'close'} Mutations menu in Oncoprint`,
+        2000
+    );
 }
 
-function goToUrlAndSetLocalStorage(url) {
+function setDropdownOpen(
+    open,
+    button_selector,
+    dropdown_selector,
+    failure_message
+) {
+    browser.waitUntil(
+        () => {
+            // check if exists first because sometimes we get errors with isVisible if it doesn't exist
+            const isOpen = browser.isExisting(dropdown_selector)
+                ? browser.isVisible(dropdown_selector)
+                : false;
+            if (open === isOpen) {
+                return true;
+            } else {
+                browser.click(button_selector);
+                return false;
+            }
+        },
+        10000,
+        failure_message,
+        2000
+    );
+}
+
+function goToUrlAndSetLocalStorage(url, authenticated = false) {
+    const currentUrl = browser.getUrl();
+    const needToLogin =
+        authenticated && (!currentUrl || !currentUrl.includes('http'));
     if (!useExternalFrontend) {
         browser.url(url);
+        console.log('Connecting to: ' + url);
     } else {
-        var urlparam = useLocalDist? 'localdist' : 'localdev';
-        var prefix = (url.indexOf("?") > 0)? '&' : '?';
+        var urlparam = useLocalDist ? 'localdist' : 'localdev';
+        var prefix = url.indexOf('?') > 0 ? '&' : '?';
         browser.url(`${url}${prefix}${urlparam}=true`);
+        console.log('Connecting to: ' + `${url}${prefix}${urlparam}=true`);
     }
-    browser.setViewportSize({ height: 1600, width: 1000 });
+    if (needToLogin) keycloakLogin();
+
+    browser.setViewportSize({ height: 1000, width: 1600 });
 
     // move mouse out of the way
-    browser.moveToObject("body", 0, 0);
+    browser.moveToObject('body', 0, 0);
 }
 
 function sessionServiceIsEnabled() {
@@ -67,13 +141,26 @@ function sessionServiceIsEnabled() {
     }).value;
 }
 
+function showGsva() {
+    browser.execute(function() {
+        window.frontendConfig.serverConfig.skin_show_gsva = true;
+    });
+}
+
 function waitForNumberOfStudyCheckboxes(expectedNumber, text) {
-    browser.waitUntil(()=>{
-        var ret = browser.elements('[data-test="cancerTypeListContainer"] > ul > ul').value.length === expectedNumber;
+    browser.waitUntil(() => {
+        var ret =
+            browser.elements('[data-test="cancerTypeListContainer"] > ul > ul')
+                .value.length === expectedNumber;
         if (text && ret) {
-            ret = browser.isExisting('[data-test="cancerTypeListContainer"] > ul > ul > ul > li:nth-child(2) > label > span');
+            ret = browser.isExisting(
+                '[data-test="cancerTypeListContainer"] > ul > ul > ul > li:nth-child(2) > label > span'
+            );
             if (ret) {
-                ret = (browser.getText('[data-test="cancerTypeListContainer"] > ul > ul > ul > li:nth-child(2) > label > span') === text);
+                ret =
+                    browser.getText(
+                        '[data-test="cancerTypeListContainer"] > ul > ul > ul > li:nth-child(2) > label > span'
+                    ) === text;
             }
         }
         return ret;
@@ -83,32 +170,40 @@ function waitForNumberOfStudyCheckboxes(expectedNumber, text) {
 function getNthOncoprintTrackOptionsElements(n) {
     // n is one-indexed
 
-    const button_selector = "#oncoprintDiv .oncoprintjs__track_options__toggle_btn_img.nth-"+n;
-    const dropdown_selector = "#oncoprintDiv .oncoprintjs__track_options__dropdown.nth-"+n;
+    const button_selector =
+        '#oncoprintDiv .oncoprintjs__track_options__toggle_btn_img.nth-' + n;
+    const dropdown_selector =
+        '#oncoprintDiv .oncoprintjs__track_options__dropdown.nth-' + n;
 
     return {
         button: $(button_selector),
         button_selector,
         dropdown: $(dropdown_selector),
-        dropdown_selector
+        dropdown_selector,
     };
 }
 
-
-const useExternalFrontend = !process.env.FRONTEND_TEST_DO_NOT_LOAD_EXTERNAL_FRONTEND;
+const useExternalFrontend = !process.env
+    .FRONTEND_TEST_DO_NOT_LOAD_EXTERNAL_FRONTEND;
 
 const useLocalDist = process.env.FRONTEND_TEST_USE_LOCAL_DIST;
 
-function waitForNetworkQuiet(timeout){
-    browser.waitUntil(()=>{
-        return browser.execute(function(){
-            return window.ajaxQuiet === true;
-        }).value == true
+function waitForNetworkQuiet(timeout) {
+    browser.waitUntil(() => {
+        return (
+            browser.execute(function() {
+                return window.ajaxQuiet === true;
+            }).value == true
+        );
     }, timeout);
 }
 
+function getPortalUrlFromEnv() {
+    return process.env.CBIOPORTAL_URL.replace(/\/$/, '');
+}
+
 function toStudyViewSummaryTab() {
-    var summaryTab = "#studyViewTabs a.tabAnchor_summary";
+    var summaryTab = '#studyViewTabs a.tabAnchor_summary';
     var summaryContent = "[data-test='summary-tab-content']";
     if (!browser.isVisible(summaryContent)) {
         browser.waitForVisible(summaryTab, 10000);
@@ -118,7 +213,7 @@ function toStudyViewSummaryTab() {
 }
 
 function toStudyViewClinicalDataTab() {
-    var clinicalDataTab = "#studyViewTabs a.tabAnchor_clinicalData";
+    var clinicalDataTab = '#studyViewTabs a.tabAnchor_clinicalData';
     var clinicalDataContent = "[data-test='clinical-data-tab-content']";
     if (!browser.isVisible(clinicalDataContent)) {
         browser.waitForVisible(clinicalDataTab, 10000);
@@ -140,17 +235,30 @@ function waitForStudyViewSelectedInfo() {
     browser.pause(2000);
 }
 
-function getTextFromElement(element) {
-    return browser.element(element).getText().trim();
+function waitForStudyView() {
+    browser.waitUntil(() => $$('.sk-spinner').length === 0, 10000);
 }
 
+function waitForGroupComparisonTabOpen() {
+    $('[data-test=ComparisonPageOverlapTabDiv]').waitForVisible(100000);
+}
+
+function getTextFromElement(element) {
+    return browser
+        .element(element)
+        .getText()
+        .trim();
+}
 
 function getNumberOfStudyViewCharts() {
     return browser.elements('div.react-grid-item').value.length;
 }
 
-function setInputText(selector, text){
-    browser.setValue(selector, '\uE003'.repeat(browser.getValue(selector).length) + text);
+function setInputText(selector, text) {
+    browser.setValue(
+        selector,
+        '\uE003'.repeat(browser.getValue(selector).length) + text
+    );
 }
 
 function getReactSelectOptions(parent) {
@@ -165,17 +273,17 @@ function selectReactSelectOption(parent, optionText) {
 function reactSelectOption(parent, optionText, loose = false) {
     parent.$('.Select-control').click();
     if (loose) {
-        return  parent.$('.Select-option*='+optionText);
+        return parent.$('.Select-option*=' + optionText);
     }
-    return parent.$('.Select-option='+optionText);
+    return parent.$('.Select-option=' + optionText);
 }
 
 function selectCheckedOption(parent, optionText, loose = false) {
     parent.$('.default-checked-select').click();
     if (loose) {
-        return  parent.$('.checked-select-option*='+optionText);
+        return parent.$('.checked-select-option*=' + optionText);
     }
-    return parent.$('.checked-select-option='+optionText);
+    return parent.$('.checked-select-option=' + optionText);
 }
 
 function getSelectCheckedOptions(parent) {
@@ -183,63 +291,206 @@ function getSelectCheckedOptions(parent) {
     return parent.$$('.checked-select-option');
 }
 
-function pasteToElement(elementSelector, text){
-
+function pasteToElement(elementSelector, text) {
     clipboardy.writeSync(text);
-    browser.setValue(elementSelector, ["Shift","Insert"]);
-
+    browser.setValue(elementSelector, ['Shift', 'Insert']);
 }
 
 function checkOncoprintElement(selector) {
-    browser.moveToObject("body", 0, 0);
+    browser.moveToObject('body', 0, 0);
     browser.execute(function() {
         frontendOnc.clearMouseOverEffects(); // clear mouse hover effects for uniform screenshot
     });
-    return checkElementWithMouseDisabled(selector || "#oncoprintDiv", 0, { hide:[".qtip", '.dropdown-menu', ".oncoprintjs__track_options__dropdown", ".oncoprintjs__cell_overlay_div"] });
+    return checkElementWithMouseDisabled(selector || '#oncoprintDiv', 0, {
+        hide: [
+            '.qtip',
+            '.dropdown-menu',
+            '.oncoprintjs__track_options__dropdown',
+            '.oncoprintjs__cell_overlay_div',
+        ],
+    });
 }
 
-function executeInBrowser(callback){
+function executeInBrowser(callback) {
     return browser.execute(callback).value;
 }
 
-function checkElementWithTemporaryClass(selectorForChecking, selectorForTemporaryClass, temporaryClass, pauseTime, options) {
-    browser.execute(function(selectorForTemporaryClass, temporaryClass){
-        $(selectorForTemporaryClass).addClass(temporaryClass);
-    }, selectorForTemporaryClass, temporaryClass);
+function checkElementWithTemporaryClass(
+    selectorForChecking,
+    selectorForTemporaryClass,
+    temporaryClass,
+    pauseTime,
+    options
+) {
+    browser.execute(
+        function(selectorForTemporaryClass, temporaryClass) {
+            $(selectorForTemporaryClass).addClass(temporaryClass);
+        },
+        selectorForTemporaryClass,
+        temporaryClass
+    );
     browser.pause(pauseTime);
     var res = browser.checkElement(selectorForChecking, options);
-    browser.execute(function(selectorForTemporaryClass, temporaryClass){
-        $(selectorForTemporaryClass).removeClass(temporaryClass);
-    }, selectorForTemporaryClass, temporaryClass);
+    browser.execute(
+        function(selectorForTemporaryClass, temporaryClass) {
+            $(selectorForTemporaryClass).removeClass(temporaryClass);
+        },
+        selectorForTemporaryClass,
+        temporaryClass
+    );
     return res;
 }
 
 function checkElementWithMouseDisabled(selector, pauseTime, options) {
-    return checkElementWithTemporaryClass(selector, selector, "disablePointerEvents", pauseTime || 0, options);
+    browser.execute(function() {
+        const style = 'display:block !important;visibility:visible !important;';
+        $(`<div id='blockUIToDisableMouse' style='${style}'></div>`).appendTo(
+            'body'
+        );
+    });
+
+    const ret = checkElementWithTemporaryClass(
+        selector,
+        selector,
+        'disablePointerEvents',
+        pauseTime || 0,
+        options
+    );
+
+    browser.execute(function() {
+        $('#blockUIToDisableMouse').remove();
+    });
+
+    return ret;
 }
 
-function checkElementWithElementHidden(selector, selectorToHide, options) { 
-    browser.execute((selectorToHide) => {
-        $(`<style id="tempHiddenStyles" type="text/css">${selectorToHide}{opacity:0;}</style>`).appendTo("head");
-    }, selectorToHide)
+function checkElementWithElementHidden(selector, selectorToHide, options) {
+    browser.execute(selectorToHide => {
+        $(
+            `<style id="tempHiddenStyles" type="text/css">${selectorToHide}{opacity:0;}</style>`
+        ).appendTo('head');
+    }, selectorToHide);
 
     var res = browser.checkElement(selector, options);
 
-    browser.execute((selectorToHide) => {
-        $("#tempHiddenStyles").remove();
-    }, selectorToHide)
+    browser.execute(selectorToHide => {
+        $('#tempHiddenStyles').remove();
+    }, selectorToHide);
 
     return res;
 }
 
-function clickQueryByGeneButton(){
+function clickQueryByGeneButton() {
     browser.waitForEnabled('a=Query By Gene');
     browser.click('a=Query By Gene');
-    browser.scroll(0,0);
-};
+    browser.scroll(0, 0);
+}
 
-function clickModifyStudySelectionButton (){
+function clickModifyStudySelectionButton() {
     browser.click('[data-test="modifyStudySelectionButton"]');
+}
+
+function getOncoprintGroupHeaderOptionsElements(trackGroupIndex) {
+    //trackGroupIndex is 0-indexed
+
+    const button_selector =
+        '#oncoprintDiv .oncoprintjs__header__toggle_btn_img.track-group-' +
+        trackGroupIndex;
+    const dropdown_selector =
+        '#oncoprintDiv .oncoprintjs__header__dropdown.track-group-' +
+        trackGroupIndex;
+
+    return {
+        button: $(button_selector),
+        button_selector,
+        dropdown: $(dropdown_selector),
+        dropdown_selector,
+    };
+}
+
+function postDataToUrl(url, data, authenticated = true) {
+    const currentUrl = browser.getUrl();
+    const needToLogin =
+        authenticated && (!currentUrl || !currentUrl.includes('http'));
+    browser.execute(
+        (url, data) => {
+            function formSubmit(url, params) {
+                // method="smart" means submit with GET iff the URL wouldn't be too long
+
+                const form = document.createElement('form');
+                form.setAttribute('method', 'post');
+                form.setAttribute('action', url);
+                form.setAttribute('target', '_self');
+
+                for (const key of Object.keys(params)) {
+                    const hiddenField = document.createElement('input');
+                    hiddenField.setAttribute('type', 'hidden');
+                    hiddenField.setAttribute('name', key);
+                    hiddenField.setAttribute('value', params[key]);
+                    form.appendChild(hiddenField);
+                }
+
+                document.body.appendChild(form);
+                form.submit();
+            }
+
+            formSubmit(url, data);
+        },
+        url,
+        data
+    );
+    if (needToLogin) keycloakLogin();
+}
+
+function keycloakLogin(timeout) {
+    browser.waitUntil(
+        () => browser.getUrl().includes('/auth/realms/cbio'),
+        timeout,
+        'No redirect to Keycloak could be detected.'
+    );
+    $('body').waitForVisible(timeout);
+
+    $('#username').setValue('testuser');
+    $('#password').setValue('P@ssword1');
+    $('#kc-login').click();
+
+    browser.waitUntil(() => !browser.getUrl().includes('/auth/realms/cbio'));
+    $('body').waitForVisible(timeout);
+}
+
+function openGroupComparison(studyViewUrl, chartDataTest, timeout) {
+    goToUrlAndSetLocalStorage(studyViewUrl, true);
+    $('[data-test=summary-tab-content]').waitForVisible();
+    waitForNetworkQuiet();
+    const chart = '[data-test=' + chartDataTest + ']';
+    browser.waitForVisible(chart, timeout || 10000);
+    browser.moveToObject(chart);
+    browser.waitUntil(() => {
+        return browser.isExisting(chart + ' .controls');
+    }, timeout || 10000);
+
+    // move to hamburger icon
+    const hamburgerIcon = '[data-test=chart-header-hamburger-icon]';
+    browser.moveToObject(hamburgerIcon);
+
+    // wait for the menu available
+    browser.waitForVisible(hamburgerIcon, timeout || 10000);
+
+    // open comparison session
+    const studyViewTabId = browser.getCurrentTabId();
+    $(chart)
+        .$(hamburgerIcon)
+        .$$('li')[1]
+        .click();
+    const groupComparisonTabId = browser
+        .windowHandles()
+        .value.filter(id => id !== studyViewTabId)[0];
+    browser.window(groupComparisonTabId);
+    waitForGroupComparisonTabOpen();
+}
+
+function selectElementByText(text) {
+    return $(`//*[text()="${text}"]`);
 }
 
 module.exports = {
@@ -249,16 +500,19 @@ module.exports = {
     waitForGeneQueryPage: waitForGeneQueryPage,
     waitForOncoprint: waitForOncoprint,
     waitForCoExpressionTab: waitForCoExpressionTab,
+    waitForPatientView: waitForPatientView,
     goToUrlAndSetLocalStorage: goToUrlAndSetLocalStorage,
     useExternalFrontend: useExternalFrontend,
     sessionServiceIsEnabled: sessionServiceIsEnabled,
     waitForNumberOfStudyCheckboxes: waitForNumberOfStudyCheckboxes,
-    waitForNetworkQuiet:waitForNetworkQuiet,
+    waitForNetworkQuiet: waitForNetworkQuiet,
     getTextInOncoprintLegend: getTextInOncoprintLegend,
     toStudyViewSummaryTab: toStudyViewSummaryTab,
     toStudyViewClinicalDataTab: toStudyViewClinicalDataTab,
     removeAllStudyViewFilters: removeAllStudyViewFilters,
     waitForStudyViewSelectedInfo: waitForStudyViewSelectedInfo,
+    waitForStudyView: waitForStudyView,
+    waitForGroupComparisonTabOpen: waitForGroupComparisonTabOpen,
     getTextFromElement: getTextFromElement,
     getNumberOfStudyViewCharts: getNumberOfStudyViewCharts,
     setOncoprintMutationsMenuOpen: setOncoprintMutationsMenuOpen,
@@ -269,12 +523,20 @@ module.exports = {
     executeInBrowser: executeInBrowser,
     checkElementWithTemporaryClass: checkElementWithTemporaryClass,
     checkElementWithMouseDisabled: checkElementWithMouseDisabled,
-    clickQueryByGeneButton:clickQueryByGeneButton,
+    clickQueryByGeneButton: clickQueryByGeneButton,
     clickModifyStudySelectionButton: clickModifyStudySelectionButton,
     selectReactSelectOption: selectReactSelectOption,
     reactSelectOption: reactSelectOption,
     getReactSelectOptions: getReactSelectOptions,
     COEXPRESSION_TIMEOUT: 120000,
     getSelectCheckedOptions: getSelectCheckedOptions,
-    selectCheckedOption: selectCheckedOption
+    selectCheckedOption: selectCheckedOption,
+    getOncoprintGroupHeaderOptionsElements: getOncoprintGroupHeaderOptionsElements,
+    showGsva: showGsva,
+    setResultsPageSettingsMenuOpen: setResultsPageSettingsMenuOpen,
+    setDropdownOpen: setDropdownOpen,
+    postDataToUrl: postDataToUrl,
+    getPortalUrlFromEnv: getPortalUrlFromEnv,
+    openGroupComparison: openGroupComparison,
+    selectElementByText: selectElementByText,
 };

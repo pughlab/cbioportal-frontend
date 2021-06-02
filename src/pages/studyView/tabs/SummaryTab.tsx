@@ -1,39 +1,50 @@
 import * as React from 'react';
-import styles from "./studySummaryTabStyles.module.scss";
-import chartHeaderStyles from "../chartHeader/styles.module.scss";
-import {ChartContainer, IChartContainerProps} from 'pages/studyView/charts/ChartContainer';
-import {observable} from 'mobx';
-import {CopyNumberAlterationIdentifier, GeneIdentifier, StudyViewPageStore} from 'pages/studyView/StudyViewPageStore';
-import {SampleIdentifier} from 'shared/api/generated/CBioPortalAPI';
+import styles from './studySummaryTabStyles.module.scss';
+import chartHeaderStyles from '../chartHeader/styles.module.scss';
 import {
-    ClinicalDataIntervalFilterValue,
-    CopyNumberGeneFilterElement,
-    DataBin,
-    RectangleBounds
-} from "shared/api/generated/CBioPortalAPIInternal";
-import LoadingIndicator from "shared/components/loadingIndicator/LoadingIndicator";
-import ReactGridLayout from 'react-grid-layout';
+    ChartContainer,
+    IChartContainerProps,
+} from 'pages/studyView/charts/ChartContainer';
+import { observable, toJS, makeObservable } from 'mobx';
+import { StudyViewPageStore } from 'pages/studyView/StudyViewPageStore';
+import { DataFilterValue, GenomicDataBin } from 'cbioportal-ts-api-client';
+import LoadingIndicator from 'shared/components/loadingIndicator/LoadingIndicator';
+import ReactGridLayout, { Layout } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
-import {observer} from 'mobx-react';
-import {ChartTypeEnum, STUDY_VIEW_CONFIG} from "../StudyViewConfig";
-import ProgressIndicator, {IProgressIndicatorItem} from "../../../shared/components/progressIndicator/ProgressIndicator";
+import { observer } from 'mobx-react';
+import {
+    ChartTypeEnum,
+    STUDY_VIEW_CONFIG,
+    ChartDimension,
+} from '../StudyViewConfig';
+import ProgressIndicator, {
+    IProgressIndicatorItem,
+} from '../../../shared/components/progressIndicator/ProgressIndicator';
 import autobind from 'autobind-decorator';
-import LabeledCheckbox from "../../../shared/components/labeledCheckbox/LabeledCheckbox";
-import {DataType} from "public-lib/components/downloadControls/DownloadControls";
-import {ChartMeta, ChartType} from "../StudyViewUtils";
-
+import {
+    ChartMeta,
+    ChartType,
+    RectangleBounds,
+    DataBin,
+} from '../StudyViewUtils';
+import { DataType } from 'cbioportal-frontend-commons';
+import { GenericAssayDataBin } from 'cbioportal-ts-api-client/dist/generated/CBioPortalAPIInternal';
+import DelayedRender from 'shared/components/DelayedRender';
+import { getRemoteDataGroupStatus } from 'cbioportal-utils';
 
 export interface IStudySummaryTabProps {
-    store: StudyViewPageStore
+    store: StudyViewPageStore;
 }
 
 // making this an observer (mobx-react) causes this component to re-render any time
 // there is a change to any observable value which is referenced in its render method.
 // Even if this value is referenced deep within some helper method
 @observer
-export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> {
-
+export class StudySummaryTab extends React.Component<
+    IStudySummaryTabProps,
+    {}
+> {
     private store: StudyViewPageStore;
     private handlers: any;
 
@@ -41,46 +52,80 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
 
     constructor(props: IStudySummaryTabProps) {
         super(props);
+        makeObservable(this);
         this.store = props.store;
 
         this.handlers = {
             onValueSelection: (chartMeta: ChartMeta, values: string[]) => {
-                this.store.updateClinicalDataEqualityFilters(chartMeta, values);
+                this.store.updateClinicalDataFilterByValues(
+                    chartMeta.uniqueKey,
+                    values.map(value => ({ value } as DataFilterValue))
+                );
             },
             onDataBinSelection: (chartMeta: ChartMeta, dataBins: DataBin[]) => {
-                this.store.updateClinicalDataIntervalFilters(chartMeta, dataBins);
+                this.store.updateClinicalDataIntervalFilters(
+                    chartMeta.uniqueKey,
+                    dataBins
+                );
             },
             onToggleLogScale: (chartMeta: ChartMeta) => {
-                this.store.toggleLogScale(chartMeta);
+                this.store.toggleLogScale(chartMeta.uniqueKey);
+            },
+            onToggleNAValue: (chartMeta: ChartMeta) => {
+                this.store.toggleNAValue(chartMeta.uniqueKey);
             },
             onDeleteChart: (chartMeta: ChartMeta) => {
-                this.store.resetFilterAndChangeChartVisibility(chartMeta, false);
+                this.store.resetFilterAndChangeChartVisibility(
+                    chartMeta.uniqueKey,
+                    false
+                );
             },
-            onChangeChartType: (chartMeta: ChartMeta, newChartType: ChartType) => {
+            onChangeChartType: (
+                chartMeta: ChartMeta,
+                newChartType: ChartType
+            ) => {
                 this.store.changeChartType(chartMeta, newChartType);
             },
-            updateMutationCountVsCNAFilter:(bounds:RectangleBounds)=>{
-                this.store.setMutationCountVsCNAFilter(bounds);
-            },
-            isNewlyAdded:(uniqueKey: string) => {
+            isNewlyAdded: (uniqueKey: string) => {
                 return this.store.isNewlyAdded(uniqueKey);
             },
             setCustomChartFilters: (chartMeta: ChartMeta, values: string[]) => {
-                this.store.setCustomChartFilters(chartMeta, values);
+                this.store.setCustomChartFilters(chartMeta.uniqueKey, values);
             },
             onLayoutChange: (layout: ReactGridLayout.Layout[]) => {
                 this.store.updateCurrentGridLayout(layout);
+                this.onResize(layout);
             },
-        }
+            resetGeneFilter: (chartMeta: ChartMeta) => {
+                this.store.resetGeneFilter(chartMeta.uniqueKey);
+            },
+            onGenomicDataBinSelection: (
+                chartMeta: ChartMeta,
+                dataBins: GenomicDataBin[]
+            ) => {
+                this.store.updateGenomicDataIntervalFilters(
+                    chartMeta.uniqueKey,
+                    dataBins
+                );
+            },
+            onGenericAssayDataBinSelection: (
+                chartMeta: ChartMeta,
+                dataBins: GenericAssayDataBin[]
+            ) => {
+                this.store.updateGenericAssayDataIntervalFilters(
+                    chartMeta.uniqueKey,
+                    dataBins
+                );
+            },
+        };
     }
 
     renderAttributeChart = (chartMeta: ChartMeta) => {
-        const props:Partial<IChartContainerProps> = {
+        const props: Partial<IChartContainerProps> = {
             chartMeta: chartMeta,
             chartType: this.props.store.chartsType.get(chartMeta.uniqueKey),
             store: this.props.store,
             dimension: this.store.chartsDimension.get(chartMeta.uniqueKey),
-            openComparisonPage: this.store.openComparisonPage,
             title: chartMeta.displayName,
             filters: [],
             onDeleteChart: this.handlers.onDeleteChart,
@@ -88,126 +133,263 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
             studyViewFilters: this.store.filters,
             analysisGroupsSettings: this.store.analysisGroupsSettings,
             cancerGeneFilterEnabled: this.store.oncokbCancerGeneFilterEnabled,
-            setComparisonConfirmationModal: this.store.setComparisonConfirmationModal
+            setComparisonConfirmationModal: this.store
+                .setComparisonConfirmationModal,
         };
 
-        const {BAR_CHART, SURVIVAL, CNA_GENES_TABLE, TABLE, SCATTER, PIE_CHART, MUTATED_GENES_TABLE, FUSION_GENES_TABLE} = ChartTypeEnum;
         switch (this.store.chartsType.get(chartMeta.uniqueKey)) {
-            case PIE_CHART: {
-
+            case ChartTypeEnum.PIE_CHART: {
                 //if the chart is one of the custom charts then get the appropriate promise
-                if(this.store.isCustomChart(chartMeta.uniqueKey)) {
-                    props.filters = this.store.getCustomChartFilters(props.chartMeta!.uniqueKey);
+                if (
+                    this.store.isUserDefinedCustomDataChart(chartMeta.uniqueKey)
+                ) {
+                    props.filters = this.store
+                        .getCustomDataFiltersByUniqueKey(chartMeta.uniqueKey)
+                        .map(
+                            clinicalDataFilterValue =>
+                                clinicalDataFilterValue.value
+                        );
                     props.onValueSelection = this.handlers.setCustomChartFilters;
                     props.onResetSelection = this.handlers.setCustomChartFilters;
-                    props.promise = this.store.getCustomChartDataCount(chartMeta);
+                    props.promise = this.store.getCustomDataCount(chartMeta);
                 } else {
                     props.promise = this.store.getClinicalDataCount(chartMeta);
-                    props.filters = this.store.getClinicalDataFiltersByUniqueKey(chartMeta.uniqueKey);
+                    props.filters = this.store
+                        .getClinicalDataFiltersByUniqueKey(chartMeta.uniqueKey)
+                        .map(
+                            clinicalDataFilterValue =>
+                                clinicalDataFilterValue.value
+                        );
                     props.onValueSelection = this.handlers.onValueSelection;
                     props.onResetSelection = this.handlers.onValueSelection;
                 }
                 props.onChangeChartType = this.handlers.onChangeChartType;
-                props.getData = (dataType?: DataType) => this.store.getPieChartDataDownload(chartMeta, dataType);
-                props.downloadTypes = ["Summary Data", "Full Data", "SVG", "PDF"];
+                props.getData = (dataType?: DataType) =>
+                    this.store.getPieChartDataDownload(chartMeta, dataType);
+                props.downloadTypes = [
+                    'Summary Data',
+                    'Full Data',
+                    'SVG',
+                    'PDF',
+                ];
                 break;
             }
-            case BAR_CHART: {
-                props.promise = this.store.getClinicalDataBin(chartMeta);
-                props.filters = this.store.getClinicalDataIntervalFiltersByUniqueKey(chartMeta.uniqueKey);
-                props.onDataBinSelection = this.handlers.onDataBinSelection;
-                props.onResetSelection = this.handlers.onDataBinSelection;
+            case ChartTypeEnum.BAR_CHART: {
+                //if the chart is one of the custom charts then get the appropriate promise
+                if (this.store.isGeneSpecificChart(chartMeta.uniqueKey)) {
+                    props.promise = this.store.getGenomicChartDataBin(
+                        chartMeta
+                    );
+                    props.filters = this.store.getGenomicDataIntervalFiltersByUniqueKey(
+                        props.chartMeta!.uniqueKey
+                    );
+                    props.onDataBinSelection = this.handlers.onGenomicDataBinSelection;
+                    props.onResetSelection = this.handlers.onGenomicDataBinSelection;
+                    props.getData = () =>
+                        this.store.getChartDownloadableData(chartMeta);
+                } else if (
+                    this.store.isGenericAssayChart(chartMeta.uniqueKey)
+                ) {
+                    props.promise = this.store.getGenericAssayChartDataBin(
+                        chartMeta
+                    );
+                    props.filters = this.store.getGenericAssayDataIntervalFiltersByUniqueKey(
+                        props.chartMeta!.uniqueKey
+                    );
+                    props.onDataBinSelection = this.handlers.onGenericAssayDataBinSelection;
+                    props.onResetSelection = this.handlers.onGenericAssayDataBinSelection;
+                    props.getData = () =>
+                        this.store.getChartDownloadableData(chartMeta);
+                } else {
+                    props.promise = this.store.getClinicalDataBin(chartMeta);
+                    props.filters = this.store.getClinicalDataFiltersByUniqueKey(
+                        chartMeta.uniqueKey
+                    );
+                    props.onDataBinSelection = this.handlers.onDataBinSelection;
+                    props.onResetSelection = this.handlers.onDataBinSelection;
+                    props.getData = () =>
+                        this.store.getChartDownloadableData(chartMeta);
+                }
                 props.onToggleLogScale = this.handlers.onToggleLogScale;
+                props.onToggleNAValue = this.handlers.onToggleNAValue;
                 props.showLogScaleToggle = this.store.isLogScaleToggleVisible(
-                    chartMeta.uniqueKey, props.promise!.result);
-                props.logScaleChecked = this.store.isLogScaleChecked(chartMeta.uniqueKey);
-                props.getData = () => this.store.getClinicalData(chartMeta);
-                props.downloadTypes = ["Data", "SVG", "PDF"];
+                    chartMeta.uniqueKey,
+                    props.promise!.result
+                );
+                props.logScaleChecked = this.store.isLogScaleChecked(
+                    chartMeta.uniqueKey
+                );
+                props.isShowNAChecked = this.store.isShowNAChecked(
+                    chartMeta.uniqueKey
+                );
+                props.showNAToggle = this.store.isShowNAToggleVisible(
+                    props.promise!.result
+                );
+                props.downloadTypes = ['Data', 'SVG', 'PDF'];
                 break;
             }
-            case TABLE: {
-                if (this.store.isCustomChart(chartMeta.uniqueKey)) {
-                    props.filters = this.store.getCustomChartFilters(props.chartMeta!.uniqueKey);
+            case ChartTypeEnum.TABLE: {
+                if (
+                    this.store.isUserDefinedCustomDataChart(chartMeta.uniqueKey)
+                ) {
+                    props.filters = this.store.getPreDefinedCustomChartFilters(
+                        props.chartMeta!.uniqueKey
+                    );
                     props.onValueSelection = this.handlers.setCustomChartFilters;
                     props.onResetSelection = this.handlers.setCustomChartFilters;
-                    props.promise = this.store.getCustomChartDataCount(chartMeta);
+                    props.promise = this.store.getCustomDataCount(chartMeta);
                 } else {
-                    props.filters = this.store.getClinicalDataFiltersByUniqueKey(chartMeta.uniqueKey);
+                    props.filters = this.store
+                        .getClinicalDataFiltersByUniqueKey(chartMeta.uniqueKey)
+                        .map(
+                            clinicalDataFilterValue =>
+                                clinicalDataFilterValue.value
+                        );
                     props.promise = this.store.getClinicalDataCount(chartMeta);
                     props.onValueSelection = this.handlers.onValueSelection;
                     props.onResetSelection = this.handlers.onValueSelection;
                 }
                 props.onChangeChartType = this.handlers.onChangeChartType;
-                props.getData = () => this.store.getClinicalData(chartMeta);
-                props.downloadTypes = ["Data"];
+                props.getData = () =>
+                    this.store.getChartDownloadableData(chartMeta);
+                props.downloadTypes = ['Data'];
                 break;
             }
-            case MUTATED_GENES_TABLE: {
-                props.filters = this.store.getMutatedGenesTableFilters();
+            case ChartTypeEnum.MUTATED_GENES_TABLE: {
+                props.filters = this.store.getGeneFiltersByUniqueKey(
+                    chartMeta.uniqueKey
+                );
                 props.promise = this.store.mutatedGeneTableRowData;
                 props.onValueSelection = this.store.addGeneFilters;
-                props.onResetSelection = this.store.resetMutatedGeneFilter;
-                props.selectedGenes=this.store.selectedGenes;
-                props.onGeneSelect=this.store.onCheckGene;
-                props.title = props.title + ( !this.store.molecularProfileSampleCounts.isComplete || this.store.molecularProfileSampleCounts.result === undefined ? '' : ` (${this.store.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples} profiled samples)`),
+                props.onResetSelection = () =>
+                    this.store.resetGeneFilter(chartMeta.uniqueKey);
+                props.selectedGenes = this.store.selectedGenes;
+                props.onGeneSelect = this.store.onCheckGene;
+                props.title = this.store.getChartTitle(
+                    ChartTypeEnum.MUTATED_GENES_TABLE,
+                    props.title
+                );
                 props.getData = () => this.store.getMutatedGenesDownloadData();
                 props.genePanelCache = this.store.genePanelCache;
-                props.downloadTypes = ["Data"];
-                props.filterByCancerGenes= this.store.filterMutatedGenesTableByCancerGenes;
+                props.downloadTypes = ['Data'];
+                props.filterByCancerGenes = this.store.filterMutatedGenesTableByCancerGenes;
                 props.onChangeCancerGeneFilter = this.store.updateMutatedGenesTableByCancerGenesFilter;
                 break;
             }
-            case FUSION_GENES_TABLE: {
-                props.filters = this.store.getFusionGenesTableFilters();
-                props.promise = this.store.fusionGeneTableRowData;
-                props.onValueSelection = this.store.addFusionGeneFilters;
-                props.onResetSelection = this.store.resetFusionGeneFilter;
-                props.selectedGenes=this.store.selectedGenes;
-                props.onGeneSelect=this.store.onCheckGene;
-                props.title = props.title + ( !this.store.molecularProfileSampleCounts.isComplete || this.store.molecularProfileSampleCounts.result === undefined ? '' : ` (${this.store.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples} profiled samples)`),
-                props.getData = () => this.store.getFusionGenesDownloadData();
+            case ChartTypeEnum.STRUCTURAL_VARIANT_GENES_TABLE: {
+                props.filters = this.store.getGeneFiltersByUniqueKey(
+                    chartMeta.uniqueKey
+                );
+                props.promise = this.store.structuralVariantGeneTableRowData;
+                props.onValueSelection = this.store.addGeneFilters;
+                props.onResetSelection = () =>
+                    this.store.resetGeneFilter(chartMeta.uniqueKey);
+                props.selectedGenes = this.store.selectedGenes;
+                props.onGeneSelect = this.store.onCheckGene;
+                props.title = this.store.getChartTitle(
+                    ChartTypeEnum.STRUCTURAL_VARIANT_GENES_TABLE,
+                    props.title
+                );
+                props.getData = () =>
+                    this.store.getStructuralVariantGenesDownloadData();
                 props.genePanelCache = this.store.genePanelCache;
-                props.downloadTypes = ["Data"];
-                props.filterByCancerGenes= this.store.filterFusionGenesTableByCancerGenes;
-                props.onChangeCancerGeneFilter = this.store.updateFusionGenesTableByCancerGenesFilter;
+                props.downloadTypes = ['Data'];
+                props.filterByCancerGenes = this.store.filterSVGenesTableByCancerGenes;
+                props.onChangeCancerGeneFilter = this.store.updateSVGenesTableByCancerGenesFilter;
                 break;
             }
-            case CNA_GENES_TABLE: {
-                props.filters = this.store.getCNAGenesTableFilters();
+            case ChartTypeEnum.CNA_GENES_TABLE: {
+                props.filters = this.store.getGeneFiltersByUniqueKey(
+                    chartMeta.uniqueKey
+                );
                 props.promise = this.store.cnaGeneTableRowData;
-                props.onValueSelection = this.store.addCNAGeneFilters;
-                props.onResetSelection = this.handlers.resetCNAGeneFilter;
-                props.selectedGenes=this.store.selectedGenes;
-                props.onGeneSelect=this.store.onCheckGene;
-                props.title = props.title + ( !this.store.molecularProfileSampleCounts.isComplete || this.store.molecularProfileSampleCounts.result === undefined ? '' : ` (${this.store.molecularProfileSampleCounts.result.numberOfCNAProfiledSamples} profiled samples)`),
+                props.onValueSelection = this.store.addGeneFilters;
+                props.onResetSelection = () =>
+                    this.store.resetGeneFilter(chartMeta.uniqueKey);
+                props.selectedGenes = this.store.selectedGenes;
+                props.onGeneSelect = this.store.onCheckGene;
+                props.title = this.store.getChartTitle(
+                    ChartTypeEnum.CNA_GENES_TABLE,
+                    props.title
+                );
                 props.getData = () => this.store.getGenesCNADownloadData();
                 props.genePanelCache = this.store.genePanelCache;
-                props.downloadTypes = ["Data"];
-                props.filterByCancerGenes= this.store.filterCNAGenesTableByCancerGenes;
-                props.onChangeCancerGeneFilter = this.store.updateCNAGenesTableByCancerGenesFilter
+                props.downloadTypes = ['Data'];
+                props.filterByCancerGenes = this.store.filterCNAGenesTableByCancerGenes;
+                props.onChangeCancerGeneFilter = this.store.updateCNAGenesTableByCancerGenesFilter;
                 break;
             }
-            case SURVIVAL: {
+            case ChartTypeEnum.GENOMIC_PROFILES_TABLE: {
+                props.filters = toJS(this.store.genomicProfilesFilter);
+                props.promise = this.store.molecularProfileSampleCounts;
+                props.onValueSelection = this.store.addGenomicProfilesFilter;
+                props.onResetSelection = () => {
+                    this.store.setGenomicProfilesFilter([]);
+                };
+                break;
+            }
+            case ChartTypeEnum.CASE_LIST_TABLE: {
+                props.filters = toJS(this.store.caseListsFilter);
+                props.promise = this.store.caseListSampleCounts;
+                props.onValueSelection = this.store.addCaseListsFilter;
+                props.onResetSelection = () => {
+                    this.store.setCaseListsFilter([]);
+                };
+                break;
+            }
+            case ChartTypeEnum.SURVIVAL: {
                 props.promise = this.store.survivalPlotData;
-                props.getData = () => this.store.getSurvivalDownloadData(chartMeta);
+                props.getData = () =>
+                    this.store.getSurvivalDownloadData(chartMeta);
                 props.patientToAnalysisGroup = this.store.patientToAnalysisGroup;
-                props.downloadTypes = ["Data", "SVG", "PDF"];
+                props.downloadTypes = ['Data', 'SVG', 'PDF'];
+                props.description = this.store.survivalDescriptions.result
+                    ? this.store.survivalDescriptions.result![
+                          chartMeta.uniqueKey.substring(
+                              0,
+                              chartMeta.uniqueKey.lastIndexOf('_SURVIVAL')
+                          )
+                      ][0]
+                    : undefined;
                 break;
             }
-            case SCATTER: {
-                if (this.store.getMutationCountVsCNAFilter()) {
-                    props.filters = [this.store.getMutationCountVsCNAFilter()];
-                }
+            case ChartTypeEnum.SCATTER: {
+                props.filters = this.store.getScatterPlotFiltersByUniqueKey(
+                    props.chartMeta!.uniqueKey
+                );
                 props.promise = this.store.mutationCountVsCNADensityData;
-                props.onValueSelection = (bounds:RectangleBounds)=>{
-                    this.handlers.updateMutationCountVsCNAFilter(bounds);
-                }
-                props.onResetSelection = ()=>{
-                    this.handlers.resetMutationCountVsCNAFilter();
-                }
+                props.onValueSelection = (bounds: RectangleBounds) => {
+                    this.store.updateScatterPlotFilterByValues(
+                        props.chartMeta!.uniqueKey,
+                        bounds
+                    );
+                };
+                props.onResetSelection = () => {
+                    this.store.updateScatterPlotFilterByValues(
+                        props.chartMeta!.uniqueKey
+                    );
+                };
                 props.sampleToAnalysisGroup = this.store.sampleToAnalysisGroup;
                 props.getData = () => this.store.getScatterDownloadData();
-                props.downloadTypes = ["Data", "SVG", "PDF"];
+                props.downloadTypes = ['Data', 'SVG', 'PDF'];
+                break;
+            }
+            case ChartTypeEnum.SAMPLE_TREATMENTS_TABLE: {
+                props.filters = this.store.sampleTreatmentFiltersAsStrings;
+                props.promise = this.store.sampleTreatments;
+                props.onValueSelection = this.store.onSampleTreatmentSelection;
+                props.onResetSelection = () => {
+                    this.store.clearSampleTreatmentFilters();
+                };
+                break;
+            }
+            case ChartTypeEnum.PATIENT_TREATMENTS_TABLE: {
+                props.filters = this.store.patientTreatmentFiltersAsStrings;
+                props.promise = this.store.patientTreatments;
+                props.onValueSelection = this.store.onPatientTreatmentSelection;
+                props.onResetSelection = () => {
+                    this.store.clearPatientTreatmentFilters();
+                };
                 break;
             }
             default:
@@ -226,140 +408,240 @@ export class StudySummaryTab extends React.Component<IStudySummaryTabProps, {}> 
         // 2.   The maintainer of RGL repo currently not actively accepts pull requests. So we don't know when the
         //      issue will be solved.
         return (
-        <div key={chartMeta.uniqueKey}>
-            <ChartContainer key={chartMeta.uniqueKey} {...(props as any)}/>
-        </div>);
+            <div key={chartMeta.uniqueKey}>
+                <DelayedRender>
+                    {/* Delay the render after a setTimeout, because synchronous rendering would jam UI updates
+                    and make things laggy */}
+                    <ChartContainer
+                        key={chartMeta.uniqueKey}
+                        {...(props as any)}
+                    />
+                </DelayedRender>
+            </div>
+        );
     };
 
     @autobind
-    getProgressItems(elapsedSecs:number): IProgressIndicatorItem[] {
-        return [{
-            label: 'Loading meta information',
-            promises: [this.store.defaultVisibleAttributes, this.store.mutationProfiles, this.store.cnaProfiles]
-        }, {
-            label: 'Loading clinical data' + (elapsedSecs > 2 ? ' - this can take several seconds' : ''),
-            promises: [this.store.initialVisibleAttributesClinicalDataBinCountData, this.store.initialVisibleAttributesClinicalDataCountData]
-        }];
+    onResize(newLayout: Layout[]) {
+        newLayout
+            .filter(l => {
+                const layout = this.store.chartsDimension.get(l.i as string);
+                return layout && (layout.h !== l.h || layout.w !== l.w);
+            })
+            .forEach(l => {
+                const key = l.i as string;
+                const toUpdate = this.store.chartsDimension.get(
+                    key
+                ) as ChartDimension;
+
+                toUpdate.h = l.h;
+                toUpdate.w = l.w;
+                this.store.chartsDimension.set(key, toUpdate);
+            });
+    }
+
+    @autobind
+    getProgressItems(elapsedSecs: number): IProgressIndicatorItem[] {
+        const clinicalDataPromises = [
+            this.store.initialVisibleAttributesClinicalDataBinCountData,
+            this.store.initialVisibleAttributesClinicalDataCountData,
+        ];
+
+        const sampleDataPromises = [
+            this.store.caseListSampleCounts,
+            this.store.selectedSamples,
+        ];
+
+        // do not display "this can take several seconds" if the corresponding data group has already been loaded
+        const isClinicalDataTakingLong =
+            elapsedSecs > 2 &&
+            getRemoteDataGroupStatus(...clinicalDataPromises) === 'pending';
+        const isSampleDataTakingLong =
+            elapsedSecs > 2 &&
+            getRemoteDataGroupStatus(...sampleDataPromises) === 'pending';
+
+        return [
+            {
+                label: 'Loading meta information',
+                promises: [
+                    this.store.defaultVisibleAttributes,
+                    this.store.mutationProfiles,
+                    this.store.cnaProfiles,
+                ],
+            },
+            {
+                label:
+                    'Loading clinical data' +
+                    (isClinicalDataTakingLong
+                        ? ' - this can take several seconds'
+                        : ''),
+                promises: clinicalDataPromises,
+            },
+            {
+                label:
+                    'Loading sample data' +
+                    (isSampleDataTakingLong
+                        ? ' - this can take several seconds'
+                        : ''),
+                promises: sampleDataPromises,
+            },
+            {
+                label: 'Rendering',
+            },
+        ];
     }
 
     render() {
-        const numberOfMutationProfiledSamples : number | undefined = this.props.store.molecularProfileSampleCounts.isComplete ? this.props.store.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples : undefined;
-        const numberOfCNAProfiledSamples : number | undefined = this.props.store.molecularProfileSampleCounts.isComplete ? this.props.store.molecularProfileSampleCounts.result.numberOfCNAProfiledSamples : undefined;
         return (
             <div>
-
-                <div className="secondaryNavigation">
-                    <div className={styles.quickFilters}>
-                        <strong>Quick Filters:</strong>
-
-                        <LoadingIndicator
-                            isLoading={this.props.store.molecularProfileSampleCounts.isPending || this.props.store.molecularProfileSampleCounts.isPending}/>
-
-                        {this.props.store.mutationProfiles.result.length > 0 && (
-                            <div data-test="with-mutation-data">
-                                {this.props.store.molecularProfileSampleCounts.isComplete && (
-                                    <LabeledCheckbox
-                                        inputProps={{className: styles.selectedInfoCheckbox}}
-                                        checked={!!this.props.store.filters.withMutationData}
-                                        onChange={this.props.store.toggleWithMutationDataFilter}
-                                        disabled={this.props.store.molecularProfileSampleCounts.result.numberOfMutationProfiledSamples === undefined}
-                                    >
-                                        {numberOfMutationProfiledSamples === undefined ? '0 samples' : numberOfMutationProfiledSamples.toLocaleString() + (numberOfMutationProfiledSamples === 1 ? " sample" : " samples")} with mutation data
-                                    </LabeledCheckbox>
-                                )}
-                            </div>
-                        )}
-
-                        {this.props.store.cnaProfiles.result.length > 0 && (
-                            <div data-test="with-cna-data">
-                                {this.props.store.molecularProfileSampleCounts.isComplete && (
-                                    <LabeledCheckbox
-                                        inputProps={{className: styles.selectedInfoCheckbox}}
-                                        checked={!!this.props.store.filters.withCNAData}
-                                        onChange={this.props.store.toggleWithCNADataFilter}
-                                        disabled={this.props.store.molecularProfileSampleCounts.result.numberOfCNAProfiledSamples === undefined}
-                                    >
-                                        {numberOfCNAProfiledSamples === undefined ? '0 samples' : numberOfCNAProfiledSamples.toLocaleString() + (numberOfCNAProfiledSamples === 1 ? " sample" : " samples")} with CNA data
-                                    </LabeledCheckbox>
-                                )}
-                            </div>
-                        )}
-
-                    </div>
-                </div>
-
-                <LoadingIndicator isLoading={this.store.loadingInitialDataForSummaryTab} size={"big"} center={true}>
-                    <ProgressIndicator getItems={this.getProgressItems} show={this.store.loadingInitialDataForSummaryTab} sequential={false}/>
+                <LoadingIndicator
+                    isLoading={this.store.loadingInitialDataForSummaryTab}
+                    size={'big'}
+                    center={true}
+                >
+                    <ProgressIndicator
+                        getItems={this.getProgressItems}
+                        show={this.store.loadingInitialDataForSummaryTab}
+                        sequential={true}
+                    />
                 </LoadingIndicator>
-
-                {
-                    this.store.invalidSampleIds.result.length > 0 &&
-                    this.showErrorMessage &&
-                    <div>
-                        <div className="alert alert-danger">
-                            <button type="button" className="close"
-                                    onClick={(event) => this.showErrorMessage = false}>&times;</button>
-                            The following sample(s) might have been deleted/updated with the recent data updates
-                            <br />
-
-                            <ul style={{ listStyle: "none", padding: "10px", maxHeight: "300px", overflowY: "scroll" }}>
-                                {this.store.invalidSampleIds.result.map(sample => <li>{sample.studyId + ':' + sample.sampleId}</li>)}
-                            </ul>
+                {this.store.invalidSampleIds.result.length > 0 &&
+                    this.showErrorMessage && (
+                        <div>
+                            <div className="alert alert-danger">
+                                <button
+                                    type="button"
+                                    className="close"
+                                    onClick={() =>
+                                        (this.showErrorMessage = false)
+                                    }
+                                >
+                                    &times;
+                                </button>
+                                The following sample(s) might have been
+                                deleted/updated with the recent data updates
+                                <br />
+                                <ul
+                                    style={{
+                                        listStyle: 'none',
+                                        padding: '10px',
+                                        maxHeight: '300px',
+                                        overflowY: 'scroll',
+                                    }}
+                                >
+                                    {this.store.invalidSampleIds.result.map(
+                                        sample => (
+                                            <li>
+                                                {sample.studyId +
+                                                    ':' +
+                                                    sample.sampleId}
+                                            </li>
+                                        )
+                                    )}
+                                </ul>
+                            </div>
                         </div>
-                    </div>
-                }
-                {
-                    this.store.showSettingRestoreMsg &&
+                    )}
+                {this.store.showSettingRestoreMsg && (
                     <div>
                         <div className="alert alert-info">
-                            <button type="button" className="close"
-                                    onClick={() => {
-                                        this.store.hideRestoreSettingsMsg = true;
-                                    }
-                                   }>&times;</button>
-                            Your previously saved layout preferences have been applied.
-                            <button className='btn btn-primary btn-sm'
-                                    onClick={() => {
-                                        this.store.hideRestoreSettingsMsg = true;
-                                    }}
-                                    style={{marginLeft: '10px'}}>Keep Saved Layout
+                            <button
+                                type="button"
+                                className="close"
+                                onClick={() => {
+                                    this.store.hideRestoreSettingsMsg = true;
+                                }}
+                            >
+                                &times;
                             </button>
-
-                            <button className='btn btn-primary btn-sm'
-                                    onClick={() => {
-                                        this.store.hideRestoreSettingsMsg = true;
-                                        this.store.undoUserSettings();
-                                    }}
-                                    style={{marginLeft: '10px'}}>Revert to Previous Layout
+                            Your previously saved layout preferences have been
+                            applied.
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={() => {
+                                    this.store.hideRestoreSettingsMsg = true;
+                                }}
+                                style={{ marginLeft: '10px' }}
+                            >
+                                Keep Saved Layout
+                            </button>
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={() => {
+                                    this.store.hideRestoreSettingsMsg = true;
+                                    this.store.undoUserChartSettings();
+                                }}
+                                style={{ marginLeft: '10px' }}
+                            >
+                                Revert to Previous Layout
                             </button>
                         </div>
                     </div>
-
-                }
+                )}
 
                 {!this.store.loadingInitialDataForSummaryTab &&
-                <div data-test="summary-tab-content">
-                    <div className={styles.studyViewFlexContainer}>
-                        {this.store.defaultVisibleAttributes.isComplete && (
-                            <ReactGridLayout className="layout"
-                                             style={{width: this.store.containerWidth}}
-                                             width={this.store.containerWidth}
-                                             cols={this.store.studyViewPageLayoutProps.cols}
-                                             rowHeight={this.store.studyViewPageLayoutProps.grid.h}
-                                             layout={this.store.studyViewPageLayoutProps.layout}
-                                             margin={[STUDY_VIEW_CONFIG.layout.gridMargin.x, STUDY_VIEW_CONFIG.layout.gridMargin.y]}
-                                             useCSSTransforms={false}
-                                             draggableHandle={`.${chartHeaderStyles.draggable}`}
-                                             onLayoutChange={this.handlers.onLayoutChange} >
-                                {this.store.visibleAttributes.map(this.renderAttributeChart)}
-                            </ReactGridLayout>
-                        )}
-
-                    </div>
-
-                </div>
-                }
+                    !this.store.blockLoading && (
+                        <div data-test="summary-tab-content">
+                            <div className={styles.studyViewFlexContainer}>
+                                {this.store.defaultVisibleAttributes
+                                    .isComplete && (
+                                    <ReactGridLayout
+                                        className="layout"
+                                        style={{
+                                            width: this.store.containerWidth,
+                                        }}
+                                        width={this.store.containerWidth}
+                                        cols={
+                                            this.store.studyViewPageLayoutProps
+                                                .cols
+                                        }
+                                        rowHeight={
+                                            this.store.studyViewPageLayoutProps
+                                                .grid.h
+                                        }
+                                        layout={
+                                            this.store.studyViewPageLayoutProps
+                                                .layout
+                                        }
+                                        margin={[
+                                            STUDY_VIEW_CONFIG.layout.gridMargin
+                                                .x,
+                                            STUDY_VIEW_CONFIG.layout.gridMargin
+                                                .y,
+                                        ]}
+                                        useCSSTransforms={false}
+                                        draggableHandle={`.${chartHeaderStyles.draggable}`}
+                                        onLayoutChange={
+                                            this.handlers.onLayoutChange
+                                        }
+                                        onResizeStop={this.onResize}
+                                    >
+                                        {this.store.visibleAttributes.map(
+                                            this.renderAttributeChart
+                                        )}
+                                    </ReactGridLayout>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                {this.props.store.selectedSamples.isComplete &&
+                    this.props.store.selectedSamples.result.length === 0 && (
+                        <div className={styles.studyViewNoSamples}>
+                            <div className={styles.studyViewNoSamplesInner}>
+                                <p>
+                                    The filters you have selected have filtered
+                                    out all the samples in this study; because
+                                    of this, no data visualizations are shown.
+                                </p>
+                                <p>
+                                    You can remove filters in the header of this
+                                    page to widen your search criteria and add
+                                    samples back to your results.
+                                </p>
+                            </div>
+                        </div>
+                    )}
             </div>
-        )
+        );
     }
 }

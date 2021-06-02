@@ -1,33 +1,62 @@
-import LazyMobXCache, {AugmentedData} from "../lib/LazyMobXCache";
-import {MolecularProfile, MolecularProfileFilter} from "../api/generated/CBioPortalAPI";
-import client from "../api/cbioportalClientInstance";
-import * as _ from "lodash";
+import LazyMobXCache, { AugmentedData } from '../lib/LazyMobXCache';
+import {
+    MolecularProfile,
+    MolecularProfileFilter,
+} from 'cbioportal-ts-api-client';
+import client from '../api/cbioportalClientInstance';
+import * as _ from 'lodash';
+import {
+    DataTypeConstants,
+    AlterationTypeConstants,
+} from 'pages/resultsView/ResultsViewPageStore';
 
-function queryToKey(studyId:string) {
+function queryToKey(studyId: string) {
     return studyId;
 }
 
-function dataToKey(molecularProfiles:MolecularProfile[], studyId:string) {
+function dataToKey(molecularProfiles: MolecularProfile[], studyId: string) {
     return studyId;
 }
 
-async function fetch(studyIds:string[]):Promise<AugmentedData<MolecularProfile[], string>[]> {
-    const profiles:MolecularProfile[] = await client.fetchMolecularProfilesUsingPOST({
-        molecularProfileFilter:{
-            studyIds
-        } as MolecularProfileFilter
+async function fetch(
+    studyIds: string[]
+): Promise<AugmentedData<MolecularProfile[], string>[]> {
+    let profiles: MolecularProfile[] = await client.fetchMolecularProfilesUsingPOST(
+        {
+            molecularProfileFilter: {
+                studyIds,
+            } as MolecularProfileFilter,
+        }
+    );
+
+    //TODO: remove this block once data is fixed
+    profiles = profiles.map(profile => {
+        if (
+            profile.molecularAlterationType ===
+                AlterationTypeConstants.STRUCTURAL_VARIANT &&
+            profile.datatype === DataTypeConstants.SV
+        ) {
+            profile.showProfileInAnalysisTab = false;
+        }
+        return profile;
     });
-    const profilesByStudy = _.groupBy(profiles, profile=>profile.studyId);
-    return studyIds.map(studyId=>{
-        const data = [(profilesByStudy[studyId] || [])];
+    //TODO: remove this block once data is fixed
+
+    const profilesByStudy = _.groupBy(profiles, profile => profile.studyId);
+    return studyIds.map(studyId => {
+        const data = [profilesByStudy[studyId] || []];
         return {
             data,
-            meta: studyId
+            meta: studyId,
         };
     });
 }
 
-export default class MolecularProfilesInStudyCache extends LazyMobXCache<MolecularProfile[],string,string> {
+export default class MolecularProfilesInStudyCache extends LazyMobXCache<
+    MolecularProfile[],
+    string,
+    string
+> {
     constructor() {
         super(queryToKey, dataToKey, fetch);
     }

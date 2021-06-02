@@ -1,28 +1,27 @@
 # cbioportal-frontend
-[![Join the chat at https://gitter.im/cBioPortal/public-chat](https://badges.gitter.im/cBioPortal/public-chat.svg)](https://gitter.im/cBioPortal/public-chat?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-## Live demo
-Master: http://cbioportal-frontend.herokuapp.com/patient?studyId=prad_fhcrc&caseId=00-090
+This repo contains the frontend code for cBioPortal which uses React, MobX and TypeScript. Read more about the architecture of cBioPortal [here](https://docs.cbioportal.org/2.1-deployment/architecture-overview).
 
-Rc: http://cbioportal-frontend-rc.herokuapp.com/patient?studyId=prad_fhcrc&caseId=00-090
+## Branch Information
+| | main branch | upcoming release branch | later release candidate branch |
+| --- | --- | --- | --- |
+| Branch name | [`master`](https://github.com/cBioPortal/cbioportal-frontend/tree/master) |  --|  [`rc`](https://github.com/cBioPortal/cbioportal-frontend/tree/rc) |
+| Description | All bug fixes and features not requiring database migrations go here. This code is either already in production or will be released this week | Next release that requires database migrations. Manual product review often takes place for this branch before release | Later releases with features that require database migrations. This is useful to allow merging in new features without affecting the upcoming release. Could be seen as a development branch, but note that only high quality pull requests are merged. That is the feature should be pretty much ready for release after merge. |
+| Test Status | [CircleCI master workflow](https://circleci.com/gh/cBioPortal/workflows/cbioportal-frontend/tree/master) | -- | [CircleCI rc workflow](https://circleci.com/gh/cBioPortal/workflows/cbioportal-frontend/tree/rc) |
+| Live instance frontend | https://frontend.cbioportal.org / https://master--cbioportalfrontend.netlify.app/ | -- | https://rc--cbioportalfrontend.netlify.app |
+| Live instance backend | https://www.cbioportal.org / https://master.cbioportal.org | -- | https://rc.cbioportal.org |
 
-## Test status & Code Quality
-| Branch | master | rc |
-| --- | --- | --- |
-| Status | [![CircleCI](https://circleci.com/gh/cBioPortal/cbioportal-frontend/tree/master.svg?style=svg)](https://circleci.com/gh/cBioPortal/cbioportal-frontend/tree/master) | [![CircleCI](https://circleci.com/gh/cBioPortal/cbioportal-frontend/tree/rc.svg?style=svg)](https://circleci.com/gh/cBioPortal/cbioportal-frontend/tree/rc) |
+Note: you can check the frontend version of the live instance by checking `window.FRONTEND_COMMIT` in the console.
 
-[![codecov](https://codecov.io/gh/cbioportal/cbioportal-frontend/branch/master/graph/badge.svg)](https://codecov.io/gh/cbioportal/cbioportal-frontend)
+## Run
 
-[![Code Climate](https://codeclimate.com/github/cBioPortal/cbioportal-frontend/badges/gpa.svg)](https://codeclimate.com/github/cBioPortal/cbioportal-frontend)
+Make sure you have installed the node version and yarn version specified in
+[package.json](https://github.com/cBioPortal/cbioportal-frontend/blob/master/package.json).
 
-## Deployment
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
+> **Tip:**  We recommend that you use [nvm:  Node Version Manager](https://github.com/nvm-sh/nvm) and [yvm:  Yarn Version Manager](https://yvm.js.org/docs/overview) to switch between versions more easily.
 
-This is the frontend code for cBioPortal using React, MobX and TypeScript. The
-frontend for the new patient view is now completely in this repo. The results view page is currently being replaced one tab at a time by mounting certain React components to the results page (JSP) in [the backend repo](https://github.com/cbioportal/cbioportal)
+> **Windows Tip:** If you are developing on Windows, we recommend that you use [Ubuntu / Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install-win10).
 
-Make sure you have installed the node version specified in [package.json](https://github.com/cBioPortal/cbioportal-frontend/blob/master/package.json). You might want to use NVM to install the particular version.
-
-Remove old compiled `node_modules` if exists
+Remove old compiled `node_modules` if it exists
 
 ```
 rm -rf node_modules
@@ -38,7 +37,7 @@ To build DLLs in common-dist folder (must be done prior to start of dev server)
 yarn run buildDLL:dev
 ```
 
-To start dev server with hot reload enabled
+To start the dev server with hot reload enabled
 ```
 # set the environment variables you want based on what branch you're branching
 # from
@@ -51,35 +50,41 @@ Example pages:
  - http://localhost:3000/
  - http://localhost:3000/patient?studyId=lgg_ucsf_2014&caseId=P04
 
-To run unit/integration tests (need to have API URL defined in `.env`)
+To run unit/integration tests
 ```
 yarn run test
 ```
+
+> **Windows Tip:** There is a known solved hiccup running the tests on Ubuntu via Windows Subsystem for Linux (WSL): [#7096](https://github.com/cBioPortal/cbioportal/issues/7096)
 
 To run unit/integration tests in watch mode
 ```
 yarn run test:watch
 ```
 
-To run unit/integration tests in watch mode (where specName is a fragment of the name of the spec file (before .spec.))
+To run unit/integration tests in watch mode (where specName is a fragment of the name of the spec file (before `.spec.`))
 ```
 yarn run test:watch -- --grep=#specName#
 ```
 
-## Formatting Code with Prettier JS
-We are starting to format commits using Prettier JS. Right now this is optional, but you may run into formatting commits.  
-Things to remember:
-- Keep Prettier JS changes in a separate commit
-- Only run it on files you're changing or creating anyways
+## Formatting Code with PrettierJS
+When you make a git commit, PrettierJS will automatically run *in write mode* on all the files you changed, and make 
+formatting adjustments to those entire files as necessary, before passing them through to the commit (i.e. this is a 
+"pre-commit git hook"). No action from you is necessary for this. You may observe that your changes don't look exactly 
+the same as you wrote them due to formatting adjustments.
 
-To run Prettier JS: 
+When you make a pull request, CircleCI will run PrettierJS *in check mode* on all of the files that have changed between 
+your pull request and the base branch of your pull request. If all of the files are formatted correctly, then the
+CircleCI `prettier` job will pass and you'll see a green check on Github. But if, for whatever reason, this check *fails*, 
+you must run the following command in your cbioportal home directory:
 ```$bash
-yarn run prettier --write <files>
+yarn run prettierFixLocal
 ```
-
-To run Prettier JS on your last commit:
+This will make PrettierJS run through the same files that CircleCI checks (i.e. all files changed since the base branch)
+but *in write mode* and thus adjust those files to have correct formatting. When you make this update, the CircleCI 
+`prettier` job should pass. To check if it will pass, you can also run the same command that CircleCI will run:
 ```$bash
-yarn run prettierLastCommit
+yarn run prettierCheckCircleCI
 ```
 
 
@@ -99,7 +104,7 @@ yarn run test
 ```
 
 ## Check in cBioPortal context
-Go to http://cbioportal.org (`master` branch) or http://cbioportal.org/beta/ (`rc` branch)
+Go to https://cbioportal.org (`master` branch) or https://rc.cbioportal.org/ (`rc` branch)
 
 In your browser console set:
 ```
@@ -113,112 +118,159 @@ or clear entire local storage
 ```
 localStorage.clear()
 ```
-You can also use a heroku deployed cbioportal-frontend pull request for serving the JS by setting localStorage to:
+You can also use a netlify deployed cbioportal-frontend pull request for serving the JS:
+1. Create the following bookmarklet: 
 ```
-localStorage.setItem("heroku", "cbioportal-frontend-pr-x")
+javascript:(function()%7Bvar pr %3D prompt("Please enter PR%23")%3Bif (pr %26%26 Number(pr)) %7B localStorage.netlify %3D %60deploy-preview-%24%7Bpr%7D--cbioportalfrontend%60%3Bwindow.location.reload()%3B %7D%7D)()
 ```
-Change `x` to the number of your pull request.
+2. Navigate to the cBioPortal installation that you want to test.
+3. Click the bookmarklet and enter your pull request number.
 
 ## Run e2e-tests
 
-E2e-tests can be run against public cbioportal instances or against a local dockerized backend. These two e2e-tests types are referred to as `remote` and `local` types of e2e-tests.
+End-to-end tests can be run against public cbioportal instances or against a local dockerized backend. These two e2e-tests types are referred to as `remote` and `local` types of e2e-tests.
 
 ## Run of `remote e2e-tests`
 
-Install webdriver-manager, which manages standalone Selenium installation:
+First, install webdriver-manager, which manages standalone Selenium installation:
 ```
-yarn install -g webdriver-manager
+yarn global add webdriver-manager
 ```
 Run updater to get necessary binaries
 ```
 webdriver-manager update
+
+// ALTERNATIVE
+// Specify chrome version if your local chrome version is not up to date.
+// This ensures that chromedriver is compatible with your local chrome
+// If it's out of sync, tests will not run
+webdriver-manager update --versions.chrome=[e.g. 86.0.4240.198]
+
 ```
 Start the webdriver-manager
 ```
-webdriver-manager start # ...or `startSSL` (see below)
+webdriver-manager start
 ```
-In one terminal run frontend (this will get mounted inside whatever
-`CBIOPORTAL_URL` is pointing to)
+
+> **Tip:** To verify that your webdriver-manager is running, go to:  http://127.0.0.1:4444/wd/hub/static/resource/hub.html.
+
+> **Windows Tip:** If you are developing on Ubuntu under Windows Subsystem for Linux (WSL), we recommend that you install and run webdriver-manager via Powershell/Windows.  If you install and run webdriver-manager via Ubuntu, webdriver-manager has a hard time finding the Chrome browser, and this will cause all the end-to-end tests to fail.
+
+In a second terminal, run the frontend
 ```bash
-# set the environment variables you want based on what branch you're branching
-# from
+# set the environment variables for your branch
 export BRANCH_ENV=master # or rc if branching from rc
 # export any custom external API URLs by editing env/custom.sh
-yarn run start
+yarn run startSSL
 ```
-In another terminal run the e2e tests
+> **Tip:** Before going to the next step, verify that your front end code is running by going to: https://localhost:3000/.
+
+In a third terminal, run the e2e tests
 ```bash
-# set the environment variables you want based on what branch you're branching
-# from
 export SPEC_FILE_PATTERN=./remote/specs/**/*.spec.js
 export SCREENSHOT_DIRECTORY=./remote/screenshots
 export BRANCH_ENV=master # or rc if branching from rc
 # export any custom external API URLs in env/custom.sh
 cd end-to-end-test
 yarn install
-yarn run test-webdriver-manager # use `test-webdriver-manager-debug` for debugging of tests
+yarn run test-webdriver-manager
+# use `test-webdriver-manager-debug` for debugging of tests
 ```
+If all goes well, you will soon seen the end-to-end tests running via your Chrome browser.
+
+> **Tip:** If you want to run just one end-to-end test, you can modify `SPEC_FILE_PATTERN` accordingly.  For example, if you want to only run the `genomicEvolution.spec.js` test, you can use:  `export SPEC_FILE_PATTERN=./remote/specs/core/genomicEvolution.spec.js`.
 
 ### Mount of frontend onto HTTPS backend
 A custom frontend can be tested against any backend in the web browser using a local node server (command `yarn run start`) and the `localdev` flag passed to th e browser (see section 'Check in cBioPortal context'). For remote backends that communicate over a HTTP over SSL (https) connection (e.g., cbioportal.org or rc.cbioportal.org), the frontend has to be served over SSL as well. In this case run `yarn run startSSL` in stead of `yarn run start`.
 
-## Run of `local e2e-tests`
+## Run of `localdb` e2e-tests
 To enable e2e-tests on for features that depend on data that are not included in studies served by the public cBioPortal instance, cbioportal-frontend provides the `e2e local database` (refered to as _e2e-localdb_ or _local e2e_ in this text) facility that allows developers to load custom studies in any backend version used for e2e-tests. CircleCI runs the `e2e-localdb` tests as a separate job.
 
 Files for the local database e2e-tests are located in the `./end-to-end-test/local` directory of cbioportal-frontend. The directory structure of `./end-to-end-test/local` is comparable to that of the `./end-to-end-test/remote` directory used for e2e-tests against remote public cBioPortal instances.
 
-### Contexts for e2e-localdb tests
-E2e-tests can run in _local context_ (workstation for software development) or _CircleCI context_ (for continuous integration testing). On CircleCI, e2e-tests can be conducted on commits that are inside or outside the context of a pull request. These different contexts for _e2e-localdb_ tests are refered to below as _Local_, _CircleCi_ and _CircleCI+PR_ contexts, respectively.
+### Running `localdb` e2e-tests for development
 
-### Running e2e-localdb tests in _Local_ context for development
-Running of e2e-localdb tests in _Local_ context in essence follows the procedure as defined in `.circleci/config.yml`. In _Local_ context the e2e-localdb tests can be run in a dockerized environment (usefull for generating screenshots) or directly on the host sytem. The `end-to-end-test/local/runtime-config/run_container_screenshot_test.sh` script is included to run e2e-local tests in a dockerized environment in _Local_ context. The `end-to-end-test/local/runtime-config/run_local_screenshot_test.sh` is included to run e2e-local tests on the host system directly in _Local_ context. Prior to running the script several environmental variables should be set. For local development follow these steps:
+1. Start cBioPortal (including session service) using the [cBioPortal docker compose solution](https://docs.cbioportal.org/2.1.1-deploy-with-docker-recommended/docker#quick-start).
+cBioPortal must be accessible on _http://localhost:8080_.
 
-1. Add `export BACKEND=cbioportal:rc` (or other backend branch) to `/env/custom.sh`.
-2. Setup a local docker container environment: 
+```
+cd
+git clone https://github.com/cBioPortal/cbioportal-docker-compose.git
+cd cbioportal-docker-compose
+./init.sh
+docker-compose up -d
+```
+
+:warning: If the frontend requires a specific backend version, make sure to deploy this instead of the default version supported by the docker compose solution.
+
+2. Install gene panels and gene sets for study_es_0:
+
+```
+cd ~/cbioportal-docker-compose
+docker-compose run --rm cbioportal sh -c '
+    cd /cbioportal/core/src/main/scripts/ \
+    && ./importGenePanel.pl --data /cbioportal/core/src/test/scripts/test_data/study_es_0/data_gene_panel_testpanel1.txt \
+    && ./importGenePanel.pl --data /cbioportal/core/src/test/scripts/test_data/study_es_0/data_gene_panel_testpanel2.txt \
+    && ./importGenesetData.pl --data /cbioportal/core/src/test/resources/genesets/study_es_0_genesets.gmt --new-version msigdb_6.1 \
+    && ./importGenesetHierarchy.pl --data /cbioportal/core/src/test/resources/genesets/study_es_0_tree.yaml'
+```
+
+Restart cBioPortal
+```
+docker-compose restart cbioportal
+```
+
+3. Load study_es_0 of the deployed (!) backend version and all studies in [end-to-end-test/local/studies](end-to-end-test/local/studies). At the moment of this writing:
+
+```
+docker-compose run --rm  -v <e2e_study_dir>:/studies cbioportal sh -c '
+    cd /cbioportal/core/src/main/scripts/importer \
+    && ./cbioportalImporter.py -s /cbioportal/core/src/test/scripts/test_data/study_es_0 \
+    && ./cbioportalImporter.py -s /studies/genepanel_test_study'
+    # add other studies if present
+```
+
+:info: The `<e2e_study_dir>` entry refer to the absolute path to [end-to-end-test/local/studies](end-to-end-test/local/studies) on the host system.
+
+4. Add `export CBIOPORTAL_URL="http://localhost:8080"` to `/env/custom.sh`.
+
+5. In a terminal, install webdriver-manager:
 
 ```bash
-export PORTAL_SOURCE_DIR=~/git/cbioportal-frontend # change path if needed
-export DB_DATA_DIR=/tmp/mysql # change path if needed
-export TEST_HOME="$PORTAL_SOURCE_DIR/end-to-end-test"
-source $PORTAL_SOURCE_DIR/env/custom.sh
-cd $TEST_HOME/local/runtime-config
-eval "$(./setup_environment.sh)"
-cd $PORTAL_SOURCE_DIR
+yarn global add webdriver-manager
 ```
 
-3. Running tests can be executed (a) on the local system or (b) in the docker environment;
-
-(a) local system (best for test development)
-```bash
-export CBIOPORTAL_URL='http://localhost:8081'
-$TEST_HOME/local/runtime-config/setup_local_context.sh -j -d -p -e # remove flags to exclude specific stages if desired (see below)
-cd $PORTAL_SOURCE_DIR
-./end-to-end-test/local/runtime-config/run_local_screenshot_test.sh # (repeat this step while developing)
+:warning: Add path to webdriver-manager installation (needed on Ubuntu Linux):
+```
+export PATH=$PATH:$(yarn global dir)/node_modules/webdriver-manager/bin
 ```
 
-(b) docker environment (best for making reference screenshots)
-```bash
-export CBIOPORTAL_URL='http://cbioportal:8080'
-yarn
-yarn build
-cd $TEST_HOME/local/docker
-./setup_docker_containers.sh -p -d -e # remove flags to exclude specific stages if desired (see below)
-cd $PORTAL_SOURCE_DIR
-$TEST_HOME/local/runtime-config/run_container_screenshot_test.sh
+and start webdriver-manager:
+```
+webdriver-manager update
+webdriver-manager start
 ```
 
-4. When finished reclaim ports by killing selenium and node servers:
-```bash
-lsof -n -i4TCP:3000 && lsof -n -i4TCP:3000 | grep LISTEN | awk '{ print $2 }' | xargs kill # reclaims port 3000
-lsof -n -i4TCP:4444 && lsof -n -i4TCP:4444 | grep LISTEN | awk '{ print $2 }' | xargs kill # reclaims port 4444
+6. If not already running at _localhost:3000_, open a second terminal and start the frontend dev server:
+
+```
+export BRANCH_ENV=custom
+yarn install --frozen-lockfile
+yarn buildDLL:dev
+yarn start
 ```
 
-#### Inclusion of specific build stages
-Setup of the local context involves building of the local frontend code, building of the cbioportal database, building the cbioportal application, building the e2e service and the start of all docker containers. During rebuilding of the development environment the developer can specify which stept should be executed by providing `-j` (building of frontent code), `-d` (building of database), `-p` (building of cbioportal), and/or `-e` (building of e2e service) flags to the `setup_local_context.sh` script. For instance, to rebuild the database and start all containers the script can be executed as:
+7. In a third terminal, run the tests:
+
 ```
-./end-to-end-test/local/runtime-config/setup_local_context.sh -d
+export BRANCH_ENV=custom
+eval "$(./scripts/env_vars.sh)"
+export SPEC_FILE_PATTERN=./local/specs/**/*.spec.js
+export SCREENSHOT_DIRECTORY=./local/screenshots
+cd end-to-end-test
+yarn install
+yarn run test-webdriver-manager-debug
 ```
-When no parameters are passed, no build steps are executed (only (re)start of containers).
 
 ### Running e2e-localdb tests _CircleCI_ or _CircleCI+PR_ context
 E2e-tests on _CircleCI_ and _CircleCI+PR_ context are triggered via _hooks_ configured on GitHub. Configuration of hooks falls beyond the scope of this manual.
@@ -254,33 +306,95 @@ Some random remarks on e2e-test development
 - Although webdriverio takes asynchronous behavor of webbrosers into account it does not defend against asynchronous behavior of specific web components (e.g., database access). Not taking this asynchronicity into account will result in `flaky` tests. Typically, flaky test run well on the local system used for development (that has plenty of free resources at moment of test), but fail often on a CI system. Often this is the result of longer times needed page/component update causing tests to fail because the test evaluates a condition before it is loaded. In webdriverio the `waitForExist()`, `waitForVisible()` and `waitFor()` method should be used to pause test execution until the page has been updated. Sometimes it is needed to wait for the appearance of a DOM element which presence is tested.
 ```javascript
 browser.waitForExist('id=button');
-assert($('id=button));
+assert($('id=button'));
 ```
 - Reference screenshosts that are created on host system directly (not in dockerized process) differ from screenshots produced by the dockerized setup (e.g., on CircleCI) and cannot be used as references
 
-##### Create new e2e-test
+#### Create new e2e-test
 Making e2e-tests follows the current procedure for the e2e-tests:
 1. Create junit test file and place in the `./end-to-end-test/local/specs` or `./end-to-end-test/remote/specs` directory.
 2. [Optional] Add a folder with an uncompressed custom study in the `./end-to-end-test/local/studies` directory.
 
-##### Random notes
+#### Random notes
 * Study_es_0 is imported by default.
 * Gene panel and gene set matrix data of custom studies must comply with gene panel/sets imported as part of study_es_0.
 * Imports of custom seed data for gene panels and gene sets are not implemented at the moment of this writing.
 * In order to minimize time of local database e2e-tests the size of custom studies should be kept as small as possible.
 * When developing in _Local_ context port 8081 can be used to access the cbioportal instance ('http://localhost:8081/cbioportal').
 
+#### Debugging help
+Here are some errors that have been encountered and are hard to debug.
+
+##### "boundingRects.reduce is not a function"
+This error occurs when an e2e test tries to take a screenshot of an element that doesn't exist.
+
+##### "There are some read requests waitng on finished stream"
+This error occurs in CircleCI when the reference screenshot file is somehow corrupted. It can be fixed by deleting and updating the reference screenshot.
+
+
+## Workspaces
+
+We are utilizing `yarn workspaces` to maintain multiple packages in a single repo (monorepo). The monorepo approach is an
+ efficient way of working on libraries in the same project as the application that is their primary consumer. 
+
+The `cbioportal-frontend` is the main web application workspace. It is used to build and deploy the cBioPortal frontend webapp. 
+Workspaces under `packages` directory are separate modules (npm packages) designed to be imported by `cbioportal-frontend` workspace as well as by external projects.
+ __Please note:__ `config` and `typings` directories under the `packages` directory are NOT workspaces or packages. They are intended to share common settings among all packages under the `packages` directory.
+
+### Adding a new workspace
+
+To add a new workspace, create a new directory under `packages` and add a `package.json` file. (See `cbioportal-frontend-commons` workspace for example configuration).
+
+The recommended way to add a new dependency to an existing workspace is to run `yarn workspace <workspace name> add <package name>` instead of just `yarn add <package name>`. For example, run `yarn workspace cbioportal-frontend add lodash` instead of `yarn add lodash`. 
+Similarly, to remove a package, run `yarn workspace <workspace name> remove <package name>`.
+
+### Tips for dependency management
+
+Please abide by the following rules for importing dependencies in a monorepo:   
+
+1. If you are working on `cbioportal-frontend` repository, import modules from packages using the package's alias:
+
+```
+// CORRECT, uses alias:
+import {something} from 'cbioportal-frontend-commons'
+
+// INCORRECT, uses relative paths:
+`import {something} from ../../packages/cbioportal-frontend-commons/src/lib/someLib`
+```
+
+2. When working on a package, never import custom code from outside that package unless you really intend for that package to be a dependency.  For example, commons packages should not import from the main cbioportal project.  
+
+3. Avoid circular dependencies at all costs. For example, while it is okay to import a module from `cbioportal-frontend-commons` in `react-mutation-mapper`, there should not be any imports from `react-mutation-mapper` in `cbioportal-frontend-commons`. If you happen to need some component from from `react-mutation-mapper` in `cbioportal-frontend-commons`, consider moving that component into `cbioportal-frontend-commons` package.
+
+### Updating existing packages
+
+Remember that the packages are used by other projects and compatibility needs to be carefully managed. 
+
+When you update code under packages a new version of changed packages automatically published once the code is merged to master. However, in a rare case when you would like to set a custom package version, you can run
+ 
+```
+yarn run updatePackageVersion
+```
+
+Alternatively you can manually set a custom version. When updating manually you should update the version number in the corresponding `package.json` as well as the dependencies of other packages depending on the package you update. For example if you update the `cbioportal-frontend-commons` version from `0.1.1` to `0.1.2-beta.0`, corresponding `cbioportal-frontend-commons` dependency in the `package.json` for `react-mutation-mapper` and `cbioportal-frontend` should also be updated to the new version.
+
+Note that when setting a custom version if you want the next published package version to be, for example, `1.0.6`, then you should set the new version to `1.0.6-beta.1` or a similar prerelease version. If you set the custom version to `1.0.6`, the next published version will be `1.0.7` not `1.0.6`. This is because the auto publish script runs in any case to detect changes in all packages including custom versioned packages.
+
+#### Update API clients
+
+```
+yarn run updateAPI
+```
+
 ## Components
+
+Components under `packages` should only depend on either external node modules or workspaces under `packages`.
+Please make sure to not introduce any dependencies from `cbioportal-frontend` workspace when updating or adding new files under `packages`.
 
 ### cbioportal-frontend-commons
 
-[cbioportal-frontend-commons](https://www.npmjs.com/package/cbioportal-frontend-commons/) is a separate npm library which is internally hosted under the `src/public-lib` directory. 
-This library contains basic utility functions and components, and it is designed as a dependency for external react libraries and applications.
+[cbioportal-frontend-commons](https://www.npmjs.com/package/cbioportal-frontend-commons/) is a separate public npm library which contains basic utility functions and components.
  
-Components/utils added under `src/public-lib` should only depend on either external node modules or components/utils under `src/public-lib`.
-Please make sure to not introduce any internal dependencies (from directories under `src` other than `public-lib`) when updating or adding new files under `src/public-lib`.
-
 ### react-mutation-mapper
 
-Mutation Mapper component has been moved to a separate GitHub repository: [cBioPortal/react-mutation-mapper](https://github.com/cBioPortal/react-mutation-mapper).
-For more information about `react-mutation-mapper` development please see [react-mutation-mapper.md](docs/react-mutation-mapper.md).
+[react-mutation-mapper](https://www.npmjs.com/package/react-mutation-mapper/) is a separate public npm library that contains the Mutation Mapper and related components.

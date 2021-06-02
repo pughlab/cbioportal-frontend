@@ -8,9 +8,7 @@ import {
     reaction,
     action,
     computed,
-    whyRun,
-    expr,
-    isObservableMap,
+    makeObservable,
 } from 'mobx';
 import {
     TypeOfCancer as CancerType,
@@ -19,19 +17,19 @@ import {
     SampleList,
     Gene,
     Sample,
-    SampleIdentifier,
     SampleFilter,
-} from '../../api/generated/CBioPortalAPI';
-import { Geneset } from '../../api/generated/CBioPortalAPIInternal';
+} from 'cbioportal-ts-api-client';
+import { Geneset } from 'cbioportal-ts-api-client';
 import CancerStudyTreeData from './CancerStudyTreeData';
-import { remoteData } from 'public-lib/api/remoteData';
+import {
+    getBrowserWindow,
+    remoteData,
+    stringListToIndexSet,
+    stringListToSet,
+} from 'cbioportal-frontend-commons';
 import { labelMobxPromises, cached, debounceAsync } from 'mobxpromise';
 import internalClient from '../../api/cbioportalInternalClientInstance';
-import {
-    MUTCommand,
-    SingleGeneQuery,
-    SyntaxError,
-} from '../../lib/oql/oql-parser';
+import { SingleGeneQuery, SyntaxError } from '../../lib/oql/oql-parser';
 import { parseOQLQuery } from '../../lib/oql/oqlfilter';
 import memoize from 'memoize-weak-decorator';
 import AppConfig from 'appConfig';
@@ -39,26 +37,18 @@ import { ComponentGetsStoreContext } from '../../lib/ContextUtils';
 import URL from 'url';
 import { buildCBioPortalPageUrl, redirectToStudyView } from '../../api/urls';
 import StudyListLogic from './StudyListLogic';
-import {
-    stringListToIndexSet,
-    stringListToSet,
-} from '../../../public-lib/lib/StringUtils';
 import chunkMapReduce from 'shared/lib/chunkMapReduce';
-import {
-    MolecularProfileQueryParams,
-    NonMolecularProfileQueryParams,
-    nonMolecularProfileParams,
-    currentQueryParams,
-    molecularProfileParams,
-    queryParams,
-    profileAvailability,
-    categorizedSamplesCount,
-} from './QueryStoreUtils';
-import onMobxPromise from 'shared/lib/onMobxPromise';
+import { currentQueryParams, categorizedSamplesCount } from './QueryStoreUtils';
+
 import getOverlappingStudies from '../../lib/getOverlappingStudies';
 import MolecularProfilesInStudyCache from '../../cache/MolecularProfilesInStudyCache';
 import { CacheData } from '../../lib/LazyMobXCache';
-import { getHierarchyData } from 'shared/lib/StoreUtils';
+import {
+    getAlterationTypesInOql,
+    getDefaultProfilesForOql,
+    getHierarchyData,
+    getOqlMessages,
+} from 'shared/lib/StoreUtils';
 import sessionServiceClient from 'shared/api//sessionServiceInstance';
 import { VirtualStudy } from 'shared/model/VirtualStudy';
 import {
@@ -69,33 +59,39 @@ import {
 import SampleListsInStudyCache from 'shared/cache/SampleListsInStudyCache';
 import formSubmit from '../../lib/formSubmit';
 import { ServerConfigHelpers } from '../../../config/config';
-import getBrowserWindow from '../../../public-lib/lib/getBrowserWindow';
-import { QueryParameter } from '../../lib/ExtendedRouterStore';
 import { AlterationTypeConstants } from '../../../pages/resultsView/ResultsViewPageStore';
+import {
+    ResultsViewURLQuery,
+    ResultsViewURLQueryEnum,
+} from 'pages/resultsView/ResultsViewURLWrapper';
+import { isMixedReferenceGenome } from 'shared/lib/referenceGenomeUtils';
+import { getSuffixOfMolecularProfile } from 'shared/lib/molecularProfileUtils';
 
 // interface for communicating
 export type CancerStudyQueryUrlParams = {
     cancer_study_id: string;
     cancer_study_list?: string;
-    genetic_profile_ids_PROFILE_MUTATION_EXTENDED: string;
-    genetic_profile_ids_PROFILE_COPY_NUMBER_ALTERATION: string;
-    genetic_profile_ids_PROFILE_MRNA_EXPRESSION: string;
-    genetic_profile_ids_PROFILE_METHYLATION: string;
-    genetic_profile_ids_PROFILE_PROTEIN_EXPRESSION: string;
-    genetic_profile_ids_PROFILE_GENESET_SCORE: string;
-    genetic_profile_ids_PROFILE_GENERIC_ASSAY: string;
+    genetic_profile_ids_PROFILE_MUTATION_EXTENDED?: string;
+    genetic_profile_ids_PROFILE_COPY_NUMBER_ALTERATION?: string;
+    genetic_profile_ids_PROFILE_MRNA_EXPRESSION?: string;
+    genetic_profile_ids_PROFILE_METHYLATION?: string;
+    genetic_profile_ids_PROFILE_PROTEIN_EXPRESSION?: string;
+    genetic_profile_ids_PROFILE_GENESET_SCORE?: string;
+    genetic_profile_ids_PROFILE_GENERIC_ASSAY?: string;
     Z_SCORE_THRESHOLD: string;
     RPPA_SCORE_THRESHOLD: string;
-    data_priority: '0' | '1' | '2';
+    data_priority?: '0' | '1' | '2';
+    profileFilter: string;
     case_set_id: string;
     case_ids: string;
     gene_list: string;
     geneset_list?: string;
-    treatment_list?: string;
     tab_index: 'tab_download' | 'tab_visualize';
     transpose_matrix?: 'on';
     Action: 'Submit';
     patient_enrichments?: string;
+    show_samples?: string;
+    exclude_germline_mutations?: string;
 };
 
 export type GeneReplacement = { alias: string; genes: Gene[] };
@@ -115,34 +111,6 @@ export function normalizeQuery(geneQuery: string) {
         .toUpperCase();
 }
 
-export type CancerStudyQueryParams = Pick<
-    QueryStore,
-    | 'searchText'
-    | 'selectableSelectedStudyIds'
-    | 'dataTypePriority'
-    | 'selectedProfileIds'
-    | 'zScoreThreshold'
-    | 'rppaScoreThreshold'
-    | 'selectedSampleListId'
-    | 'caseIds'
-    | 'caseIdsMode'
-    | 'geneQuery'
-    | 'genesetQuery'
->;
-export const QueryParamsKeys: (keyof CancerStudyQueryParams)[] = [
-    'searchText',
-    'selectableSelectedStudyIds',
-    'dataTypePriority',
-    'selectedProfileIds',
-    'zScoreThreshold',
-    'rppaScoreThreshold',
-    'selectedSampleListId',
-    'caseIds',
-    'caseIdsMode',
-    'geneQuery',
-    'genesetQuery',
-];
-
 type GenesetId = string;
 
 export enum Focus {
@@ -153,18 +121,13 @@ export enum Focus {
 
 // mobx observable
 export class QueryStore {
-    public initialQueryParams: {
-        pathname: string;
-        nonMolecularProfileParams: NonMolecularProfileQueryParams;
-        molecularProfileIds: ReadonlyArray<string>;
-    };
-
     constructor(urlWithInitialParams?: string) {
+        makeObservable(this);
         this.initialize(urlWithInitialParams);
     }
 
     initialize(urlWithInitialParams?: string) {
-        labelMobxPromises(this);
+        //labelMobxPromises(this);
 
         if (urlWithInitialParams) this.setParamsFromUrl(urlWithInitialParams);
 
@@ -212,7 +175,7 @@ export class QueryStore {
                     );
                 }
             }),
-            action(error => {
+            action((error: any) => {
                 //TODO: how to handle if there is an error
             })
         );
@@ -226,7 +189,7 @@ export class QueryStore {
                     x => x !== id
                 );
             }),
-            action(error => {
+            action((error: any) => {
                 //TODO: how to handle if there is an error
             })
         );
@@ -272,17 +235,6 @@ export class QueryStore {
         return Object.keys(ret);
     }
 
-    copyFrom(other: CancerStudyQueryParams) {
-        // download tab does not appear anywhere except home page
-        this.forDownloadTab = false;
-
-        for (let key of QueryParamsKeys) this[key] = other[key];
-    }
-
-    @computed get stateToSerialize() {
-        return _.pick(this, QueryParamsKeys);
-    }
-
     @computed
     get onlyOneReferenceGenome() {
         const referenceGenomes = _.uniq(
@@ -302,15 +254,16 @@ export class QueryStore {
     @observable searchText: string = '';
 
     @observable private _allSelectedStudyIds: ObservableMap<
+        string,
         boolean
-    > = observable.map<boolean>();
+    > = observable.map<string, boolean>();
 
     @computed get allSelectedStudyIds(): string[] {
-        return this._allSelectedStudyIds.keys();
+        return Array.from(this._allSelectedStudyIds.keys());
     }
 
     @computed get selectableSelectedStudyIds(): string[] {
-        let ids: string[] = this._allSelectedStudyIds.keys();
+        let ids: string[] = Array.from(this._allSelectedStudyIds.keys());
         const selectableStudies = this.selectableStudiesSet.result;
         ids = ids.reduce((obj: string[], next) => {
             if (selectableStudies[next]) {
@@ -346,51 +299,151 @@ export class QueryStore {
 
     //this is to cache a selected ids in the query
     // used in when visualizing a shared another user virtual study
-    private _defaultSelectedIds: ObservableMap<boolean> = observable.map<
+    private _defaultSelectedIds: ObservableMap<
+        string,
         boolean
-    >();
+    > = observable.map<string, boolean>();
 
     @computed get defaultSelectedIds() {
         return this._defaultSelectedIds;
     }
 
-    @observable dataTypePriority = { mutation: true, cna: true };
+    @observable private profileFilterSet?: ObservableMap<string, boolean>;
 
-    // molecular profile ids
-    @observable.ref private _selectedProfileIds?: ReadonlyArray<
-        string
-    > = undefined; // user selection
-    @computed get selectedProfileIds(): ReadonlyArray<string> {
-        let selectedIds;
+    dataTypePriorityFromUrl?: string;
+    profileIdsFromUrl?: string[];
+    profileFilterSetFromUrl?: string[];
 
-        if (this._selectedProfileIds !== undefined) {
-            selectedIds = this._selectedProfileIds;
-        } else {
-            // compute default selection
-            const altTypes: MolecularProfile['molecularAlterationType'][] = [
-                'MUTATION_EXTENDED',
-                'COPY_NUMBER_ALTERATION',
-            ];
-            selectedIds = [];
-            for (let altType of altTypes) {
-                let profiles = this.getFilteredProfiles(altType);
-                if (profiles.length)
-                    selectedIds.push(profiles[0].molecularProfileId);
+    @computed get selectedProfileIdSet() {
+        let selectedIdSet: { [is: string]: boolean } = {};
+        if (this.validProfileIdSetForSelectedStudies.isComplete) {
+            const groupedMolecularProfilesByType = this
+                .validProfileIdSetForSelectedStudies.result;
+            if (this.profileFilterSet === undefined) {
+                if (!this.studiesHaveChangedSinceInitialization) {
+                    if (!_.isEmpty(this.profileFilterSetFromUrl)) {
+                        this.profileFilterSetFromUrl!.forEach(profileFilter => {
+                            if (groupedMolecularProfilesByType[profileFilter]) {
+                                selectedIdSet[profileFilter] = true;
+                            }
+                        });
+                    } else if (!_.isEmpty(this.profileIdsFromUrl)) {
+                        _.chain(this.profileIdsFromUrl)
+                            .reduce((acc: MolecularProfile[], profileId) => {
+                                const molecularProfile = this
+                                    .dict_molecularProfileId_molecularProfile[
+                                    profileId
+                                ];
+                                if (molecularProfile) {
+                                    acc.push(molecularProfile);
+                                    if (
+                                        molecularProfile.molecularAlterationType ===
+                                        AlterationTypeConstants.MUTATION_EXTENDED
+                                    ) {
+                                        acc = acc.concat(
+                                            this.getFilteredProfiles(
+                                                'STRUCTURAL_VARIANT'
+                                            )
+                                        );
+                                    }
+                                }
+                                return acc;
+                            }, [])
+                            .forEach(profile => {
+                                selectedIdSet[
+                                    getSuffixOfMolecularProfile(profile)
+                                ] = true;
+                            })
+                            .value();
+                    } else {
+                        const altTypes: MolecularProfile['molecularAlterationType'][] = [];
+                        switch (this.dataTypePriorityFromUrl) {
+                            default:
+                            case '0':
+                                altTypes.push('MUTATION_EXTENDED');
+                                altTypes.push('STRUCTURAL_VARIANT');
+                                altTypes.push('COPY_NUMBER_ALTERATION');
+                                break;
+                            case '1':
+                                altTypes.push('MUTATION_EXTENDED');
+                                altTypes.push('STRUCTURAL_VARIANT');
+                                break;
+                            case '2':
+                                altTypes.push('COPY_NUMBER_ALTERATION');
+                                break;
+                        }
+
+                        let profiles = _.flatMap(altTypes, altType =>
+                            this.getFilteredProfiles(altType)
+                        );
+
+                        profiles.forEach(profile => {
+                            selectedIdSet[
+                                getSuffixOfMolecularProfile(profile)
+                            ] = true;
+                        });
+                    }
+                } else {
+                    const altTypes: MolecularProfile['molecularAlterationType'][] = [
+                        'MUTATION_EXTENDED',
+                        'STRUCTURAL_VARIANT',
+                        'COPY_NUMBER_ALTERATION',
+                    ];
+                    altTypes.forEach(altType => {
+                        _(this.getFilteredProfiles(altType))
+                            .groupBy(profile => profile.studyId)
+                            .forEach(profiles => {
+                                selectedIdSet[
+                                    getSuffixOfMolecularProfile(profiles[0])
+                                ] = true;
+                            });
+                    });
+                }
+            } else {
+                selectedIdSet = _.fromPairs(this.profileFilterSet.toJSON());
             }
         }
-
-        // download tab only allows one selected profile
-        if (this.forDownloadTab) return selectedIds.slice(0, 1);
-
-        // query tab only allows selecting profiles with showProfileInAnalysisTab=true
-        return selectedIds.filter(id => {
-            let profile = this.dict_molecularProfileId_molecularProfile[id];
-            return profile && profile.showProfileInAnalysisTab;
-        });
+        return selectedIdSet;
     }
 
-    set selectedProfileIds(value) {
-        this._selectedProfileIds = value;
+    // used when single study is selected
+    @action selectMolecularProfile(
+        profile: MolecularProfile,
+        checked: boolean
+    ) {
+        let groupProfiles = this.getFilteredProfiles(
+            profile.molecularAlterationType
+        );
+
+        if (this.profileFilterSet === undefined) {
+            this.profileFilterSet = observable.map(this.selectedProfileIdSet);
+        }
+
+        groupProfiles.forEach(profile =>
+            this.profileFilterSet!.delete(getSuffixOfMolecularProfile(profile))
+        );
+
+        if (checked) {
+            this.profileFilterSet!.set(
+                getSuffixOfMolecularProfile(profile),
+                true
+            );
+        }
+    }
+
+    // used when multi-study is selected
+    @action setProfileTypes(profileTypes: string[], checked: boolean) {
+        if (this.profileFilterSet === undefined) {
+            this.profileFilterSet = observable.map(this.selectedProfileIdSet);
+        }
+
+        profileTypes.forEach(profileType => {
+            if (checked) {
+                this.profileFilterSet!.set(profileType, true);
+            } else {
+                this.profileFilterSet!.delete(profileType);
+            }
+        });
     }
 
     @observable zScoreThreshold: string = '2.0';
@@ -568,9 +621,9 @@ export class QueryStore {
             } = Object.assign({}, physicalStudiesIdsSet, virtualStudiesIdsSet);
 
             //queried id that are not selectable(this would mostly be shared virtual study)
-            const unknownQueriedIds: string[] = this._defaultSelectedIds
-                .keys()
-                .filter(id => !knownSelectableIdsSet[id]);
+            const unknownQueriedIds: string[] = Array.from(
+                this._defaultSelectedIds.keys()
+            ).filter(id => !knownSelectableIdsSet[id]);
 
             let result: { [studyId: string]: string[] } = {};
 
@@ -668,9 +721,9 @@ export class QueryStore {
             );
 
             //queried id that are not selectable(this would mostly be shared virtual study)
-            const unknownQueriedIds: string[] = this._defaultSelectedIds
-                .keys()
-                .filter(id => !_.includes(knownSelectableIds, id));
+            const unknownQueriedIds: string[] = Array.from(
+                this._defaultSelectedIds.keys()
+            ).filter(id => !_.includes(knownSelectableIds, id));
 
             let result: { [studyId: string]: VirtualStudy } = {};
 
@@ -720,10 +773,7 @@ export class QueryStore {
                 studyId => this.physicalStudiesSet.result[studyId]
             );
 
-            if (
-                this._allSelectedStudyIds.keys().length !==
-                physicalStudyIds.length
-            ) {
+            if (this._allSelectedStudyIds.size !== physicalStudyIds.length) {
                 await Promise.all(
                     _.map(physicalStudyIds, studyId => {
                         return client
@@ -743,7 +793,7 @@ export class QueryStore {
                     ...this.sharedVirtualStudiesSet.result,
                 };
 
-                this._allSelectedStudyIds.keys().forEach(id => {
+                for (const id of this._allSelectedStudyIds.keys()) {
                     if (_vs[id]) {
                         let virtualStudy = _vs[id];
                         virtualStudy.data.studies.forEach(study => {
@@ -754,7 +804,7 @@ export class QueryStore {
                             }
                         });
                     }
-                });
+                }
             } else {
                 physicalStudyIds.forEach(studyId => {
                     studyToSampleSet[studyId] = {};
@@ -801,7 +851,7 @@ export class QueryStore {
                 const sharedVirtualStudiesSet = this.sharedVirtualStudiesSet
                     .result;
                 let sharedIds: string[] = _.filter(
-                    this._allSelectedStudyIds.keys(),
+                    [...this._allSelectedStudyIds.keys()],
                     id => sharedVirtualStudiesSet[id] !== undefined
                 );
 
@@ -851,31 +901,10 @@ export class QueryStore {
         await: () => [this.selectableStudiesSet],
         invoke: async () => {
             const _selectableStudiesSet = this.selectableStudiesSet.result;
-            let ids: string[] = this._allSelectedStudyIds.keys();
+            let ids: string[] = [...this._allSelectedStudyIds.keys()];
             return ids.filter(id => !(id in _selectableStudiesSet));
         },
         default: [],
-    });
-
-    readonly molecularProfiles = remoteData<MolecularProfile[]>({
-        invoke: async () => {
-            if (this.physicalStudyIdsInSelection.length === 1) {
-                return await client.getAllMolecularProfilesInStudyUsingGET({
-                    studyId: this.physicalStudyIdsInSelection[0],
-                });
-            } else {
-                return [];
-            }
-        },
-        default: [],
-        onResult: () => {
-            if (
-                !this.initiallySelected.profileIds ||
-                this.studiesHaveChangedSinceInitialization
-            ) {
-                this._selectedProfileIds = undefined;
-            }
-        },
     });
 
     readonly molecularProfilesInSelectedStudies = remoteData<
@@ -892,6 +921,14 @@ export class QueryStore {
             return _.flatten(profiles.map(d => (d.data ? d.data : [])));
         },
         default: [],
+        onResult: () => {
+            if (
+                !this.initiallySelected.profileIds ||
+                this.studiesHaveChangedSinceInitialization
+            ) {
+                this.profileFilterSet = undefined;
+            }
+        },
     });
 
     readonly sampleListInSelectedStudies = remoteData<SampleList[]>({
@@ -925,32 +962,38 @@ export class QueryStore {
         },
     });
 
-    readonly profileAvailability = remoteData<{
-        mutation: boolean;
-        cna: boolean;
-    }>({
+    readonly validProfileIdSetForSelectedStudies = remoteData({
         await: () => [this.molecularProfilesInSelectedStudies],
-        invoke: () => {
-            return Promise.resolve(
-                profileAvailability(
-                    this.molecularProfilesInSelectedStudies.result!
+        invoke: async () => {
+            const validProfileIds: string[] = _(
+                this.molecularProfilesInSelectedStudies.result
+            )
+                .filter(
+                    molecularProfile =>
+                        molecularProfile.showProfileInAnalysisTab
                 )
-            );
+                .groupBy(molecularProfile => molecularProfile.studyId)
+                .flatMap(studyProfiles => {
+                    return _(studyProfiles)
+                        .groupBy(
+                            profile =>
+                                profile.molecularAlterationType +
+                                profile.datatype
+                        )
+                        .map(alterationTypeProfiles => {
+                            // A study can have multiple profiles for same alteration type and datatpye.
+                            // we need just one profile of each
+                            return getSuffixOfMolecularProfile(
+                                alterationTypeProfiles[0]
+                            );
+                        })
+                        .value();
+                })
+                .value();
+
+            return stringListToSet(validProfileIds);
         },
-        default: {
-            mutation: false,
-            cna: false,
-        },
-        onResult: () => {
-            if (
-                !this.initiallySelected.sampleListId ||
-                this.studiesHaveChangedSinceInitialization
-            ) {
-                this.dataTypePriority = profileAvailability(
-                    this.molecularProfilesInSelectedStudies.result!
-                );
-            }
-        },
+        default: {},
     });
 
     readonly profiledSamplesCount = remoteData<{
@@ -1345,7 +1388,7 @@ export class QueryStore {
 
     // CANCER STUDY
 
-    @cached get treeData() {
+    @cached @computed get treeData() {
         return new CancerStudyTreeData({
             cancerTypes: this.cancerTypes.result,
             studies: this.cancerStudies.result,
@@ -1455,46 +1498,11 @@ export class QueryStore {
         }
     }
 
-    // DATA TYPE PRIORITY
-
-    private calculateDataTypePriorityCode(dataTypePriority: {
-        mutation: boolean;
-        cna: boolean;
-    }): '0' | '1' | '2' {
-        let { mutation, cna } = dataTypePriority;
-        if (mutation && cna) return '0';
-        if (mutation) return '1';
-        if (cna) return '2';
-
-        return '0';
-    }
-
-    set dataTypePriorityCode(code: '0' | '1' | '2') {
-        switch (code) {
-            default:
-            case '0':
-                this.dataTypePriority = { mutation: true, cna: true };
-                break;
-            case '1':
-                this.dataTypePriority = { mutation: true, cna: false };
-                break;
-            case '2':
-                this.dataTypePriority = { mutation: false, cna: true };
-                break;
-        }
-    }
-
-    @computed get dataTypePriorityCode(): '0' | '1' | '2' {
-        return this.calculateDataTypePriorityCode(this.dataTypePriority);
-    }
-
     // MOLECULAR PROFILE
 
-    @computed get dict_molecularProfileId_molecularProfile(): _.Dictionary<
-        MolecularProfile | undefined
-    > {
+    @computed get dict_molecularProfileId_molecularProfile() {
         return _.keyBy(
-            this.molecularProfiles.result,
+            this.molecularProfilesInSelectedStudies.result,
             profile => profile.molecularProfileId
         );
     }
@@ -1502,49 +1510,80 @@ export class QueryStore {
     getFilteredProfiles(
         molecularAlterationType: MolecularProfile['molecularAlterationType']
     ) {
-        return this.molecularProfiles.result.filter(profile => {
-            if (profile.molecularAlterationType != molecularAlterationType)
-                return false;
+        return this.molecularProfilesInSelectedStudies.result.filter(
+            profile => {
+                if (profile.molecularAlterationType != molecularAlterationType)
+                    return false;
 
-            return profile.showProfileInAnalysisTab || this.forDownloadTab;
-        });
+                return profile.showProfileInAnalysisTab || this.forDownloadTab;
+            }
+        );
     }
 
-    isProfileSelected(molecularProfileId: string) {
-        return _.includes(this.selectedProfileIds, molecularProfileId);
+    isProfileTypeSelected(profileType: string) {
+        return this.selectedProfileIdSet[profileType] || false;
     }
 
-    getSelectedProfileIdFromMolecularAlterationType(
-        molecularAlterationType: MolecularProfile['molecularAlterationType'],
-        selectedProfileIds?: ReadonlyArray<string>
-    ): string {
-        for (let profileId of selectedProfileIds || this.selectedProfileIds) {
-            let profile = this.dict_molecularProfileId_molecularProfile[
-                profileId
-            ];
-            if (
-                profile &&
-                profile.molecularAlterationType === molecularAlterationType
-            )
-                return profile.molecularProfileId;
-        }
-        return '';
+    getSelectedProfileTypeFromMolecularAlterationType(
+        molecularAlterationType: MolecularProfile['molecularAlterationType']
+    ) {
+        return this.getFilteredProfiles(molecularAlterationType)
+            .map(profile => getSuffixOfMolecularProfile(profile))
+            .find(profile => this.isProfileTypeSelected(profile));
     }
 
     get isGenesetProfileSelected() {
-        let result = false;
-        if (this.getFilteredProfiles('GENESET_SCORE')[0]) {
-            for (const selectedProfileId in this.selectedProfileIds) {
-                if (
-                    this.selectedProfileIds[selectedProfileId] ===
-                    this.getFilteredProfiles('GENESET_SCORE')[0]
-                        .molecularProfileId
-                ) {
-                    result = true;
-                }
-            }
+        const genesetProfiles = this.getFilteredProfiles('GENESET_SCORE');
+        if (genesetProfiles.length > 0) {
+            const profileType = getSuffixOfMolecularProfile(genesetProfiles[0]);
+            return this.isProfileTypeSelected(profileType) || false;
         }
-        return result;
+        return false;
+    }
+
+    @computed get defaultProfilesForOql() {
+        if (this.molecularProfilesInSelectedStudies.isComplete) {
+            return getDefaultProfilesForOql(
+                this.molecularProfilesInSelectedStudies.result
+            );
+        }
+        return undefined;
+    }
+    @computed get defaultMutationProfile() {
+        return (
+            this.defaultProfilesForOql &&
+            this.defaultProfilesForOql[
+                AlterationTypeConstants.MUTATION_EXTENDED
+            ]
+        );
+    }
+    @computed get defaultStructuralVariantProfile() {
+        return (
+            this.defaultProfilesForOql &&
+            this.defaultProfilesForOql[
+                AlterationTypeConstants.STRUCTURAL_VARIANT
+            ]
+        );
+    }
+    @computed get defaultCnaProfile() {
+        return (
+            this.defaultProfilesForOql &&
+            this.defaultProfilesForOql[
+                AlterationTypeConstants.COPY_NUMBER_ALTERATION
+            ]
+        );
+    }
+    @computed get defaultMrnaProfile() {
+        return (
+            this.defaultProfilesForOql &&
+            this.defaultProfilesForOql[AlterationTypeConstants.MRNA_EXPRESSION]
+        );
+    }
+    @computed get defaultProtProfile() {
+        return (
+            this.defaultProfilesForOql &&
+            this.defaultProfilesForOql[AlterationTypeConstants.PROTEIN_LEVEL]
+        );
     }
 
     // SAMPLE LIST
@@ -1557,16 +1596,16 @@ export class QueryStore {
         if (this.selectableSelectedStudyIds.length !== 1) return undefined;
 
         let studyId = this.selectableSelectedStudyIds[0];
-        let mutSelect = this.getSelectedProfileIdFromMolecularAlterationType(
+        let mutSelect = this.getSelectedProfileTypeFromMolecularAlterationType(
             'MUTATION_EXTENDED'
         );
-        let cnaSelect = this.getSelectedProfileIdFromMolecularAlterationType(
+        let cnaSelect = this.getSelectedProfileTypeFromMolecularAlterationType(
             'COPY_NUMBER_ALTERATION'
         );
-        let expSelect = this.getSelectedProfileIdFromMolecularAlterationType(
+        let expSelect = this.getSelectedProfileTypeFromMolecularAlterationType(
             'MRNA_EXPRESSION'
         );
-        let rppaSelect = this.getSelectedProfileIdFromMolecularAlterationType(
+        let rppaSelect = this.getSelectedProfileTypeFromMolecularAlterationType(
             'PROTEIN_LEVEL'
         );
         let sampleListId = studyId + '_all';
@@ -1578,16 +1617,12 @@ export class QueryStore {
         else if (!mutSelect && cnaSelect && !expSelect && !rppaSelect)
             sampleListId = studyId + '_cna';
         else if (!mutSelect && !cnaSelect && expSelect && !rppaSelect) {
-            if (this.isProfileSelected(studyId + '_mrna_median_Zscores'))
+            if (this.isProfileTypeSelected('mrna_median_Zscores'))
                 sampleListId = studyId + '_mrna';
-            else if (
-                this.isProfileSelected(studyId + '_rna_seq_mrna_median_Zscores')
-            )
+            else if (this.isProfileTypeSelected('rna_seq_mrna_median_Zscores'))
                 sampleListId = studyId + '_rna_seq_mrna';
             else if (
-                this.isProfileSelected(
-                    studyId + '_rna_seq_v2_mrna_median_Zscores'
-                )
+                this.isProfileTypeSelected('rna_seq_v2_mrna_median_Zscores')
             )
                 sampleListId = studyId + '_rna_seq_v2_mrna';
         } else if ((mutSelect || cnaSelect) && expSelect && !rppaSelect)
@@ -1738,7 +1773,10 @@ export class QueryStore {
         }
     }
 
-    @observable map_genesets_selected_volcano = new ObservableMap<boolean>();
+    @observable map_genesets_selected_volcano = new ObservableMap<
+        string,
+        boolean
+    >();
 
     @computed get volcanoPlotGraphData():
         | { x: number; y: number; fill: string }[]
@@ -1760,7 +1798,8 @@ export class QueryStore {
             (!this.submitError &&
                 (this.genes.isComplete || this.genesets.isComplete) &&
                 this.asyncUrlParams.isComplete) ||
-            (!!this.oql.error || !!this.genesetIdsQuery.error)
+            !!this.oql.error ||
+            !!this.genesetIdsQuery.error
         ); // to make "Please click 'Submit' to see location of error." possible
     }
 
@@ -1773,87 +1812,109 @@ export class QueryStore {
     }
 
     @computed get oqlMessages(): string[] {
-        let unrecognizedMutations = _.flatten(
-            this.oql.query.map(result => {
-                return (result.alterations || []).filter(
-                    alt =>
-                        alt.alteration_type === 'mut' &&
-                        (alt.info as any).unrecognized
-                ) as MUTCommand<any>[];
-            })
+        return getOqlMessages(this.oql.query);
+    }
+
+    /**
+     * Sample count can come from the following areas:
+     * 1. The sum of the samples in the selected study(s)
+     * 2. The number of cases (patients or samples) in caseIds
+     *     This is _approximate_. Patients can have multiple samples
+     * 3. The number of samples in the selected sample list
+     * 4. The number of samples in the selected profiled samples result
+     */
+    @computed get approxSampleCount(): number {
+        const sampleListId = this.selectedSampleListId;
+
+        if (!sampleListId) {
+            return this.profiledSamplesCount.result.all;
+        }
+
+        if (sampleListId === CUSTOM_CASE_LIST_ID) {
+            return this.caseIds
+                ? Math.max(this.caseIds.trim().split(/\s+/g).length, 1)
+                : 1;
+        }
+
+        const sampleList = this.sampleLists.result.find(
+            l => l.sampleListId === sampleListId
         );
-        return unrecognizedMutations.map(mutCommand => {
-            return `Unrecognized input "${
-                (mutCommand as any).constr_val
-            }" is interpreted as a mutation code.`;
-        });
+        if (sampleList) {
+            return sampleList.sampleCount;
+        }
+
+        if (sampleListId in this.profiledSamplesCount.result) {
+            return (this.profiledSamplesCount.result as any)[sampleListId];
+        }
+
+        return this.profiledSamplesCount.result.all;
     }
 
     @computed get isQueryLimitReached(): boolean {
         return (
-            this.oql.query.length * this.profiledSamplesCount.result.all >
+            this.oql.query.length * this.approxSampleCount >
             AppConfig.serverConfig.query_product_limit
         );
     }
 
     @computed get geneLimit(): number {
         return Math.floor(
-            AppConfig.serverConfig.query_product_limit /
-                this.profiledSamplesCount.result.all
+            AppConfig.serverConfig.query_product_limit / this.approxSampleCount
         );
     }
 
-    @computed get submitError() {
-        let haveMutInQuery = false;
-        let haveCnaInQuery = false;
-        let haveExpInQuery = false;
-        let haveProtInQuery = false;
-
-        for (const queryLine of this.oql.query) {
-            for (const alteration of queryLine.alterations || []) {
-                haveMutInQuery =
-                    haveMutInQuery || alteration.alteration_type === 'mut';
-                haveCnaInQuery =
-                    haveCnaInQuery || alteration.alteration_type === 'cna';
-                haveExpInQuery =
-                    haveExpInQuery || alteration.alteration_type === 'exp';
-                haveProtInQuery =
-                    haveProtInQuery || alteration.alteration_type === 'prot';
-            }
+    @computed get isMixedReferenceGenome() {
+        if (
+            this.physicalStudyIdsInSelection &&
+            this.physicalStudiesSet.result
+        ) {
+            const studies = _.map(
+                this.physicalStudyIdsInSelection,
+                id => this.physicalStudiesSet.result[id]
+            );
+            return isMixedReferenceGenome(studies);
         }
+    }
 
+    @computed get alterationTypesInOQL() {
+        return getAlterationTypesInOql(this.oql.query);
+    }
+
+    @computed get submitError() {
         if (!this.selectableSelectedStudyIds.length)
             return 'Please select one or more cancer studies.';
 
-        if (this.isSingleNonVirtualStudySelected) {
-            if (!this.selectedProfileIds.length)
-                return 'Please select one or more molecular profiles.';
-
-            let mutProfileSelected = this.getSelectedProfileIdFromMolecularAlterationType(
-                AlterationTypeConstants.MUTATION_EXTENDED as any
-            );
-            let cnaProfileSelected = this.getSelectedProfileIdFromMolecularAlterationType(
-                AlterationTypeConstants.COPY_NUMBER_ALTERATION as any
-            );
-            let expProfileSelected = this.getSelectedProfileIdFromMolecularAlterationType(
-                AlterationTypeConstants.MRNA_EXPRESSION as any
-            );
-            let protProfileSelected = this.getSelectedProfileIdFromMolecularAlterationType(
-                AlterationTypeConstants.PROTEIN_LEVEL as any
-            );
-            if (haveMutInQuery && !mutProfileSelected)
-                return 'Mutation data query specified in OQL, but no mutation profile selected in `Select Genomic Profiles`';
-            if (haveCnaInQuery && !cnaProfileSelected)
-                return 'CNA data query specified in OQL, but not CNA profile selected in `Select Genomic Profiles`';
-            if (haveExpInQuery && !expProfileSelected)
-                return 'mRNA expression data query specified in OQL, but no mRNA profile selected in `Select Genomic Profiles`';
-            if (haveProtInQuery && !protProfileSelected)
-                return 'Protein level data query specified in OQL, but no protein level profile selected in `Select Genomic Profiles`';
-        } else if (
-            !(this.dataTypePriority.mutation || this.dataTypePriority.cna)
-        ) {
+        if (_.isEmpty(this.selectedProfileIdSet))
             return 'Please select one or more molecular profiles.';
+
+        if (this.isSingleNonVirtualStudySelected) {
+            if (
+                this.alterationTypesInOQL.haveMutInQuery &&
+                !this.defaultMutationProfile
+            )
+                return 'Mutation data query specified in OQL, but no mutation profile is available for the selected study.';
+            if (
+                this.alterationTypesInOQL.haveStructuralVariantInQuery &&
+                !this.defaultStructuralVariantProfile
+            )
+                return 'Structural variant data query specified in OQL, but no structural variant profile is available for the selected study.';
+            if (
+                this.alterationTypesInOQL.haveCnaInQuery &&
+                !this.defaultCnaProfile
+            )
+                return 'CNA data query specified in OQL, but no CNA profile is available in the selected study.';
+            if (
+                this.alterationTypesInOQL.haveMrnaInQuery &&
+                !this.defaultMrnaProfile
+            )
+                return 'mRNA expression data query specified in OQL, but no mRNA profile is available in the selected study.';
+            if (
+                this.alterationTypesInOQL.haveProtInQuery &&
+                !this.defaultProtProfile
+            )
+                return 'Protein level data query specified in OQL, but no protein level profile is available in the selected study.';
         }
+
         if (
             this.selectableSelectedStudyIds.length &&
             this.selectedSampleListId === CUSTOM_CASE_LIST_ID
@@ -1866,19 +1927,19 @@ export class QueryStore {
             if (this.asyncCustomCaseSet.error)
                 return 'Error in custom case set.';
         } else if (
-            haveExpInQuery &&
+            this.alterationTypesInOQL.haveMrnaInQuery &&
             this.selectableSelectedStudyIds.length > 1
         ) {
             return 'Expression filtering in the gene list (the EXP command) is not supported when doing cross cancer queries.';
         } else if (
-            haveProtInQuery &&
+            this.alterationTypesInOQL.haveProtInQuery &&
             this.selectableSelectedStudyIds.length > 1
         ) {
             return 'Protein level filtering in the gene list (the PROT command) is not supported when doing cross cancer queries.';
         }
 
-        if (this.selectedProfileIds.length !== 0) {
-            if (this.selectedProfileIds.length === 1) {
+        if (!_.isEmpty(this.selectedProfileIdSet)) {
+            if (Object.keys(this.selectedProfileIdSet).length === 1) {
                 if (this.isGenesetProfileSelected) {
                     //Only geneset profile selected
                     if (!this.genesetQuery.length && !this.oql.query.length) {
@@ -1917,37 +1978,19 @@ export class QueryStore {
 
         if (this.genes.result.suggestions.length)
             return 'Please edit the gene symbols.';
-    }
 
-    private readonly dict_molecularAlterationType_filenameSuffix: {
-        [K in MolecularProfile['molecularAlterationType']]?: string;
-    } = {
-        MUTATION_EXTENDED: 'mutations',
-        COPY_NUMBER_ALTERATION: 'cna',
-        MRNA_EXPRESSION: 'mrna',
-        METHYLATION: 'methylation',
-        METHYLATION_BINARY: 'methylation',
-        PROTEIN_LEVEL: 'rppa',
-    };
-
-    @computed get downloadDataFilename() {
-        let study =
-            this.selectableSelectedStudyIds.length === 1 &&
-            this.treeData.map_studyId_cancerStudy.get(
-                this.selectableSelectedStudyIds[0]
-            );
-        let profile = this.dict_molecularProfileId_molecularProfile[
-            this.selectedProfileIds[0] as string
-        ];
-
-        if (!this.forDownloadTab || !study || !profile)
-            return 'cbioportal-data.txt';
-
-        let suffix =
-            this.dict_molecularAlterationType_filenameSuffix[
-                profile.molecularAlterationType
-            ] || profile.molecularAlterationType.toLowerCase();
-        return `cbioportal-${study.studyId}-${suffix}.txt`;
+        // TDOD: remove this condition once multiple entrez gene ids is supported
+        const hugoGeneSymbolSet = _.groupBy(
+            this.genes.result.found,
+            gene => gene.hugoGeneSymbol
+        );
+        const hasGenesWithMultipleEntrezGeneIds = _.some(
+            hugoGeneSymbolSet,
+            genes => genes.length > 1
+        );
+        if (hasGenesWithMultipleEntrezGeneIds) {
+            return 'Please edit the gene symbols.';
+        }
     }
 
     readonly asyncUrlParams = remoteData({
@@ -2002,12 +2045,18 @@ export class QueryStore {
             stringListToSet(queriedStudies)
         );
 
-        this._selectedProfileIds = profileIds.every(id => id === undefined)
-            ? undefined
-            : (profileIds.filter(_.identity) as string[]);
+        this.profileIdsFromUrl = _.compact(profileIds);
         this.zScoreThreshold = params.Z_SCORE_THRESHOLD || '2.0';
         this.rppaScoreThreshold = params.RPPA_SCORE_THRESHOLD || '2.0';
-        this.dataTypePriorityCode = params.data_priority || '0';
+        if (params.data_priority) {
+            this.dataTypePriorityFromUrl = params.data_priority;
+        }
+        if (params.profileFilter) {
+            if (isNaN(parseInt(params.profileFilter, 10))) {
+                this.profileFilterSetFromUrl = params.profileFilter.split(',');
+            }
+        }
+
         this.selectedSampleListId = params.case_set_id
             ? params.case_set_id.toString()
             : ''; // must be a string even though it's integer
@@ -2017,7 +2066,9 @@ export class QueryStore {
             decodeURIComponent(params.gene_list || '')
         );
         this.genesetQuery = normalizeQuery(
-            decodeURIComponent(params[QueryParameter.GENESET_LIST] || '')
+            decodeURIComponent(
+                params[ResultsViewURLQueryEnum.geneset_list] || ''
+            )
         );
         this.forDownloadTab = params.tab_index === 'tab_download';
         this.initiallySelected.profileIds = true;
@@ -2026,7 +2077,7 @@ export class QueryStore {
 
     // TODO: we should be able to merge this with the above since it accepts same interface
     @action setParamsFromLocalStorage(
-        legacySubmission: Partial<CancerStudyQueryUrlParams>
+        legacySubmission: Partial<ResultsViewURLQuery>
     ) {
         const caseIds = legacySubmission.case_ids;
         if (caseIds) {
@@ -2083,32 +2134,6 @@ export class QueryStore {
         this.selectedCancerTypeIds = [];
     }
 
-    @action selectMolecularProfile(
-        profile: MolecularProfile,
-        checked: boolean
-    ) {
-        let groupProfiles = this.getFilteredProfiles(
-            profile.molecularAlterationType
-        );
-        let groupProfileIds = groupProfiles.map(
-            profile => profile.molecularProfileId
-        );
-        if (this.forDownloadTab) {
-            // download tab only allows a single selection
-            this._selectedProfileIds = [profile.molecularProfileId];
-        } else {
-            let difference = _.difference(
-                this.selectedProfileIds,
-                groupProfileIds
-            );
-            if (checked)
-                this._selectedProfileIds = _.union(difference, [
-                    profile.molecularProfileId,
-                ]);
-            else this._selectedProfileIds = difference;
-        }
-    }
-
     @action replaceGene(oldSymbol: string, newSymbol: string) {
         this.geneQuery = normalizeQuery(
             this.geneQuery
@@ -2132,10 +2157,10 @@ export class QueryStore {
     }
 
     @action applyGeneSelection(
-        map_geneSymbol_selected: ObservableMap<boolean>
+        map_geneSymbol_selected: ObservableMap<string, boolean>
     ) {
         let [toAppend, toRemove] = _.partition(
-            map_geneSymbol_selected.keys(),
+            Array.from(map_geneSymbol_selected.keys()),
             geneSymbol => map_geneSymbol_selected.get(geneSymbol)
         );
         toAppend = _.difference(toAppend, this.geneIds);
@@ -2147,10 +2172,10 @@ export class QueryStore {
     }
 
     @action addToGenesetSelection(
-        map_geneset_selected: ObservableMap<boolean>
+        map_geneset_selected: ObservableMap<string, boolean>
     ) {
         let [toAppend, toRemove] = _.partition(
-            map_geneset_selected.keys(),
+            Array.from(map_geneset_selected.keys()),
             geneSet => map_geneset_selected.get(geneSet)
         );
         const genesetQuery = _.union(toAppend, this.genesetIds).join(' ');
@@ -2158,10 +2183,10 @@ export class QueryStore {
     }
 
     @action applyGenesetSelection(
-        map_geneset_selected: ObservableMap<boolean>
+        map_geneset_selected: ObservableMap<string, boolean>
     ) {
         const [toAppend, toRemove] = _.partition(
-            map_geneset_selected.keys(),
+            Array.from(map_geneset_selected.keys()),
             geneSet => map_geneset_selected.get(geneSet)
         );
         let genesetQuery = this.genesetQuery;
@@ -2224,11 +2249,11 @@ export class QueryStore {
         redirectToStudyView(this.selectableSelectedStudyIds);
     }
 
-    @cached get molecularProfilesInStudyCache() {
+    @cached @computed get molecularProfilesInStudyCache() {
         return new MolecularProfilesInStudyCache();
     }
 
-    @cached get sampleListsInStudyCache() {
+    @cached @computed get sampleListsInStudyCache() {
         return new SampleListsInStudyCache();
     }
 }

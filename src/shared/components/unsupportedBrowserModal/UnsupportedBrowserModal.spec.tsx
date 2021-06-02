@@ -1,14 +1,16 @@
 import * as React from 'react';
 import { expect } from 'chai';
-import { shallow } from 'enzyme';
-import UnsupportedBrowserModal from "./UnsupportedBrowserModal";
+import Enzyme, { shallow } from 'enzyme';
+import UnsupportedBrowserModal from './UnsupportedBrowserModal';
+import Adapter from 'enzyme-adapter-react-16';
+
+Enzyme.configure({ adapter: new Adapter() });
 
 describe('UnsupportedBrowserModal', () => {
-
     let wrapper: any;
 
-    before(()=> {
-        wrapper = shallow(<UnsupportedBrowserModal/>);
+    before(() => {
+        wrapper = shallow(<UnsupportedBrowserModal />);
     });
 
     it('does not show modal when Chrome is being used', () => {
@@ -22,7 +24,7 @@ describe('UnsupportedBrowserModal', () => {
     });
 
     it('does not show when state is manually set to false', () => {
-        wrapper.instance().setState({show: false});
+        wrapper.instance().setState({ show: false });
         expect(wrapper.state('show')).to.equal(false);
     });
 
@@ -50,5 +52,4 @@ describe('UnsupportedBrowserModal', () => {
         wrapper.instance().handleUnsupportedBrowsers('msie', '11.0.0', false);
         expect(wrapper.state('show')).to.equal(false);
     });
-
 });

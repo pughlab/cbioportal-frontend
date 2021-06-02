@@ -1,4 +1,3 @@
-
 .body {
     display: flex;
     flex-direction: column;
@@ -17,15 +16,20 @@
         border-color: green;
         outline-color: green;
     }
+}
 
-    .fillIds {
-        text-decoration: underline;
-        cursor: pointer;
-    }
+.selection {
+    display: flex;
+    align-items: center;
+}
+
+.selectionText {
+    text-decoration: underline;
+    cursor: pointer;
 }
 
 .operations {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
 }

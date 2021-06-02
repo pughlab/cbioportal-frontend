@@ -1,11 +1,15 @@
-import {assert} from 'chai';
-import {mount} from "enzyme";
-import * as React from "react";
-import GeneSymbolValidator, {IGeneSymbolValidatorProps} from './GeneSymbolValidator';
+import { assert } from 'chai';
+import Enzyme, { mount } from 'enzyme';
+import * as React from 'react';
+import GeneSymbolValidator, {
+    IGeneSymbolValidatorProps,
+} from './GeneSymbolValidator';
 import sinon from 'sinon';
+import Adapter from 'enzyme-adapter-react-16';
+
+Enzyme.configure({ adapter: new Adapter() });
 
 describe('GeneSymbolValidator', () => {
-
     let props: IGeneSymbolValidatorProps;
     let wrapper: any;
     let instance: GeneSymbolValidator;
@@ -13,17 +17,17 @@ describe('GeneSymbolValidator', () => {
     beforeEach(() => {
         props = {
             oql: {
-                query: [{gene: 'TP53', alterations: false}]
+                query: [{ gene: 'TP53', alterations: false }],
             },
             geneQuery: 'TP53',
             skipGeneValidation: false,
+            replaceGene: () => {},
             updateGeneQuery: () => null,
         } as IGeneSymbolValidatorProps;
         wrapper = mount(<GeneSymbolValidator {...props} />);
         instance = wrapper.instance() as GeneSymbolValidator;
     });
-    afterEach(() => {
-    });
+    afterEach(() => {});
 
     it('Validate geneQuery properly', () => {
         sinon.stub(instance, 'genes').get(() => {
@@ -33,17 +37,19 @@ describe('GeneSymbolValidator', () => {
                 isError: false,
                 isComplete: true,
                 result: {
-                    found: [{
-                        entrezGeneId: 7157,
-                        hugoGeneSymbol: "TP53",
-                        type: "protein-coding",
-                        cytoband: "17p13.1",
-                        length: 19149,
-                        chromosome: "17"
-                    }],
-                    suggestions: []
+                    found: [
+                        {
+                            entrezGeneId: 7157,
+                            hugoGeneSymbol: 'TP53',
+                            type: 'protein-coding',
+                            cytoband: '17p13.1',
+                            length: 19149,
+                            chromosome: '17',
+                        },
+                    ],
+                    suggestions: [],
                 },
-                error: undefined
+                error: undefined,
             };
         });
 
@@ -51,7 +57,8 @@ describe('GeneSymbolValidator', () => {
 
         assert.equal(
             wrapper.find('#geneBoxValidationStatus').text(),
-            "All gene symbols are valid.");
+            'All gene symbols are valid.'
+        );
     });
 
     it('api error', () => {
@@ -61,8 +68,8 @@ describe('GeneSymbolValidator', () => {
                 isPending: false,
                 isError: true,
                 isComplete: true,
-                result: {found: [], suggestions: []},
-                error: new Error('error')
+                result: { found: [], suggestions: [] },
+                error: new Error('error'),
             };
         });
 
@@ -70,6 +77,7 @@ describe('GeneSymbolValidator', () => {
 
         assert.equal(
             wrapper.find('#geneBoxValidationStatus').text(),
-            "Unable to validate gene symbols.");
+            'Unable to validate gene symbols.'
+        );
     });
 });

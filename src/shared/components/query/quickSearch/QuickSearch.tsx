@@ -5,18 +5,19 @@ import client from 'shared/api/cbioportalClientInstance';
 import { OptionType } from './OptionType';
 import autobind from 'autobind-decorator';
 import './styles.scss';
-import getBrowserWindow from 'public-lib/lib/getBrowserWindow';
 import { sleep } from 'shared/lib/TimeUtils';
 import { Label } from 'react-bootstrap';
 import * as moduleStyles from './styles.module.scss';
-import { action, computed, observable, runInAction } from 'mobx';
-import { remoteData } from 'public-lib/api/remoteData';
+import { action, computed, makeObservable, observable } from 'mobx';
+import { getBrowserWindow, remoteData } from 'cbioportal-frontend-commons';
 import Pluralize from 'pluralize';
 import AppConfig from 'appConfig';
 import { ServerConfigHelpers } from 'config/config';
 import sessionServiceClient from 'shared/api/sessionServiceInstance';
 import { trackEvent } from 'shared/lib/tracking';
 import { PagePath } from 'shared/enums/PagePaths';
+import { QueryStore } from '../QueryStore';
+import { CancerStudy } from 'cbioportal-ts-api-client';
 
 export const SHOW_MORE_SIZE: number = 20;
 const DEFAULT_PAGE_SIZE: number = 3;
@@ -46,8 +47,12 @@ type GeneStudyQuery = {
     name?: string;
 };
 
+type QuickSearchProps = {
+    studies: CancerStudy[];
+};
+
 @observer
-export default class QuickSearch extends React.Component {
+export default class QuickSearch extends React.Component<QuickSearchProps, {}> {
     private select: any;
     @observable private studyPageMultiplier: number = 0;
     @observable private genePageMultiplier: number = 0;
@@ -57,8 +62,21 @@ export default class QuickSearch extends React.Component {
     @observable private isFocusing = false;
     @observable private isLoading = false;
 
+    constructor(props: any) {
+        super(props);
+        makeObservable(this);
+    }
+
     @computed get menuIsOpen() {
         return this.isFocusing && this.inputValue.length > 0;
+    }
+
+    @computed
+    get studies(): Map<string, string> {
+        return this.props.studies.reduce((prev, curr) => {
+            prev.set(curr.studyId, curr.name);
+            return prev;
+        }, new Map<string, string>());
     }
 
     @autobind
@@ -98,11 +116,13 @@ export default class QuickSearch extends React.Component {
         };
     }
 
+    @autobind
     private sampleToOption(sample: any, index: number): Option {
         return {
             value: sample.sampleId,
             type: OptionType.SAMPLE,
             studyId: sample.studyId,
+            studyName: this.studies.get(sample.studyId),
             patientId: sample.patientId,
             sampleType: sample.sampleType,
             index,
@@ -191,13 +211,13 @@ export default class QuickSearch extends React.Component {
                         keyword: input,
                         projection: 'META',
                     }),
-                    client.getAllSamplesUsingGETWithHttpInfo({
+                    client.getSamplesByKeywordUsingGETWithHttpInfo({
                         keyword: input,
                         pageSize:
                             DEFAULT_PAGE_SIZE +
                             SHOW_MORE_SIZE * this.samplePageMultiplier,
                     }),
-                    client.getAllSamplesUsingGETWithHttpInfo({
+                    client.getSamplesByKeywordUsingGETWithHttpInfo({
                         keyword: input,
                         projection: 'META',
                     }),
@@ -324,15 +344,14 @@ export default class QuickSearch extends React.Component {
         },
     });
 
-    @autobind
-    @action
+    @action.bound
     private handleChange(newOption: any) {
         let parameters;
         let route;
         if (newOption.type === OptionType.STUDY) {
             parameters = { id: newOption.studyId };
-            route = 'study';
-            this.trackClick('study', this.inputValue);
+            route = PagePath.Study;
+            this.trackClick(PagePath.Study, this.inputValue);
         } else if (newOption.type === OptionType.GENE) {
             const studyList =
                 this.geneStudyQuery.isComplete &&
@@ -377,8 +396,7 @@ export default class QuickSearch extends React.Component {
         trackEvent({ category: 'quickSearch', action: action, label: label });
     }
 
-    @autobind
-    @action
+    @action.bound
     private handleInputChange(inputValue: any, { action }: { action: any }) {
         if (action !== 'set-value') {
             // if user has changed search query then
@@ -400,8 +418,7 @@ export default class QuickSearch extends React.Component {
         }
     }
 
-    @autobind
-    @action
+    @action.bound
     private onFocus() {
         this.isFocusing = true;
     }
@@ -530,7 +547,7 @@ function formatMyLabel(data: any) {
     } else if (data.type === OptionType.SAMPLE) {
         label = data.value;
         typeStyle = 'warning';
-        details = data.sampleType;
+        details = `${data.studyName ? data.studyName : data.studyId}`;
         clickInfo = 'Select a sample to open its summary';
     } else {
         label =

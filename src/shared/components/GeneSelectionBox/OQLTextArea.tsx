@@ -3,16 +3,23 @@ import * as _ from 'lodash';
 import { observer } from 'mobx-react';
 import classnames from 'classnames';
 import styles from './styles.module.scss';
+import queryStoreStyles from '../../components/query/styles/styles.module.scss';
 import {
     observable,
     computed,
     action,
     reaction,
     IReactionDisposer,
+    makeObservable,
 } from 'mobx';
-import { Gene } from 'shared/api/generated/CBioPortalAPI';
+import { Gene } from 'cbioportal-ts-api-client';
 import { SingleGeneQuery } from 'shared/lib/oql/oql-parser';
-import { GeneReplacement, Focus } from 'shared/components/query/QueryStore';
+import {
+    GeneReplacement,
+    Focus,
+    normalizeQuery,
+    QueryStore,
+} from 'shared/components/query/QueryStore';
 import {
     getEmptyGeneValidationResult,
     getFocusOutText,
@@ -22,8 +29,15 @@ import GeneSymbolValidator, {
     GeneValidationResult,
 } from './GeneSymbolValidator';
 import autobind from 'autobind-decorator';
+import bind from 'bind-decorator';
+import { createQueryStore } from '../../lib/createQueryStore';
+import { FlexCol } from '../flexbox/FlexBox';
 
 export interface IGeneSelectionBoxProps {
+    submitButton?: JSX.Element;
+    error?: string;
+    messages?: string[];
+
     focus?: Focus;
     inputGeneQuery?: string;
     validateInputGeneQuery?: boolean;
@@ -40,6 +54,7 @@ export interface IGeneSelectionBoxProps {
         },
         queryStr: string
     ) => void;
+    textAreaHeight?: string;
 }
 
 export enum GeneBoxType {
@@ -63,11 +78,26 @@ export default class OQLTextArea extends React.Component<
     // Need to record the textarea value due to SyntheticEvent restriction due to debounce
     private currentTextAreaValue = '';
 
-    @observable private geneQuery = '';
+    @observable private _geneQuery = '';
+    @computed get geneQuery() {
+        if (this.queryStore) {
+            return this.queryStore.geneQuery;
+        } else {
+            return this._geneQuery;
+        }
+    }
+    set geneQuery(q: string) {
+        if (this.queryStore) {
+            this.queryStore.geneQuery = q;
+        } else {
+            this._geneQuery = q;
+        }
+    }
     @observable private geneQueryIsValid = true;
     @observable private queryToBeValidated = '';
     @observable private isFocused = false;
     @observable private skipGenesValidation = false;
+    private queryStore: QueryStore | undefined;
 
     private readonly textAreaRef: React.RefObject<HTMLTextAreaElement>;
     private updateQueryToBeValidateDebounce = _.debounce(() => {
@@ -94,6 +124,7 @@ export default class OQLTextArea extends React.Component<
 
     constructor(props: IGeneSelectionBoxProps) {
         super(props);
+        makeObservable(this);
         this.geneQuery = this.props.inputGeneQuery || '';
         this.queryToBeValidated = this.geneQuery;
         if (!this.props.validateInputGeneQuery) {
@@ -135,8 +166,7 @@ export default class OQLTextArea extends React.Component<
         }
     }
 
-    @autobind
-    @action
+    @action.bound
     private updateGeneQuery(value: string) {
         this.geneQuery = value;
         // at the time gene query is updated, the queryToBeValidated should be set to the same
@@ -157,8 +187,7 @@ export default class OQLTextArea extends React.Component<
         }
     }
 
-    @autobind
-    @action
+    @action.bound
     updateTextAreaRefValue() {
         this.textAreaRef.current!.value = this.getTextAreaValue();
     }
@@ -186,9 +215,9 @@ export default class OQLTextArea extends React.Component<
                 classNames.push(styles.default);
                 break;
         }
-        this.geneQuery
-            ? classNames.push(styles.notEmpty)
-            : classNames.push(styles.empty);
+        if (!this.geneQuery) {
+            classNames.push(styles.empty);
+        }
         return classNames;
     }
 
@@ -200,32 +229,26 @@ export default class OQLTextArea extends React.Component<
         );
     }
 
-    @autobind
-    @action
+    @action.bound
     afterGeneSymbolValidation(
         validQuery: boolean,
         validationResult: GeneValidationResult,
         oql: OQL
     ) {
         this.geneQueryIsValid = validQuery;
-        // no matter whether the query is valid, we need to sync queryToBeValidated with geneQuery
-        this.geneQuery = this.queryToBeValidated;
+
         if (this.props.callback) {
             this.props.callback(oql, validationResult, this.geneQuery);
         }
+    }
 
-        if (
-            oql.error !== undefined &&
-            (this.props.focus === undefined ||
-                this.props.focus === Focus.ShouldFocus) &&
-            this.textAreaRef.current
-        ) {
-            this.textAreaRef.current.focus();
-            this.textAreaRef.current.setSelectionRange(
-                oql.error.start,
-                oql.error.end
-            );
-        }
+    @autobind
+    highlightError(oql: OQL) {
+        this.textAreaRef.current!.focus();
+        this.textAreaRef.current!.setSelectionRange(
+            oql.error!.start,
+            oql.error!.end
+        );
     }
 
     @computed
@@ -235,38 +258,100 @@ export default class OQLTextArea extends React.Component<
             : 'Click gene symbols below or enter here';
     }
 
+    @bind onChange(event: any) {
+        this.currentTextAreaValue = event.currentTarget.value;
+        this.geneQuery = this.currentTextAreaValue;
+        this.updateQueryToBeValidateDebounce();
+    }
+
+    @bind onFocus() {
+        this.isFocused = true;
+    }
+
+    @bind onBlur() {
+        this.isFocused = false;
+    }
+
+    @bind replaceGene(oldSymbol: string, newSymbol: string) {
+        let updatedQuery = normalizeQuery(
+            this.getTextAreaValue()
+                .toUpperCase()
+                .replace(
+                    new RegExp(`\\b${oldSymbol.toUpperCase()}\\b`, 'g'),
+                    () => newSymbol.toUpperCase()
+                )
+        );
+        this.updateGeneQuery(updatedQuery);
+    }
+
+    @computed get showErrorsAndMessages() {
+        return (
+            this.props.location !== GeneBoxType.STUDY_VIEW_PAGE ||
+            this.isFocused
+        );
+    }
+
     render() {
         return (
             <div className={styles.genesSelection}>
-                <textarea
-                    ref={this.textAreaRef}
-                    onFocus={() => (this.isFocused = true)}
-                    onBlur={() => (this.isFocused = false)}
-                    className={classnames(...this.textAreaClasses)}
-                    rows={5}
-                    cols={80}
-                    placeholder={this.promptText}
-                    title={this.promptText}
-                    defaultValue={this.getTextAreaValue()}
-                    onChange={event => {
-                        this.currentTextAreaValue = event.currentTarget.value;
-                        this.updateQueryToBeValidateDebounce();
-                    }}
-                    data-test="geneSet"
-                />
+                <div className={styles.topRow}>
+                    <textarea
+                        ref={this.textAreaRef as any}
+                        onFocus={this.onFocus}
+                        onBlur={this.onBlur}
+                        className={classnames(this.textAreaClasses)}
+                        rows={5}
+                        cols={80}
+                        placeholder={this.promptText}
+                        title={this.promptText}
+                        defaultValue={this.getTextAreaValue()}
+                        onChange={this.onChange}
+                        data-test="geneSet"
+                        style={{ height: this.props.textAreaHeight }}
+                    />
 
-                <GeneSymbolValidator
-                    focus={this.props.focus}
-                    geneQuery={this.queryToBeValidated}
-                    skipGeneValidation={this.skipGenesValidation}
-                    updateGeneQuery={this.updateGeneQuery}
-                    afterValidation={this.afterGeneSymbolValidation}
-                    errorMessageOnly={
-                        this.props.location === GeneBoxType.STUDY_VIEW_PAGE
-                    }
-                >
-                    {this.props.children}
-                </GeneSymbolValidator>
+                    {this.props.submitButton}
+                </div>
+                <div className={'oqlValidationContainer'}>
+                    <GeneSymbolValidator
+                        focus={this.props.focus}
+                        geneQuery={this.queryToBeValidated}
+                        skipGeneValidation={this.skipGenesValidation}
+                        updateGeneQuery={this.updateGeneQuery}
+                        afterValidation={this.afterGeneSymbolValidation}
+                        replaceGene={this.replaceGene}
+                        errorMessageOnly={
+                            this.props.location === GeneBoxType.STUDY_VIEW_PAGE
+                        }
+                        highlightError={this.highlightError}
+                    >
+                        {this.props.children}
+                    </GeneSymbolValidator>
+                </div>
+                <div>
+                    {this.showErrorsAndMessages && this.props.error && (
+                        <span
+                            className={queryStoreStyles.errorMessage}
+                            data-test="oqlErrorMessage"
+                        >
+                            {this.props.error}
+                        </span>
+                    )}
+
+                    {this.showErrorsAndMessages &&
+                        this.props.messages &&
+                        this.props.messages.map(msg => (
+                            <span className={queryStoreStyles.oqlMessage}>
+                                <i
+                                    className="fa fa-info-circle"
+                                    style={{
+                                        marginRight: 5,
+                                    }}
+                                />
+                                {msg}
+                            </span>
+                        ))}
+                </div>
             </div>
         );
     }

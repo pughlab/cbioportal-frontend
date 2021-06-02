@@ -1,8 +1,8 @@
 import * as React from 'react';
-import * as styles_any from './styles/styles.module.scss';
+import styles from './styles/styles.module.scss';
 import { Modal } from 'react-bootstrap';
 import { observer } from 'mobx-react';
-import { computed } from 'mobx';
+import { computed, makeObservable } from 'mobx';
 import { FlexRow, FlexCol } from '../flexbox/FlexBox';
 import gene_lists from './gene_lists';
 import classNames from 'classnames';
@@ -13,17 +13,6 @@ import SectionHeader from '../sectionHeader/SectionHeader';
 import AppConfig from 'appConfig';
 import { ServerConfigHelpers } from '../../../config/config';
 
-const styles = styles_any as {
-    GeneSetSelector: string;
-    GenesetsSelectorWindow: string;
-    GenesetsVolcanoSelectorWindow: string;
-    buttonRow: string;
-    geneSet: string;
-    empty: string;
-    notEmpty: string;
-    sectionSpinner: string;
-};
-
 export interface GenesetsSelectorProps {}
 
 @observer
@@ -31,6 +20,10 @@ export default class GenesetsSelector extends QueryStoreComponent<
     GenesetsSelectorProps,
     {}
 > {
+    constructor(props: any) {
+        super(props);
+        makeObservable(this);
+    }
     @computed get selectedGeneListOption() {
         const option = this.geneListOptions.find(
             opt => opt.value === this.store.geneQuery

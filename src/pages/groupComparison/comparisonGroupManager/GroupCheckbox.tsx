@@ -1,48 +1,66 @@
-import * as React from "react";
-import {observer} from "mobx-react";
+import * as React from 'react';
+import { observer } from 'mobx-react';
 import {
-    caseCounts, DUPLICATE_GROUP_NAME_MSG,
+    caseCounts,
     getNumPatients,
     getNumSamples,
     MissingSamplesMessage,
-    StudyViewComparisonGroup
-} from "../GroupComparisonUtils";
-import {Group} from "../../../shared/api/ComparisonGroupClient";
-import {StudyViewPageStore} from "../../studyView/StudyViewPageStore";
-import autobind from "autobind-decorator";
-import {computed, observable} from "mobx";
-import ErrorIcon from "../../../shared/components/ErrorIcon";
-import styles from "../styles.module.scss"
-import {SyntheticEvent} from "react";
-import DefaultTooltip from "../../../public-lib/components/defaultTooltip/DefaultTooltip";
-import EllipsisTextTooltip from "../../../public-lib/components/ellipsisTextTooltip/EllipsisTextTooltip";
-
-
+    StudyViewComparisonGroup,
+} from '../GroupComparisonUtils';
+import { StudyViewPageStore } from '../../studyView/StudyViewPageStore';
+import autobind from 'autobind-decorator';
+import { action, computed, makeObservable, observable } from 'mobx';
+import ErrorIcon from '../../../shared/components/ErrorIcon';
+import styles from '../styles.module.scss';
+import { CirclePicker, CirclePickerProps } from 'react-color';
+import { OverlayTrigger, Popover } from 'react-bootstrap';
+import { COLORS } from '../../studyView/StudyViewUtils';
+import {
+    CLI_FEMALE_COLOR,
+    CLI_NO_COLOR,
+    CLI_YES_COLOR,
+    DARK_GREY,
+} from '../../../shared/lib/Colors';
+import { DefaultTooltip, TruncatedText } from 'cbioportal-frontend-commons';
+import classnames from 'classnames';
+import { ColorPickerIcon } from 'pages/groupComparison/comparisonGroupManager/ColorPickerIcon';
+import { getBrowserWindow } from 'cbioportal-frontend-commons';
 
 export interface IGroupCheckboxProps {
-    group:StudyViewComparisonGroup;
-    store:StudyViewPageStore;
-    markedForDeletion:boolean;
-    restore:(group:StudyViewComparisonGroup)=>void;
-    rename:(newName:string, currentGroup:StudyViewComparisonGroup)=>void;
-    delete:(group:StudyViewComparisonGroup)=>void;
-    addSelectedSamples:(group:StudyViewComparisonGroup)=>void;
-    allGroupNames:string[];
+    group: StudyViewComparisonGroup;
+    store: StudyViewPageStore;
+    markedForDeletion: boolean;
+    markedWithWarningSign: boolean;
+    studyIds: string[];
+    restore: (group: StudyViewComparisonGroup) => void;
+    delete: (group: StudyViewComparisonGroup) => void;
+    shareGroup: (group: StudyViewComparisonGroup) => void;
+    color: string;
+    onChangeGroupColor: (
+        group: StudyViewComparisonGroup,
+        color: string | undefined
+    ) => void;
 }
 
+const COLOR_UNDEFINED = '#FFFFFF';
+
 @observer
-export default class GroupCheckbox extends React.Component<IGroupCheckboxProps, {}> {
-
-    @observable _editingName = false;
-    @observable nameInput = "";
-
-    @computed get editingName() {
-        return this._editingName && !this.props.markedForDeletion;
+export default class GroupCheckbox extends React.Component<
+    IGroupCheckboxProps,
+    {}
+> {
+    constructor(props: IGroupCheckboxProps) {
+        super(props);
+        makeObservable(this);
     }
 
     @autobind
     private onCheckboxClick() {
-        this.props.store.toggleComparisonGroupSelected(this.props.group.uid)
+        this.props.store.toggleComparisonGroupSelected(this.props.group.uid);
+        this.props.store.flagDuplicateColorsForSelectedGroups(
+            this.props.group.uid,
+            this.props.color!
+        );
     }
 
     @autobind
@@ -51,185 +69,235 @@ export default class GroupCheckbox extends React.Component<IGroupCheckboxProps, 
     }
 
     @autobind
-    private onEditClick() {
-        this._editingName = true;
-        this.nameInput = this.props.group.name;
-    }
-
-    @autobind
     private onDeleteClick() {
         this.props.delete(this.props.group);
     }
 
     @autobind
-    private onAddSelectedSamplesClick() {
-        this.props.addSelectedSamples(this.props.group);
+    private shareGroup() {
+        this.props.shareGroup(this.props.group);
     }
 
     @autobind
-    private onEditSubmit() {
-        if (
-            this.nameInput.length > 0 &&
-            this.nameInput !== this.props.group.name
-        ) {
-            this.props.rename(this.nameInput, this.props.group);
-        }
-        this._editingName = false;
+    private onOverlayEnter() {
+        this.props.store.numberOfVisibleColorChooserModals += 1;
     }
 
     @autobind
-    private onEditCancel() {
-        this._editingName = false;
-    }
-
-    @autobind
-    private handleNameInputChange(evt:SyntheticEvent<HTMLInputElement>) {
-        this.nameInput = (evt.target as HTMLInputElement).value;
+    private onOverlayExit() {
+        this.props.store.numberOfVisibleColorChooserModals -= 1;
     }
 
     @computed get label() {
         return (
-            <span style={{display:"flex", alignItems:"center"}}>
-                <EllipsisTextTooltip
-                    text={this.props.group.name}
-                />
-                &nbsp;({caseCounts(getNumSamples(this.props.group), getNumPatients(this.props.group))})
+            <span
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    whiteSpace: 'nowrap',
+                }}
+            >
+                <TruncatedText text={this.props.group.name} maxLength={30} />
+                &nbsp;(
+                {caseCounts(
+                    getNumSamples(this.props.group),
+                    getNumPatients(this.props.group)
+                )}
+                )
             </span>
         );
     }
 
-    @computed get editSubmitError() {
-        if (this.nameInput.length === 0) {
-            return { message: "Please enter a name."};
-        } else if (this.nameInput === this.props.group.name) {
-            // Non-null object signifies that submit should be disabled, but no message specified means no tooltip.
-            return {};
-        } else if (this.props.allGroupNames.indexOf(this.nameInput) > -1) {
-            return { message: DUPLICATE_GROUP_NAME_MSG};
-        } else {
-            return null;
-        }
+    @computed get colorList() {
+        let colors: string[] = COLORS.slice(0, 20);
+        colors.push(CLI_YES_COLOR);
+        colors.push(CLI_NO_COLOR);
+        colors.push(CLI_FEMALE_COLOR);
+        colors.push(DARK_GREY);
+        return colors;
     }
+
+    @action.bound
+    handleChangeComplete = (color: any, event: any) => {
+        // if same color is select, unselect it (go back to no color)
+        if (color.hex === this.props.color) {
+            this.props.onChangeGroupColor(this.props.group, undefined);
+            this.props.store.flagDuplicateColorsForSelectedGroups(
+                this.props.group.uid,
+                undefined
+            );
+        } else {
+            this.props.onChangeGroupColor(this.props.group, color.hex);
+            this.props.store.flagDuplicateColorsForSelectedGroups(
+                this.props.group.uid,
+                color.hex
+            );
+        }
+    };
+
+    buildColorChooserWidget = () => (
+        <Popover
+            id="popover-basic"
+            onClick={e => {
+                e.stopPropagation();
+                e.preventDefault();
+            }}
+        >
+            <div>
+                <CirclePicker
+                    colors={this.colorList}
+                    circleSize={20}
+                    circleSpacing={3}
+                    onChangeComplete={this.handleChangeComplete}
+                    color={this.props.color}
+                    width="140px"
+                />
+            </div>
+        </Popover>
+    );
 
     render() {
         const group = this.props.group;
         let checkboxAndLabel;
         if (this.props.markedForDeletion) {
-            checkboxAndLabel = <span className={styles.markedForDeletion}>{this.label}</span>;
+            checkboxAndLabel = (
+                <span className={styles.markedForDeletion}>{this.label}</span>
+            );
         } else {
             checkboxAndLabel = (
-                <div className="groupItem checkbox"><label>
+                <div
+                    className={styles.groupItem}
+                    style={{ display: 'flex', alignItems: 'center' }}
+                >
                     <input
                         type="checkbox"
                         value={group.uid}
-                        checked={this.props.store.isComparisonGroupSelected(group.uid)}
+                        checked={this.props.store.isComparisonGroupSelected(
+                            group.uid
+                        )}
                         onClick={this.onCheckboxClick}
                     />
-                    { this.editingName ?
-                        <DefaultTooltip
-                            visible={!!(this.editSubmitError && this.editSubmitError.message)}
-                            overlay={
-                                <div>
-                                    <i
-                                        className="fa fa-md fa-exclamation-triangle"
-                                        style={{
-                                            color: "#BB1700",
-                                            marginRight: 5
-                                        }}
-                                    />
-                                    <span>
-                                {this.editSubmitError && this.editSubmitError.message}
-                            </span>
-                                </div>
-                            }
-                        >
-                            <input
-                                type="text"
-                                value={this.nameInput}
-                                onChange={this.handleNameInputChange}
-                                style={{width:174}}
-                            />
-                        </DefaultTooltip>:
-                        this.label
-                    }
-                </label></div>
+                    {this.label}
+                </div>
             );
         }
 
-        let editingRelatedIcons;
-        if (this.editingName) {
-            editingRelatedIcons = [
-                <button
-                    className="btn btn-xs btn-primary"
-                    onClick={this.onEditSubmit}
-                    disabled={!!this.editSubmitError}
-                    style={{marginRight:3}}
-                >
-                    Save
-                </button>,
-                <button
-                    className="btn btn-xs btn-default"
-                    onClick={this.onEditCancel}
-                >
-                    Cancel
-                </button>
-            ];
-        } else if (!this.props.markedForDeletion) {
-            editingRelatedIcons = [
-                <DefaultTooltip overlay={"Edit Name"}>
-                <span
-                    onClick={this.onEditClick}
-                >
-                    <i
-                        className="fa fa-md fa-pencil"
-                        style={{
-                            cursor:"pointer"
-                        }}
-                    />
-                </span></DefaultTooltip>,
-                <DefaultTooltip overlay={"Delete Group"}>
-                <span
-                    onClick={this.onDeleteClick}
-                >
-                    <i
-                        className="fa fa-md fa-trash"
-                        style={{
-                            cursor:"pointer"
-                        }}
-                    />
-                </span></DefaultTooltip>,
-                <DefaultTooltip overlay={<span>{`Add currently selected samples (${getNumSamples(group)}) to `}<strong>{group.name}</strong></span>}>
-                    <span
-                        onClick={this.onAddSelectedSamplesClick}
-                    >
-                        <i
-                            className="fa fa-md fa-plus"
-                            style={{
-                                cursor:"pointer"
-                            }}
-                        />
-                    </span>
-                </DefaultTooltip>
-            ];
-        }
-        
         return (
-            <div key={group.uid}
-                className={styles.groupRow}
+            <div
+                key={group.uid}
+                className={classnames(styles.groupRow, {
+                    [styles.sharedGroup]: this.props.group.isSharedGroup,
+                })}
                 style={{
-                    display:"flex",
-                    flexDirection:"row",
-                    justifyContent:"space-between",
-                    alignItems:"center",
-                    paddingBottom:4,
-                    paddingTop:4
+                    display: 'flex',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingBottom: 4,
+                    paddingTop: 4,
+                    minHeight: '35px',
                 }}
             >
                 {checkboxAndLabel}
+
                 <div className={styles.groupLineItemActionButtons}>
-                    {editingRelatedIcons}
-                    {this.props.group.nonExistentSamples.length > 0 && <ErrorIcon tooltip={<MissingSamplesMessage samples={this.props.group.nonExistentSamples}/>} />}
-                    {this.props.markedForDeletion && (<button style={{marginLeft:10}} className="btn btn-xs btn-default" onClick={this.onRestoreClick}>Restore</button>)}
+                    {!this.props.markedForDeletion && (
+                        <>
+                            <DefaultTooltip
+                                overlay={
+                                    'You have selected identical colors for compared groups.'
+                                }
+                            >
+                                <span>
+                                    {this.props.markedWithWarningSign && (
+                                        <i
+                                            className="fa fa-warning"
+                                            style={{
+                                                cursor: 'pointer',
+                                                color: '#fad201',
+                                                position: 'relative',
+                                                top: '1px',
+                                                right: '2px',
+                                            }}
+                                        />
+                                    )}
+                                </span>
+                            </DefaultTooltip>
+                            <OverlayTrigger
+                                containerPadding={40}
+                                trigger="click"
+                                placement="bottom"
+                                overlay={this.buildColorChooserWidget()}
+                                onEnter={this.onOverlayEnter}
+                                onExit={this.onOverlayExit}
+                                rootClose={true}
+                            >
+                                <DefaultTooltip
+                                    overlay={
+                                        'Optional: Select color for group to be used in group comparison. If no color is selected, a random color will be applied.'
+                                    }
+                                    disabled={
+                                        this.props.store
+                                            .numberOfVisibleColorChooserModals >
+                                        0
+                                    }
+                                >
+                                    <span
+                                        style={{
+                                            marginTop: 2,
+                                            marginRight: 2,
+                                        }}
+                                    >
+                                        <ColorPickerIcon
+                                            color={
+                                                this.props.color ||
+                                                COLOR_UNDEFINED
+                                            }
+                                        />
+                                    </span>
+                                </DefaultTooltip>
+                            </OverlayTrigger>
+
+                            <DefaultTooltip overlay={'Delete Group'}>
+                                <span onClick={this.onDeleteClick}>
+                                    <i
+                                        className="fa fa-md fa-trash"
+                                        style={{
+                                            cursor: 'pointer',
+                                        }}
+                                    />
+                                </span>
+                            </DefaultTooltip>
+                            <span onClick={this.shareGroup}>
+                                <i
+                                    className="fa fa-share-alt"
+                                    style={{
+                                        cursor: 'pointer',
+                                    }}
+                                />
+                            </span>
+                        </>
+                    )}
+                    {this.props.group.nonExistentSamples.length > 0 && (
+                        <ErrorIcon
+                            tooltip={
+                                <MissingSamplesMessage
+                                    samples={
+                                        this.props.group.nonExistentSamples
+                                    }
+                                />
+                            }
+                        />
+                    )}
+                    {this.props.markedForDeletion && (
+                        <button
+                            style={{ marginLeft: 10 }}
+                            className="btn btn-xs btn-default"
+                            onClick={this.onRestoreClick}
+                        >
+                            Restore
+                        </button>
+                    )}
                 </div>
             </div>
         );

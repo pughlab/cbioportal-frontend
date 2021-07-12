@@ -23,8 +23,15 @@ export const GenericAssayTypeConstants: { [s: string]: string } = {
 };
 
 export async function fetchGenericAssayMetaByMolecularProfileIdsGroupedByGenericAssayType(
-    genericAssayProfiles: MolecularProfile[]
+    molecularProfiles: MolecularProfile[]
 ) {
+    const genericAssayProfiles = molecularProfiles.filter(profile => {
+        return (
+            profile.molecularAlterationType ===
+            AlterationTypeConstants.GENERIC_ASSAY
+        );
+    });
+
     const genericAssayProfilesGroupedByGenericAssayType = _.groupBy(
         genericAssayProfiles,
         'genericAssayType'

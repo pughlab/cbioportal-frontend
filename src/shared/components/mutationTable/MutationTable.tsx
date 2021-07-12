@@ -112,7 +112,7 @@ import { getAnnotationData, IAnnotation } from 'react-mutation-mapper';
 import HgvscColumnFormatter from './column/HgvscColumnFormatter';
 import HgvsgColumnFormatter from './column/HgvsgColumnFormatter';
 import GnomadColumnFormatter from './column/GnomadColumnFormatter';
-import ClinvarColumnFormatter from './column/ClinvarColumnFormatter';
+import ClinVarColumnFormatter from './column/ClinVarColumnFormatter';
 import autobind from 'autobind-decorator';
 import DbsnpColumnFormatter from './column/DbsnpColumnFormatter';
 import SignalColumnFormatter from './column/SignalColumnFormatter';
@@ -1149,19 +1149,20 @@ export default class MutationTable<
         this._columns[MutationTableColumnType.CLINVAR] = {
             name: 'ClinVar',
             render: (d: Mutation[]) =>
-                ClinvarColumnFormatter.renderFunction(
+                ClinVarColumnFormatter.renderFunction(
                     d,
-                    this.props.indexedVariantAnnotations
+                    this.props.indexedVariantAnnotations,
+                    this.props.indexedMyVariantInfoAnnotations
                 ),
             sortBy: (d: Mutation[]) =>
-                ClinvarColumnFormatter.getSortValue(
+                ClinVarColumnFormatter.getSortValue(
                     d,
-                    this.props.indexedVariantAnnotations
+                    this.props.indexedMyVariantInfoAnnotations
                 ),
             download: (d: Mutation[]) =>
-                ClinvarColumnFormatter.download(
+                ClinVarColumnFormatter.download(
                     d,
-                    this.props.indexedVariantAnnotations
+                    this.props.indexedMyVariantInfoAnnotations
                 ),
             tooltip: (
                 <span>

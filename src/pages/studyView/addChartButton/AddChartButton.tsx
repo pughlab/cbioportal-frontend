@@ -266,10 +266,9 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
     get hideGeneSpecificTab() {
         return (
             this.props.disableGeneSpecificTab ||
-            !this.props.store.molecularProfileForGeneCharts.isComplete ||
-            (this.props.store.molecularProfileForGeneCharts.isComplete &&
-                this.props.store.molecularProfileForGeneCharts.result.length ===
-                    0)
+            !this.props.store.molecularProfileOptions.isComplete ||
+            (this.props.store.molecularProfileOptions.isComplete &&
+                this.props.store.molecularProfileOptions.result.length === 0)
         );
     }
 
@@ -277,11 +276,13 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
     get hideGenericAssayTabs() {
         return (
             this.props.disableGenericAssayTabs ||
-            !this.props.store.genericAssayProfiles.isComplete ||
+            !this.props.store.genericAssayProfileOptionsByType.isComplete ||
             !this.props.store.genericAssayEntitiesGroupedByGenericAssayType
                 .isComplete ||
-            (this.props.store.genericAssayProfiles.isComplete &&
-                _.isEmpty(this.props.store.genericAssayProfiles.result))
+            (this.props.store.genericAssayProfileOptionsByType.isComplete &&
+                _.isEmpty(
+                    this.props.store.genericAssayProfileOptionsByType.result
+                ))
         );
     }
 

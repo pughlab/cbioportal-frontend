@@ -1087,6 +1087,7 @@ export class PatientViewPageStore {
                     [
                         GENOME_NEXUS_ARG_FIELD_ENUM.ANNOTATION_SUMMARY,
                         GENOME_NEXUS_ARG_FIELD_ENUM.HOTSPOTS,
+                        GENOME_NEXUS_ARG_FIELD_ENUM.CLINVAR,
                         AppConfig.serverConfig.show_signal
                             ? GENOME_NEXUS_ARG_FIELD_ENUM.SIGNAL
                             : '',
@@ -1537,8 +1538,10 @@ export class PatientViewPageStore {
                 if (sampleMolecularIdentifiers.length) {
                     genePanelData = await client.fetchGenePanelDataInMultipleMolecularProfilesUsingPOST(
                         {
-                            sampleMolecularIdentifiers,
-                        }
+                            genePanelDataMultipleStudyFilter: {
+                                sampleMolecularIdentifiers,
+                            },
+                        } as any
                     );
                 }
 
@@ -1591,7 +1594,7 @@ export class PatientViewPageStore {
         {
             await: () => [
                 this.mutatedGenes,
-                this.samples,
+                this.samplesWithUniqueKeys,
                 this.genePanelData,
                 this.genePanels,
             ],
@@ -1600,11 +1603,11 @@ export class PatientViewPageStore {
                 return computeGenePanelInformation(
                     this.genePanelData.result,
                     this.genePanels.result,
-                    this.samples.result!,
+                    this.samplesWithUniqueKeys.result!,
                     [
                         {
-                            uniquePatientKey: this.samples.result![0]
-                                .uniquePatientKey,
+                            uniquePatientKey: this.samplesWithUniqueKeys
+                                .result![0].uniquePatientKey,
                         },
                     ],
                     this.mutatedGenes.result!
@@ -2306,8 +2309,8 @@ export class PatientViewPageStore {
             this.mergedMutationDataIncludingUncalled,
             mutationList => {
                 return _.some(mutationList, m => {
-                    const vaf = getVariantAlleleFrequency(m);
-                    return vaf != null && vaf > 0;
+                    const vafReport = getVariantAlleleFrequency(m);
+                    return vafReport !== null && vafReport.vaf > 0;
                 });
             }
         );

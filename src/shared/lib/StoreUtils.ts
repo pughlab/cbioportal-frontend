@@ -1,6 +1,5 @@
 import * as _ from 'lodash';
 import $ from 'jquery';
-import localForage from 'localforage';
 import {
     fetchVariantAnnotationsByMutation as fetchDefaultVariantAnnotationsByMutation,
     fetchVariantAnnotationsIndexedByGenomicLocation as fetchDefaultVariantAnnotationsIndexedByGenomicLocation,
@@ -140,7 +139,6 @@ import {
     isNotGermlineMutation,
 } from 'shared/lib/MutationUtils';
 import { ObservableMap } from 'mobx';
-import { chunkCalls } from 'cbioportal-utils';
 
 export const MolecularAlterationType_filenameSuffix: {
     [K in MolecularProfile['molecularAlterationType']]?: string;
@@ -266,38 +264,19 @@ export async function fetchAllReferenceGenomeGenes(
     genomeName: string,
     client: CBioPortalAPI = defaultClient
 ) {
-    const doCaching = window.location.hostname.includes('.cbioportal.org');
-
-    // allows us to clear cache when data changes
-    const referenceGenomeKey = `referenceGenome-${AppConfig.serverConfig.referenceGenomeVersion}`;
-
-    const hg19cached = doCaching
-        ? await localForage.getItem(referenceGenomeKey)
-        : false;
-
-    if (doCaching) {
-        if (hg19cached) {
-            console.info('using locally cached reference genome data');
-            return hg19cached as ReferenceGenomeGene[];
-        } else {
-            return await internalClient
-                .getAllReferenceGenomeGenesUsingGET({
-                    genomeName: genomeName,
-                })
-                .then(d => {
-                    // this is async, but we can fire and forget
-                    localForage.setItem(referenceGenomeKey, d);
-                    return d;
-                });
-        }
+    if (AppConfig.serverConfig.app_name === 'public-portal') {
+        // this is temporary
+        return $.ajax({
+            url: getFrontendAssetUrl('reactapp/reference_genome_hg19.json'),
+            dataType: 'json',
+        });
+    }
+    if (genomeName) {
+        return await internalClient.getAllReferenceGenomeGenesUsingGET({
+            genomeName: genomeName,
+        });
     } else {
-        if (genomeName) {
-            return await internalClient.getAllReferenceGenomeGenesUsingGET({
-                genomeName: genomeName,
-            });
-        } else {
-            return [];
-        }
+        return [];
     }
 }
 
@@ -996,14 +975,12 @@ export async function queryOncoKbData(
         'id'
     );
 
-    const mutationQueryResult: IndicatorQueryResp[] = await chunkCalls(
-        chunk =>
-            client.annotateMutationsByProteinChangePostUsingPOST_1({
-                body: chunk,
-            }),
-        mutationQueryVariants,
-        250
-    );
+    const mutationQueryResult =
+        mutationQueryVariants.length === 0
+            ? []
+            : await client.annotateMutationsByProteinChangePostUsingPOST_1({
+                  body: mutationQueryVariants,
+              });
 
     const structuralVariantQueryResult =
         structuralQueryVariants.length === 0
@@ -1516,8 +1493,8 @@ export function existsSomeMutationWithAscnPropertyInCollection(
 }
 
 export function generateDataQueryFilter(
-    sampleListId: string | undefined,
-    sampleIds: string[] | undefined
+    sampleListId: string | null,
+    sampleIds?: string[]
 ): IDataQueryFilter {
     let filter: IDataQueryFilter = {};
 

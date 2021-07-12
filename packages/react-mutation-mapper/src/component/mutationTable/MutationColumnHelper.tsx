@@ -9,7 +9,7 @@ import ProteinChange, {
 } from '../column/ProteinChange';
 import { annotationSortMethod } from '../column/Annotation';
 import { gnomadSortMethod } from '../column/Gnomad';
-import { clinvarSortMethod } from '../column/ClinvarInterpretation';
+import { clinVarSortMethod } from '../column/ClinVar';
 import MutationType from '../column/MutationType';
 import MutationStatus from '../column/MutationStatus';
 import { dbsnpSortMethod } from '../column/Dbsnp';
@@ -30,7 +30,7 @@ export enum MutationColumn {
     HGVSG = 'hgvsg',
     HGVSC = 'hgvsc',
     GNOMAD = 'gnomad',
-    CLINVAR = 'clinvar',
+    CLINVAR = 'clinVar',
     DBSNP = 'dbsnp',
     SIGNAL = 'signal',
 }
@@ -344,7 +344,7 @@ export const MUTATION_COLUMNS_DEFINITION = {
         id: MutationColumn.CLINVAR,
         name: MutationColumnName.CLINVAR,
         Header: MUTATION_COLUMN_HEADERS[MutationColumn.CLINVAR],
-        sortMethod: clinvarSortMethod,
+        sortMethod: clinVarSortMethod,
         show: false,
     },
     [MutationColumn.DBSNP]: {

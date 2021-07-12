@@ -6,8 +6,7 @@ import HeaderAnnotation from '../headerAnnotation/HeaderAnnotation';
 import FeatureTable from '../featureTable/FeatureTable';
 import { VariantStore } from '../../store/VariantStore';
 import { variantToMutation } from '../../util/VariantUtil';
-
-import styles from './Variant.module.scss';
+import './Variant.scss';
 
 interface IVariantProps {
     variant: string;
@@ -38,8 +37,8 @@ class Variant extends React.Component<IVariantProps> {
         return this.isLoading ? (
             this.loadingIndicator
         ) : (
-            <div className={`${styles.pageBody} ${styles.variantPage}`}>
-                <Row className={styles.row}>
+            <div className={'page-body variant-page'}>
+                <Row>
                     <HeaderAnnotation
                         annotation={this.variantStore.annotationSummary}
                         mutation={
@@ -60,13 +59,13 @@ class Variant extends React.Component<IVariantProps> {
                         onTranscriptSelect={this.onTranscriptSelect}
                     />
                 </Row>
-                <Row className={styles.row}>
+                <Row>
                     <FeatureTable
                         myVariantInfo={this.myVariantInfo}
                         annotationInternal={this.variantStore.annotationSummary}
                         variantAnnotation={this.variantAnnotation}
                         oncokb={this.oncokb}
-                        clinvar={this.clinvar}
+                        clinVar={this.clinVar}
                         signalAnnotation={this.signalAnnotation}
                         isCanonicalTranscriptSelected={
                             this.isCanonicalTranscriptSelected!
@@ -104,8 +103,8 @@ class Variant extends React.Component<IVariantProps> {
     }
 
     @computed
-    private get clinvar() {
-        return this.variantAnnotation?.clinvar.annotation;
+    private get clinVar() {
+        return this.myVariantInfo?.clinVar;
     }
 
     @computed
@@ -150,7 +149,7 @@ class Variant extends React.Component<IVariantProps> {
     protected get loadingIndicator() {
         return (
             this.props.mainLoadingIndicator || (
-                <div className={styles.loadingIndicator}>
+                <div className={'loadingIndicator'}>
                     <i className="fa fa-spinner fa-pulse fa-2x" />
                 </div>
             )

@@ -2,15 +2,15 @@ import _ from 'lodash';
 import * as React from 'react';
 
 import { observer } from 'mobx-react';
-import { Clinvar, SignalAnnotation } from 'genome-nexus-ts-api-client';
+import { ClinVar, SignalAnnotation } from 'genome-nexus-ts-api-client';
 import { IndicatorQueryResp } from 'oncokb-ts-api-client';
 import Oncokb from './Oncokb';
+import ClinVarInterpretation from './ClinVarInterpretation';
 import Penetrance from './Penetrance';
 import MSKExpertReview from './MSKExpertReview';
-import ClinvarInterpretation from './ClinvarInterpretation';
 
 interface IPathogenicityProps {
-    clinvar?: Clinvar;
+    clinVar?: ClinVar;
     oncokb?: IndicatorQueryResp;
     signalAnnotation?: SignalAnnotation;
     isCanonicalTranscriptSelected: boolean;
@@ -22,7 +22,7 @@ class Pathogenicity extends React.Component<IPathogenicityProps> {
         return (
             <div>
                 <Penetrance signalAnnotation={this.props.signalAnnotation} />
-                <ClinvarInterpretation clinvar={this.props.clinvar} />
+                <ClinVarInterpretation clinVar={this.props.clinVar} />
                 <Oncokb
                     oncokb={this.props.oncokb}
                     isCanonicalTranscriptSelected={

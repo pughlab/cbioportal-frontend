@@ -1662,7 +1662,7 @@ export default class PatientViewPage extends React.Component<
                                 )}
 
                                 <MSKTab
-                                    key={7}
+                                    key={27}
                                     id="pathImageDriveTab"
                                     linkText="CT Scans"
                                     hide={
@@ -1688,7 +1688,7 @@ export default class PatientViewPage extends React.Component<
                                 </MSKTab>
 
                                 <MSKTab
-                                    key={8}
+                                    key={28}
                                     id="pathSlidesTab"
                                     linkText="Pathology Slides"
                                     hide={
@@ -1713,7 +1713,7 @@ export default class PatientViewPage extends React.Component<
                                     </div>
                                 </MSKTab>
                                 <MSKTab
-                                    key={9}
+                                    key={29}
                                     id="IPRTab"
                                     linkText="BCGSC Integrated Pipeline Reports"
                                     hide={

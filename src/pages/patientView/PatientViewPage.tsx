@@ -386,15 +386,6 @@ export default class PatientViewPage extends React.Component<
         return '';
     }
 
-    private getImageDriveId(data: Array<ClinicalData>): string {
-        for (const row in data) {
-            if (data[row]['clinicalAttributeId'] === 'IMAGE_DRIVE_ID') {
-                return data[row]['value'];
-            }
-        }
-        return '';
-    }
-
     private wholeSlideViewerUrl = remoteData<string | undefined>({
         await: () => [this.patientViewPageStore.getWholeSlideViewerIds],
         invoke: async () => {
@@ -1662,32 +1653,6 @@ export default class PatientViewPage extends React.Component<
                                 )}
 
                                 <MSKTab
-                                    key={27}
-                                    id="pathImageDriveTab"
-                                    linkText="CT Scans"
-                                    hide={
-                                        this.patientViewPageStore
-                                            .clinicalDataPatient.isError ||
-                                        (this.patientViewPageStore
-                                            .clinicalDataPatient.isComplete &&
-                                            this.getImageDriveId(
-                                                this.patientViewPageStore
-                                                    .clinicalDataPatient.result
-                                            ) === '')
-                                    }
-                                >
-                                    <div style={{ position: 'relative' }}>
-                                        <IFrameLoader
-                                            height={700}
-                                            url={`https://imagedrive.bcgsc.ca/ImageDrive/#vfs/${this.getImageDriveId(
-                                                this.patientViewPageStore
-                                                    .clinicalDataPatient.result
-                                            )}`}
-                                        />
-                                    </div>
-                                </MSKTab>
-
-                                <MSKTab
                                     key={28}
                                     id="pathSlidesTab"
                                     linkText="Pathology Slides"
@@ -1702,35 +1667,10 @@ export default class PatientViewPage extends React.Component<
                                             ) === '')
                                     }
                                 >
-                                    <div style={{ position: 'relative' }}>
-                                        <IFrameLoader
-                                            height={700}
-                                            url={`https://slidesharing.ca/eSlideTray.php?ImageIds=${this.getSlideId(
-                                                this.patientViewPageStore
-                                                    .clinicalDataPatient.result
-                                            )}`}
-                                        />
-                                    </div>
-                                </MSKTab>
-                                <MSKTab
-                                    key={29}
-                                    id="IPRTab"
-                                    linkText="BCGSC Integrated Pipeline Reports"
-                                    hide={
-                                        this.patientViewPageStore
-                                            .clinicalDataPatient.isError ||
-                                        (this.patientViewPageStore
-                                            .clinicalDataPatient.isComplete &&
-                                            this.patientViewPageStore
-                                                .studyId !== 'COMPARISON')
-                                    }
-                                >
-                                    <div style={{ position: 'relative' }}>
-                                        <IFrameLoader
-                                            height={900}
-                                            url={`https://ipr.bcgsc.ca/reports/${this.patientViewPageStore.patientId}`}
-                                        />
-                                    </div>
+                                    <IFrameLoader
+                                        height={700}
+                                        url={`https://slidesharing.ca/eSlideTray.php?ImageIds=116`}
+                                    />
                                 </MSKTab>
 
                                 {this.resourceTabs.component}

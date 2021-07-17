@@ -1656,19 +1656,9 @@ export default class PatientViewPage extends React.Component<
                                     key={28}
                                     id="pathSlidesTab"
                                     linkText="Pathology Slides"
-                                    hide={
-                                        this.patientViewPageStore
-                                            .clinicalDataPatient.isError ||
-                                        (this.patientViewPageStore
-                                            .clinicalDataPatient.isComplete &&
-                                            this.getSlideId(
-                                                this.patientViewPageStore
-                                                    .clinicalDataPatient.result
-                                            ) === '')
-                                    }
                                 >
                                     <IFrameLoader
-                                        height={700}
+                                        height={WindowStore.size.height - 220}
                                         url={`https://slidesharing.ca/eSlideTray.php?ImageIds=116`}
                                     />
                                 </MSKTab>

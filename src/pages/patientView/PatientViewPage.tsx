@@ -377,15 +377,6 @@ export default class PatientViewPage extends React.Component<
         );
     }
 
-    private getSlideId(data: Array<ClinicalData>): string {
-        for (const row in data) {
-            if (data[row]['clinicalAttributeId'] === 'SLIDE_ID') {
-                return data[row]['value'];
-            }
-        }
-        return '';
-    }
-
     private wholeSlideViewerUrl = remoteData<string | undefined>({
         await: () => [this.patientViewPageStore.getWholeSlideViewerIds],
         invoke: async () => {
@@ -1653,13 +1644,13 @@ export default class PatientViewPage extends React.Component<
                                 )}
 
                                 <MSKTab
-                                    key={28}
+                                    key={9}
                                     id="pathSlidesTab"
                                     linkText="Pathology Slides"
                                 >
                                     <IFrameLoader
                                         height={WindowStore.size.height - 220}
-                                        url={`https://slidesharing.ca/eSlideTray.php?ImageIds=116`}
+                                        url="https://slidesharing.ca/eSlideTray.php?ImageIds=116"
                                     />
                                 </MSKTab>
 

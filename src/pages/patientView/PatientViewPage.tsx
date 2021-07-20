@@ -1645,7 +1645,7 @@ export default class PatientViewPage extends React.Component<
 
                                 <MSKTab
                                     key={9}
-                                    id="pathSlidesTab"
+                                    id={PatientViewPageTabs.PathologySlides}
                                     linkText="Pathology Slides"
                                 >
                                     <div>

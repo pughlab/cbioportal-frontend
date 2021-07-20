@@ -1648,10 +1648,16 @@ export default class PatientViewPage extends React.Component<
                                     id="pathSlidesTab"
                                     linkText="Pathology Slides"
                                 >
-                                    <IFrameLoader
-                                        height={WindowStore.size.height - 220}
-                                        url="https://slidesharing.ca/eSlideTray.php?ImageIds=116"
-                                    />
+                                    <div>
+                                        <IFrameLoader
+                                            height={
+                                                WindowStore.size.height - 220
+                                            }
+                                            url={
+                                                'https://slidesharing.ca/eSlideTray.php?ImageIds=116'
+                                            }
+                                        />
+                                    </div>
                                 </MSKTab>
 
                                 {this.resourceTabs.component}

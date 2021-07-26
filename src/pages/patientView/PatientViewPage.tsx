@@ -550,6 +550,15 @@ export default class PatientViewPage extends React.Component<
         this.patientViewPageStore.setMutationalSignaturesVersion(version);
     }
 
+    private getSlideId(data: Array<ClinicalData>): string {
+        for (const row in data) {
+            if (data[row]['clinicalAttributeId'] === 'SLIDE_ID') {
+                return data[row]['value'];
+            }
+        }
+        return '';
+    }
+
     public render() {
         let sampleManager: SampleManager | null = null;
         if (this.patientViewPageStore.sampleManager.isComplete) {
@@ -1647,15 +1656,26 @@ export default class PatientViewPage extends React.Component<
                                     key={9}
                                     id={PatientViewPageTabs.PathologySlides}
                                     linkText="Pathology Slides"
+                                    hide={
+                                        this.patientViewPageStore
+                                            .clinicalDataPatient.isError ||
+                                        (this.patientViewPageStore
+                                            .clinicalDataPatient.isComplete &&
+                                            this.getSlideId(
+                                                this.patientViewPageStore
+                                                    .clinicalDataPatient.result
+                                            ) === '')
+                                    }
                                 >
                                     <div>
                                         <IFrameLoader
                                             height={
                                                 WindowStore.size.height - 220
                                             }
-                                            url={
-                                                'https://slidesharing.ca/eSlideTray.php?ImageIds=116'
-                                            }
+                                            url={`https://slidesharing.ca/eSlideTray.php?ImageIds=${this.getSlideId(
+                                                this.patientViewPageStore
+                                                    .clinicalDataPatient.result
+                                            )}`}
                                         />
                                     </div>
                                 </MSKTab>

@@ -104,8 +104,10 @@ export function groupTrialMatchesByAgeNumerical(
         _.map(cancerTypes, item => {
             // If a cancer type contains a "!", it means this trial cannot be used for the cancer type, which is a "NOT" match.
             if (!_.isUndefined(item)) {
-                if (item.includes('!')) {
-                    negativeCancerTypes.push(item.replace('!', ''));
+                if (item.includes('!') || item.toLowerCase().includes('not')) {
+                    let str = item.replace('!', '');
+                    str = str.split('not').join('');
+                    negativeCancerTypes.push(str);
                 } else {
                     positiveCancerTypes.push(item);
                 }
@@ -125,7 +127,12 @@ export function groupTrialMatchesByAgeNumerical(
                     !_.isUndefined(trialMatch.genomicAlteration) &&
                     trialMatch.genomicAlteration !== ''
                 )
-                    return !trialMatch.genomicAlteration.includes('!');
+                    return !(
+                        trialMatch.genomicAlteration.includes('!') &&
+                        trialMatch.genomicAlteration
+                            .toLowerCase()
+                            .includes('not')
+                    );
             }
         );
         const negativeTrialMatches = _.filter(
@@ -135,7 +142,12 @@ export function groupTrialMatchesByAgeNumerical(
                     !_.isUndefined(trialMatch.genomicAlteration) &&
                     trialMatch.genomicAlteration !== ''
                 )
-                    return trialMatch.genomicAlteration.includes('!');
+                    return (
+                        trialMatch.genomicAlteration.includes('!') ||
+                        trialMatch.genomicAlteration
+                            .toLowerCase()
+                            .includes('not')
+                    );
             }
         );
         if (positiveTrialMatches.length > 0) {
@@ -196,6 +208,7 @@ export function groupPositiveTrialMatchesByMatchType(
         CNA: [],
         MSI: [],
         WILDTYPE: [],
+        gene: [],
     };
     _.forEach(
         matchesGroupedByMatchType,
@@ -398,6 +411,10 @@ export function getAgeRangeDisplay(trialAgeNumerical: string[]) {
             return `Age: ${trialAgeNumerical.join(', ')}`;
         }
     } else {
-        return `${trialAgeNumerical[0]} yrs old`;
+        if (trialAgeNumerical[0].length == 0) {
+            return 'Age: Unknown';
+        } else {
+            return `${trialAgeNumerical[0]} yrs old`;
+        }
     }
 }

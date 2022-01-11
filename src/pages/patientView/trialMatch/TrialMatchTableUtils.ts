@@ -104,9 +104,8 @@ export function groupTrialMatchesByAgeNumerical(
         _.map(cancerTypes, item => {
             // If a cancer type contains a "!", it means this trial cannot be used for the cancer type, which is a "NOT" match.
             if (!_.isUndefined(item)) {
-                if (item.includes('!') || item.toLowerCase().includes('not')) {
-                    let str = item.replace('!', '');
-                    str = str.split('not').join('');
+                if (item.includes('!')) {
+                    let str = item.split('!').join('');
                     negativeCancerTypes.push(str);
                 } else {
                     positiveCancerTypes.push(item);
@@ -127,12 +126,7 @@ export function groupTrialMatchesByAgeNumerical(
                     !_.isUndefined(trialMatch.genomicAlteration) &&
                     trialMatch.genomicAlteration !== ''
                 )
-                    return !(
-                        trialMatch.genomicAlteration.includes('!') &&
-                        trialMatch.genomicAlteration
-                            .toLowerCase()
-                            .includes('not')
-                    );
+                    return !trialMatch.genomicAlteration.includes('!');
             }
         );
         const negativeTrialMatches = _.filter(
@@ -142,12 +136,7 @@ export function groupTrialMatchesByAgeNumerical(
                     !_.isUndefined(trialMatch.genomicAlteration) &&
                     trialMatch.genomicAlteration !== ''
                 )
-                    return (
-                        trialMatch.genomicAlteration.includes('!') ||
-                        trialMatch.genomicAlteration
-                            .toLowerCase()
-                            .includes('not')
-                    );
+                    return trialMatch.genomicAlteration.includes('!');
             }
         );
         if (positiveTrialMatches.length > 0) {

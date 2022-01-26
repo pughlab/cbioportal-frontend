@@ -1,5 +1,5 @@
 import * as request from 'superagent';
-import {IPharmacoDBGeneDrugAssociationData, IPharmacoDBmRnaEntry, IPharmacoDBCnaEntry,IPharmacoDBView} from "shared/model/PharmacoDB.ts";
+import  {IPharmacoDBmRnaEntry, IPharmacoDBCnaEntry,IPharmacoDBView} from "shared/model/PharmacoDB.ts";
 
 
 /**

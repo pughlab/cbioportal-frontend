@@ -2,7 +2,7 @@
 
 import {OncoKB, IOncoKbProps, oncoKbAnnotationSortValue} from "react-mutation-mapper";
 
-import {initQueryIndicator} from "test/OncoKbMockUtils";
+import {initQueryIndicator} from "../../../../test/OncoKbMockUtils";
 import {lazyMobXTableSort} from "shared/components/lazyMobXTable/LazyMobXTable";
 import {IndicatorQueryResp} from "public-lib/api/generated/OncoKbAPI";
 

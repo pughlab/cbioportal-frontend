@@ -1,5 +1,5 @@
 import * as _ from 'lodash';
-import {IPharmacoDBGeneDrugAssociationData, IPharmacoDBView,IPharmacoDBViewList, IPharmacoDBCnaRequest,IPharmacoDBCnaEntry} from "shared/model/PharmacoDB.ts";
+import {IPharmacoDBView,IPharmacoDBViewList, IPharmacoDBCnaRequest,IPharmacoDBCnaEntry} from "shared/model/PharmacoDB.ts";
 import pharmacoDBClient from "shared/api/PharmacoDBClientInstance";
 import { DiscreteCopyNumberData } from "shared/api/generated/CBioPortalAPI";
 

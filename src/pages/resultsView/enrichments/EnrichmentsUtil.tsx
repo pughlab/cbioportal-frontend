@@ -10,8 +10,11 @@ import {
     GenericAssayEnrichmentRow,
 } from 'shared/model/EnrichmentRow';
 import { formatLogOddsRatio, roundLogRatio } from 'shared/lib/FormatUtils';
-import * as _ from 'lodash';
-import { AlterationTypeConstants } from '../ResultsViewPageStore';
+import _ from 'lodash';
+import {
+    AlterationTypeConstants,
+    DataTypeConstants,
+} from '../ResultsViewPageStore';
 import { filterAndSortProfiles } from '../coExpression/CoExpressionTabUtils';
 import { IMiniFrequencyScatterChartData } from './MiniFrequencyScatterChart';
 import {
@@ -60,6 +63,12 @@ export enum GeneOptionLabel {
     AVERAGE_FREQUENCY = 'Genes with highest average frequency',
     SIGNIFICANT_P_VALUE = 'Genes with most significant p-value',
     SYNC_WITH_TABLE = 'Sync with table (up to 100 genes)',
+}
+
+export enum AlterationContainerType {
+    MUTATION = 'MUTATION',
+    COPY_NUMBER = 'COPY_NUMBER',
+    ALTERATIONS = 'ALTERATIONS',
 }
 
 export enum EnrichmentType {
@@ -535,9 +544,12 @@ export function pickMethylationEnrichmentProfiles(
 export function pickGenericAssayEnrichmentProfiles(
     profiles: MolecularProfile[]
 ) {
+    // TODO: Pick profiles from all Generic Assay dataTypes after we implement related features
     return profiles.filter(p => {
         return (
-            p.molecularAlterationType === AlterationTypeConstants.GENERIC_ASSAY
+            p.molecularAlterationType ===
+                AlterationTypeConstants.GENERIC_ASSAY &&
+            p.datatype === DataTypeConstants.LIMITVALUE
         );
     });
 }
@@ -612,7 +624,7 @@ export function getAlterationEnrichmentColumns(
             ),
             sortBy: (d: AlterationEnrichmentRow) => Number(d.logRatio),
             download: (d: AlterationEnrichmentRow) =>
-                formatLogOddsRatio(d.logRatio!),
+                d.logRatio ? formatLogOddsRatio(d.logRatio) : '-',
         });
 
         enrichedGroupColum.tooltip = (
@@ -638,7 +650,9 @@ export function getAlterationEnrichmentColumns(
             name: group.name,
             headerRender: PERCENTAGE_IN_headerRender,
             render: (d: AlterationEnrichmentRow) => (
-                <span>{formatPercentage(group.name, d)}</span>
+                <span data-test={`${group.name}-CountCell`}>
+                    {formatPercentage(group.name, d)}
+                </span>
             ),
             tooltip: (
                 <span>

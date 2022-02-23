@@ -1,10 +1,9 @@
 import * as React from 'react';
 import { PageLayout } from '../../../shared/components/PageLayout/PageLayout';
-import AppConfig from 'appConfig';
+import { getServerConfig } from 'config/config';
 import StaticContent from '../../../shared/components/staticContent/StaticContent';
 import Helmet from 'react-helmet';
 import './styles.scss';
-import { computed } from 'mobx';
 
 class Heading extends React.Component<{ level: number }, {}> {
     render() {
@@ -38,7 +37,15 @@ class Heading extends React.Component<{ level: number }, {}> {
 }
 
 const renderers = {
-    heading: Heading,
+    h2: (props: any) => {
+        return <Heading level={2} {...props} />;
+    },
+    h3: (props: any) => {
+        return <Heading level={3} {...props} />;
+    },
+    h4: (props: any) => {
+        return <Heading level={4} {...props} />;
+    },
 };
 
 export default class FAQ extends React.Component<{}, {}> {
@@ -51,7 +58,7 @@ export default class FAQ extends React.Component<{}, {}> {
 
                 <a id="pageTop" />
                 <StaticContent
-                    sourceUrl={AppConfig.serverConfig.skin_documentation_faq!}
+                    sourceUrl={getServerConfig().skin_documentation_faq!}
                     title={'FAQs'}
                     renderers={renderers}
                 />

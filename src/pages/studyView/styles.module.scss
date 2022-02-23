@@ -117,3 +117,30 @@
         color: #fff !important;
     }
 }
+
+.tooltip {
+    max-width: 300px;
+}
+
+$wide: 10px;
+$regular: 5px;
+
+.content {
+    margin: $regular $wide $regular 0;
+    font-size: smaller;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.editableSpanStyles {
+    padding: 0px 3px;
+    border: none;
+    line-height: 1;
+    margin-top: 0;
+    margin-bottom: 0;
+
+    &:focus {
+        outline: none;
+    }
+}

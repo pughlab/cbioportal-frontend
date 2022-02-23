@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { observer } from 'mobx-react';
 import { computed, makeObservable } from 'mobx';
 import styles from './styles.module.scss';
@@ -7,21 +7,26 @@ import {
     DataFilterValue,
     AndedPatientTreatmentFilters,
     AndedSampleTreatmentFilters,
+    GeneFilterQuery,
     PatientTreatmentFilter,
     SampleTreatmentFilter,
 } from 'cbioportal-ts-api-client';
 import {
     DataType,
-    getUniqueKeyFromMolecularProfileIds,
+    FilterIconMessage,
     ChartType,
     getGenomicChartUniqueKey,
     getGenericAssayChartUniqueKey,
+    DataBin,
+    updateCustomIntervalFilter,
 } from 'pages/studyView/StudyViewUtils';
 import {
     ChartMeta,
+    geneFilterQueryToOql,
     getCNAColorByAlteration,
     getPatientIdentifiers,
     getSelectedGroupNames,
+    getUniqueKeyFromMolecularProfileIds,
     intervalFiltersDisplayValue,
     StudyViewFilterWithSampleIdentifierFilters,
 } from 'pages/studyView/StudyViewUtils';
@@ -39,16 +44,19 @@ import { DefaultTooltip } from 'cbioportal-frontend-commons';
 import {
     OredPatientTreatmentFilters,
     OredSampleTreatmentFilters,
-} from 'cbioportal-ts-api-client/dist/generated/CBioPortalAPIInternal';
+} from 'cbioportal-ts-api-client';
 import { ClinicalDataFilter } from 'cbioportal-ts-api-client/dist/generated/CBioPortalAPI';
 import {
     STRUCTURAL_VARIANT_COLOR,
     MUT_COLOR_MISSENSE,
 } from 'cbioportal-frontend-commons';
+import { StudyViewPageStore } from 'pages/studyView/StudyViewPageStore';
+import { toPromise } from 'cbioportal-frontend-commons';
 
 export interface IUserSelectionsProps {
+    store: StudyViewPageStore;
     filter: StudyViewFilterWithSampleIdentifierFilters;
-    customChartsFilter: { [key: string]: string[] };
+    customChartsFilter: ClinicalDataFilter[];
     numberOfSelectedSamplesInCustomSelection: number;
     comparisonGroupSelection: StudyViewComparisonGroup[];
     attributesMetaSet: { [id: string]: ChartMeta & { chartType: ChartType } };
@@ -62,7 +70,7 @@ export interface IUserSelectionsProps {
         uniqueKey: string,
         values: DataFilterValue[]
     ) => void;
-    updateGenericAssayDataIntervalFilter: (
+    updateGenericAssayDataFilter: (
         uniqueKey: string,
         values: DataFilterValue[]
     ) => void;
@@ -75,13 +83,10 @@ export interface IUserSelectionsProps {
     caseListNameSet: { [key: string]: string };
     removeGenomicProfileFilter: (value: string) => void;
     removeCaseListsFilter: (value: string) => void;
-    removeSampleTreatmentsFilter: (
+    removeTreatmentsFilter: (
         andedIndex: number,
-        oredIndex: number
-    ) => void;
-    removePatientTreatmentsFilter: (
-        andedIndex: number,
-        oredIndex: number
+        oredIndex: number,
+        metaKey: string
     ) => void;
 }
 
@@ -215,6 +220,26 @@ export default class UserSelections extends React.Component<
                                     </span>,
                                     this.renderDataBinFilter(
                                         genomicDataIntervalFilter.values,
+                                        (
+                                            chartUniqueKey: string,
+                                            newRange: {
+                                                start?: number;
+                                                end?: number;
+                                            }
+                                        ) => {
+                                            updateCustomIntervalFilter(
+                                                newRange,
+                                                chartMeta,
+                                                this.props.store
+                                                    .getGenomicChartDataBin,
+                                                this.props.store
+                                                    .getGenomicDataIntervalFiltersByUniqueKey,
+                                                this.props.store
+                                                    .updateCustomBins,
+                                                this.props.store
+                                                    .updateGenomicDataIntervalFilters
+                                            );
+                                        },
                                         this.props
                                             .updateGenomicDataIntervalFilter,
                                         chartMeta
@@ -256,14 +281,31 @@ export default class UserSelections extends React.Component<
                                         </span>,
                                         <PillTag
                                             content={intervalFiltersDisplayValue(
-                                                genericAssayDataFilter.values
+                                                genericAssayDataFilter.values,
+                                                (newRange: {
+                                                    start?: number;
+                                                    end?: number;
+                                                }) => {
+                                                    updateCustomIntervalFilter(
+                                                        newRange,
+                                                        chartMeta,
+                                                        this.props.store
+                                                            .getGenericAssayChartDataBin,
+                                                        this.props.store
+                                                            .getGenericAssayDataFiltersByUniqueKey,
+                                                        this.props.store
+                                                            .updateCustomBins,
+                                                        this.props.store
+                                                            .updateGenericAssayDataFilters
+                                                    );
+                                                }
                                             )}
                                             backgroundColor={
                                                 STUDY_VIEW_CONFIG.colors.theme
                                                     .clinicalFilterContent
                                             }
                                             onDelete={() =>
-                                                this.props.updateGenericAssayDataIntervalFilter(
+                                                this.props.updateGenericAssayDataFilter(
                                                     chartMeta.uniqueKey,
                                                     []
                                                 )
@@ -281,62 +323,16 @@ export default class UserSelections extends React.Component<
         }
 
         // All custom data charts
-        if (!_.isEmpty(this.props.customChartsFilter)) {
-            _.reduce(
-                this.props.customChartsFilter,
-                (acc, content: string[], key: string) => {
-                    const chartMeta = this.props.attributesMetaSet[key];
-                    if (chartMeta) {
-                        acc.push(
-                            <div className={styles.parentGroupLogic}>
-                                <GroupLogic
-                                    components={[
-                                        <span
-                                            className={
-                                                styles.filterClinicalAttrName
-                                            }
-                                        >
-                                            {chartMeta.displayName}
-                                        </span>,
-                                        <GroupLogic
-                                            components={content.map(label => {
-                                                return (
-                                                    <PillTag
-                                                        content={label}
-                                                        backgroundColor={
-                                                            STUDY_VIEW_CONFIG
-                                                                .colors.theme
-                                                                .clinicalFilterContent
-                                                        }
-                                                        onDelete={() =>
-                                                            this.props.updateCustomChartFilter(
-                                                                chartMeta.uniqueKey,
-                                                                _.remove(
-                                                                    content,
-                                                                    value =>
-                                                                        value !==
-                                                                        label
-                                                                )
-                                                            )
-                                                        }
-                                                    />
-                                                );
-                                            })}
-                                            operation={'or'}
-                                            group={false}
-                                        />,
-                                    ]}
-                                    operation={':'}
-                                    group={false}
-                                />
-                            </div>
-                        );
-                    }
-                    return acc;
-                },
-                components
-            );
-        }
+        this.renderClinicalDataFilters(
+            this.props.customChartsFilter,
+            components,
+            (uniqueKey: string, values: DataFilterValue[]) => {
+                this.props.updateCustomChartFilter(
+                    uniqueKey,
+                    values.map(datum => datum.value)
+                );
+            }
+        );
 
         _.reduce(
             this.props.filter.geneFilters || [],
@@ -432,7 +428,8 @@ export default class UserSelections extends React.Component<
             this.props.filter.sampleTreatmentFilters.filters.length > 0
         ) {
             const f = this.renderTreatmentFilter(
-                this.props.filter.sampleTreatmentFilters
+                this.props.filter.sampleTreatmentFilters,
+                'SAMPLE_TREATMENTS'
             );
             components.push(f);
         }
@@ -442,7 +439,30 @@ export default class UserSelections extends React.Component<
             this.props.filter.patientTreatmentFilters.filters.length > 0
         ) {
             const f = this.renderTreatmentFilter(
-                this.props.filter.patientTreatmentFilters
+                this.props.filter.patientTreatmentFilters,
+                'PATIENT_TREATMENTS'
+            );
+            components.push(f);
+        }
+
+        if (
+            this.props.filter.sampleTreatmentGroupFilters &&
+            this.props.filter.sampleTreatmentGroupFilters.filters.length > 0
+        ) {
+            const f = this.renderTreatmentFilter(
+                this.props.filter.sampleTreatmentGroupFilters,
+                'SAMPLE_TREATMENT_GROUPS'
+            );
+            components.push(f);
+        }
+
+        if (
+            this.props.filter.patientTreatmentGroupFilters &&
+            this.props.filter.patientTreatmentGroupFilters.filters.length > 0
+        ) {
+            const f = this.renderTreatmentFilter(
+                this.props.filter.patientTreatmentGroupFilters,
+                'PATIENT_TREATMENT_GROUPS'
             );
             components.push(f);
         }
@@ -473,6 +493,21 @@ export default class UserSelections extends React.Component<
                               )
                             : this.renderDataBinFilter(
                                   clinicalDataFilter.values,
+                                  (
+                                      chartUniqueKey: string,
+                                      newRange: { start?: number; end?: number }
+                                  ) => {
+                                      updateCustomIntervalFilter(
+                                          newRange,
+                                          chartMeta,
+                                          this.props.store.getClinicalDataBin,
+                                          this.props.store
+                                              .getClinicalDataFiltersByUniqueKey,
+                                          this.props.store.updateCustomBins,
+                                          this.props.store
+                                              .updateClinicalDataIntervalFilters
+                                      );
+                                  },
                                   onDelete,
                                   chartMeta
                               );
@@ -505,12 +540,20 @@ export default class UserSelections extends React.Component<
     // Bar chart filter
     private renderDataBinFilter(
         values: DataFilterValue[],
+        onUpdate: (
+            chartUniqueKey: string,
+            update: { start?: number; end?: number }
+        ) => void,
         onDelete: (chartUniqueKey: string, values: DataFilterValue[]) => void,
         chartMeta: ChartMeta
     ): JSX.Element {
         return (
             <PillTag
-                content={intervalFiltersDisplayValue(values)}
+                content={intervalFiltersDisplayValue(
+                    values,
+                    (update: { start?: number; end?: number }) =>
+                        onUpdate(chartMeta.uniqueKey, update)
+                )}
                 backgroundColor={
                     STUDY_VIEW_CONFIG.colors.theme.clinicalFilterContent
                 }
@@ -558,7 +601,8 @@ export default class UserSelections extends React.Component<
     }
 
     private renderTreatmentFilter(
-        f: AndedPatientTreatmentFilters | AndedSampleTreatmentFilters
+        f: AndedPatientTreatmentFilters | AndedSampleTreatmentFilters,
+        metaKey: string
     ): JSX.Element {
         type OuterFilter =
             | OredPatientTreatmentFilters
@@ -572,21 +616,22 @@ export default class UserSelections extends React.Component<
             (oFilter: OuterFilter, oIndex: number) => {
                 const pills = (oFilter.filters as any).map(
                     (iFilter: InnerFilter, iIndex: number) => {
-                        const filterInfo = this.getFilterStringAndRemoveFunc(
-                            iFilter
-                        );
-
+                        const str = iFilter.hasOwnProperty('time')
+                            ? (iFilter as SampleTreatmentFilter).time
+                            : '';
                         return (
                             <PillTag
-                                content={
-                                    iFilter.treatment + ' ' + filterInfo.str
-                                }
+                                content={iFilter.treatment + ' ' + str}
                                 backgroundColor={
                                     STUDY_VIEW_CONFIG.colors.theme
                                         .clinicalFilterContent
                                 }
                                 onDelete={() => {
-                                    filterInfo.func(oIndex, iIndex);
+                                    this.props.removeTreatmentsFilter(
+                                        oIndex,
+                                        iIndex,
+                                        metaKey
+                                    );
                                 }}
                             />
                         );
@@ -608,29 +653,13 @@ export default class UserSelections extends React.Component<
         );
     }
 
-    private getFilterStringAndRemoveFunc(
-        filter: PatientTreatmentFilter | SampleTreatmentFilter
-    ): { str: string; func: (o: number, i: number) => void } {
-        if (filter.hasOwnProperty('time')) {
-            return {
-                str: (filter as SampleTreatmentFilter).time,
-                func: this.props.removeSampleTreatmentsFilter,
-            };
-        } else {
-            return {
-                str: '',
-                func: this.props.removePatientTreatmentsFilter,
-            };
-        }
-    }
-
     private groupedGeneQueries(
-        geneQueries: string[],
+        geneQueries: GeneFilterQuery[],
         chartMeta: ChartMeta & { chartType: ChartType }
     ): JSX.Element[] {
-        return geneQueries.map(oql => {
+        return geneQueries.map(geneQuery => {
             let color = DEFAULT_NA_COLOR;
-            let displayGeneSymbol = oql;
+            let displayGeneSymbol = geneQuery.hugoGeneSymbol;
             switch (chartMeta.chartType) {
                 case ChartTypeEnum.MUTATED_GENES_TABLE:
                     color = MUT_COLOR_MISSENSE;
@@ -639,10 +668,10 @@ export default class UserSelections extends React.Component<
                     color = STRUCTURAL_VARIANT_COLOR;
                     break;
                 case ChartTypeEnum.CNA_GENES_TABLE: {
-                    const oqlParts = oql.trim().split(':');
-                    if (oqlParts.length === 2) {
-                        displayGeneSymbol = oqlParts[0];
-                        let tagColor = getCNAColorByAlteration(oqlParts[1]);
+                    if (geneQuery.alterations.length === 1) {
+                        let tagColor = getCNAColorByAlteration(
+                            geneQuery.alterations[0]
+                        );
                         if (tagColor) {
                             color = tagColor;
                         }
@@ -654,8 +683,17 @@ export default class UserSelections extends React.Component<
                 <PillTag
                     content={displayGeneSymbol}
                     backgroundColor={color}
+                    infoSection={
+                        <FilterIconMessage
+                            chartType={chartMeta.chartType}
+                            geneFilterQuery={geneQuery}
+                        />
+                    }
                     onDelete={() =>
-                        this.props.removeGeneFilter(chartMeta.uniqueKey, oql)
+                        this.props.removeGeneFilter(
+                            chartMeta.uniqueKey,
+                            geneFilterQueryToOql(geneQuery)
+                        )
                     }
                 />
             );

@@ -19,6 +19,10 @@
       "description": "Signal Mutation Controller"
     },
     {
+      "name": "search-controller",
+      "description": "Search Controller"
+    },
+    {
       "name": "cancer-hotspots-controller",
       "description": "Cancer Hotspots Controller"
     },
@@ -29,6 +33,10 @@
     {
       "name": "annotation-summary-controller",
       "description": "Annotation Summary Controller"
+    },
+    {
+      "name": "curious-cases-controller",
+      "description": "Curious Cases Controller"
     },
     {
       "name": "signal-query-controller",
@@ -423,6 +431,38 @@
         }
       }
     },
+    "/curious_cases/{genomicLocation}": {
+      "get": {
+        "tags": [
+          "curious-cases-controller"
+        ],
+        "summary": "Retrieves Curious Cases info by a genomic location",
+        "operationId": "fetchCuriousCasesGET",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "genomicLocation",
+            "in": "path",
+            "description": "Genomic location, for example: 7,116411883,116411905,TTCTTTCTCTCTGTTTTAAGATC,-",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/CuriousCases"
+            }
+          }
+        }
+      }
+    },
     "/mutation_assessor": {
       "post": {
         "tags": [
@@ -634,6 +674,49 @@
             "description": "OK",
             "schema": {
               "$ref": "#/definitions/NucleotideContext"
+            }
+          }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "tags": [
+          "search-controller"
+        ],
+        "summary": "Performs index search.",
+        "operationId": "searchAnnotationByKeywordGETUsingGET",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "description": "keyword. For example 13:g.32890665G>A, TP53 p.R273C, BRAF c.1799T>A",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Max number of matching results to return",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/IndexSearch"
+              }
             }
           }
         }
@@ -1135,6 +1218,27 @@
         }
       }
     },
+    "CuriousCases": {
+      "type": "object",
+      "properties": {
+        "comment": {
+          "type": "string"
+        },
+        "genomicLocation": {
+          "type": "string"
+        },
+        "hugoGeneSymbol": {
+          "type": "string"
+        },
+        "pubmedIds": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      }
+    },
     "Dbsnp": {
       "type": "object",
       "properties": {
@@ -1500,6 +1604,71 @@
           "type": "number",
           "format": "double",
           "description": "Median HRD ntelomeric AI"
+        }
+      }
+    },
+    "Index": {
+      "type": "object",
+      "properties": {
+        "cdna": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hgvsc": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hgvsp": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hgvspShort": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hugoSymbol": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rsid": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "variant": {
+          "type": "string"
+        }
+      }
+    },
+    "IndexSearch": {
+      "type": "object",
+      "properties": {
+        "queryType": {
+          "type": "string",
+          "enum": [
+            "GENE_HGVSPSHORT",
+            "GENE_CDNA",
+            "GENE_HGVSP",
+            "HGVSG",
+            "HGVSC"
+          ]
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Index"
+          }
         }
       }
     },

@@ -2,6 +2,8 @@ import autobind from 'autobind-decorator';
 import { remoteData } from 'cbioportal-frontend-commons';
 import {
     AggregatedHotspots,
+    convertDbPtmToPtm,
+    convertUniprotFeatureToPtm,
     defaultHotspotFilter,
     genomicLocationString,
     getMyCancerGenomeData,
@@ -9,15 +11,23 @@ import {
     groupHotspotsByMutations,
     getMutationsByTranscriptId,
     groupMutationsByProteinStartPos,
+    groupPtmDataByPosition,
+    groupPtmDataByTypeAndPosition,
     indexHotspotsData,
-    ICivicGene,
-    ICivicVariant,
+    ICivicGeneIndex,
+    ICivicVariantIndex,
     IHotspotIndex,
     IMyCancerGenomeData,
     IOncoKbData,
     fetchCivicGenes,
     fetchCivicVariants,
+    PostTranslationalModification,
+    PtmSource,
+    UniprotFeature,
     uniqueGenomicLocations,
+    UniprotCategory,
+    convertUniprotFeatureToUniprotTopology,
+    UniprotTopology,
 } from 'cbioportal-utils';
 import { Gene, Mutation, IMyVariantInfoIndex } from 'cbioportal-utils';
 import memoize from 'memoize-weak-decorator';
@@ -33,7 +43,8 @@ import {
     Hotspot,
     PfamDomain,
     PfamDomainRange,
-    PostTranslationalModification,
+    PostTranslationalModification as DbPtm,
+    // TODO UniprotFeature, UniprotFeatureList
     VariantAnnotation,
 } from 'genome-nexus-ts-api-client';
 import _ from 'lodash';
@@ -58,17 +69,15 @@ import {
     defaultOncoKbIndicatorFilter,
     groupOncoKbIndicatorDataByMutations,
 } from '../util/OncoKbUtils';
-import {
-    groupPtmDataByPosition,
-    groupPtmDataByTypeAndPosition,
-} from '../util/PtmUtils';
 import { DefaultMutationMapperDataStore } from './DefaultMutationMapperDataStore';
 import { DefaultMutationMapperDataFetcher } from './DefaultMutationMapperDataFetcher';
 import { DefaultMutationMapperFilterApplier } from './DefaultMutationMapperFilterApplier';
+import { get } from 'superagent';
 
 interface DefaultMutationMapperStoreConfig {
     annotationFields?: string[];
     isoformOverrideSource?: string;
+    ptmSources?: string[];
     filterMutationsBySelectedTranscript?: boolean;
     genomeNexusUrl?: string;
     oncoKbUrl?: string;
@@ -87,6 +96,7 @@ interface DefaultMutationMapperStoreConfig {
     selectionFilters?: DataFilter[];
     highlightFilters?: DataFilter[];
     groupFilters?: { group: string; filter: DataFilter }[];
+    genomeBuild?: string;
 }
 
 class DefaultMutationMapperStore<T extends Mutation>
@@ -175,6 +185,11 @@ class DefaultMutationMapperStore<T extends Mutation>
     @computed
     public get isoformOverrideSource(): string {
         return this.config.isoformOverrideSource || 'uniprot';
+    }
+
+    @computed
+    public get ptmSources(): string[] {
+        return this.config.ptmSources || [PtmSource.dbPTM];
     }
 
     @computed
@@ -685,6 +700,131 @@ class DefaultMutationMapperStore<T extends Mutation>
 
     readonly ptmData: MobxPromise<PostTranslationalModification[]> = remoteData(
         {
+            await: () => {
+                const waitList = [];
+
+                if (this.ptmSources.includes(PtmSource.Uniprot)) {
+                    waitList.push(this.uniprotPtmData);
+                }
+                if (this.ptmSources.includes(PtmSource.dbPTM)) {
+                    waitList.push(this.dbPtmData);
+                }
+
+                return waitList;
+            },
+            invoke: () => {
+                const data: PostTranslationalModification[] = [];
+
+                if (
+                    this.ptmSources.includes(PtmSource.Uniprot) &&
+                    this.uniprotPtmData.result
+                ) {
+                    data.push(
+                        ...this.uniprotPtmData.result.map(
+                            convertUniprotFeatureToPtm
+                        )
+                    );
+                }
+
+                if (
+                    this.ptmSources.includes(PtmSource.dbPTM) &&
+                    this.dbPtmData.result
+                ) {
+                    data.push(...this.dbPtmData.result.map(convertDbPtmToPtm));
+                }
+
+                return Promise.resolve(data);
+            },
+            onError: () => {
+                // fail silently
+            },
+        }
+    );
+
+    readonly uniprotPtmData: MobxPromise<UniprotFeature[]> = remoteData(
+        {
+            await: () => [
+                this.mutationData,
+                this.activeTranscript,
+                this.allTranscripts,
+            ],
+            invoke: async () => {
+                let uniprotId: string | undefined;
+
+                if (this.activeTranscript.result) {
+                    const transcript = this.transcriptsByTranscriptId[
+                        this.activeTranscript.result
+                    ];
+                    uniprotId = transcript?.uniprotId;
+                }
+
+                if (uniprotId) {
+                    // TODO we need to update genome nexus for this one to work,
+                    //  for now we are getting the data directly from uniprot API
+                    // return this.dataFetcher.fetchPtmData(
+                    //     this.activeTranscript.result
+                    // );
+                    return this.dataFetcher.fetchUniprotFeatures(uniprotId, [
+                        UniprotCategory.PTM,
+                    ]);
+                } else {
+                    return [];
+                }
+            },
+            onError: () => {
+                // fail silently
+            },
+        },
+        []
+    );
+
+    readonly uniprotTopologyData: MobxPromise<UniprotTopology[]> = remoteData(
+        {
+            await: () => [
+                this.mutationData,
+                this.activeTranscript,
+                this.allTranscripts,
+            ],
+            invoke: async () => {
+                let uniprotId: string | undefined;
+                const data: UniprotTopology[] = [];
+
+                if (this.activeTranscript.result) {
+                    const transcript = this.transcriptsByTranscriptId[
+                        this.activeTranscript.result
+                    ];
+                    uniprotId = transcript?.uniprotId;
+                }
+
+                if (uniprotId) {
+                    // TODO we need to update genome nexus for this one to work,
+                    //  for now we are getting the data directly from uniprot API
+                    const uniprotFeatures = await this.dataFetcher.fetchUniprotFeatures(
+                        uniprotId,
+                        [UniprotCategory.TOPOLOGY]
+                    );
+                    uniprotFeatures.forEach(uniprotFeature => {
+                        let uniprotTopology = convertUniprotFeatureToUniprotTopology(
+                            uniprotFeature
+                        );
+                        if (uniprotTopology) {
+                            data.push(uniprotTopology);
+                        }
+                    });
+                    return data;
+                } else {
+                    return [];
+                }
+            },
+            onError: () => {
+                // fail silently
+            },
+        },
+        []
+    );
+
+    readonly dbPtmData: MobxPromise<DbPtm[]> = remoteData(
+        {
             await: () => [this.mutationData, this.activeTranscript],
             invoke: async () => {
                 if (this.activeTranscript.result) {
@@ -759,9 +899,9 @@ class DefaultMutationMapperStore<T extends Mutation>
         {
             await: () => [this.cancerHotspotsData],
             invoke: async () =>
-                this.ptmData.result
+                this.cancerHotspotsData.result
                     ? groupCancerHotspotDataByPosition(
-                          this.cancerHotspotsData.result!
+                          this.cancerHotspotsData.result
                       )
                     : {},
         },
@@ -880,7 +1020,7 @@ class DefaultMutationMapperStore<T extends Mutation>
         }
     }
 
-    readonly civicGenes: MobxPromise<ICivicGene | undefined> = remoteData({
+    readonly civicGenes: MobxPromise<ICivicGeneIndex | undefined> = remoteData({
         await: () => [this.mutationData],
         invoke: async () =>
             this.config.enableCivic
@@ -894,12 +1034,12 @@ class DefaultMutationMapperStore<T extends Mutation>
         },
     });
 
-    readonly civicVariants = remoteData<ICivicVariant | undefined>({
+    readonly civicVariants = remoteData<ICivicVariantIndex | undefined>({
         await: () => [this.civicGenes, this.mutationData],
         invoke: async () => {
             if (this.config.enableCivic && this.civicGenes.result) {
                 return fetchCivicVariants(
-                    this.civicGenes.result as ICivicGene,
+                    this.civicGenes.result as ICivicGeneIndex,
                     this.mutationData.result || []
                 );
             } else {
@@ -976,6 +1116,30 @@ class DefaultMutationMapperStore<T extends Mutation>
             (mutation.gene && mutation.gene.entrezGeneId) ||
             0
         );
+    }
+
+    readonly ensemblTranscriptLookUp: MobxPromise<any | undefined> = remoteData(
+        {
+            await: () => [this.activeTranscript],
+            invoke: async () => {
+                const ensemblTranscriptLookUpLink =
+                    this.genomeBuild === 'hg19'
+                        ? `https://grch37.rest.ensembl.org/lookup/id/${this.activeTranscript.result}?content-type=application/json`
+                        : `https://rest.ensembl.org/lookup/id/${this.activeTranscript.result}?content-type=application/json`;
+                return this.activeTranscript.result
+                    ? get(ensemblTranscriptLookUpLink)
+                    : undefined;
+            },
+            onError: () => {
+                // fail silently, leave the error handling responsibility to the data consumer
+            },
+        }
+    );
+
+    @computed
+    // Get genome build for exon track
+    public get genomeBuild(): string {
+        return this.config.genomeBuild || 'hg19';
     }
 }
 

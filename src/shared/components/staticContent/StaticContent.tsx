@@ -2,7 +2,10 @@ import * as React from 'react';
 import $ from 'jquery';
 import { observer } from 'mobx-react';
 import ReactMarkdown from 'react-markdown';
-import AppConfig from 'appConfig';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
+import remarkGfm from 'remark-gfm';
+import { getServerConfig } from 'config/config';
 import { remoteData } from 'cbioportal-frontend-commons';
 import LoadingIndicator from '../loadingIndicator/LoadingIndicator';
 import { getDocsUrl } from '../../api/urls';
@@ -10,13 +13,13 @@ import './gfm.css';
 
 function isMarkDown(url: string) {
     return (
-        !AppConfig.serverConfig.skin_documentation_markdown === false &&
+        !getServerConfig().skin_documentation_markdown === false &&
         /\.md$/.test(url)
     );
 }
 
 function setImageRoot(path: string) {
-    return `${AppConfig.serverConfig.skin_documentation_baseurl}/${path}`;
+    return `${getServerConfig().skin_documentation_baseurl}/${path}`;
 }
 
 @observer
@@ -27,7 +30,7 @@ export default class StaticContent extends React.Component<
     private get url() {
         return getDocsUrl(
             this.props.sourceUrl!,
-            AppConfig.serverConfig.skin_documentation_baseurl!
+            getServerConfig().skin_documentation_baseurl!
         );
     }
 
@@ -39,10 +42,10 @@ export default class StaticContent extends React.Component<
         if (isMarkDown(url)) {
             return (
                 <ReactMarkdown
-                    renderers={this.props.renderers || {}}
+                    components={this.props.renderers || {}}
                     className={'markdown-body'}
-                    escapeHtml={false}
-                    source={this.source.result!}
+                    children={this.source.result!}
+                    rehypePlugins={[rehypeRaw, rehypeSanitize, remarkGfm]}
                 />
             );
         } else {

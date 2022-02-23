@@ -11,8 +11,7 @@ const ServerConfigDefaults: Partial<IServerConfig> = {
     g2s_url: 'https://g2s.genomenexus.org',
     mycancergenome_show: false,
 
-    digital_slide_archive_iframe_url:
-        'https://cancer.digitalslidearchive.org/index.html?patientId=',
+    digital_slide_archive_iframe_url: 'https://cancer.digitalslidearchive.org/',
     digital_slide_archive_meta_url:
         'https://api.digitalslidearchive.org/api/v1/tcga/image?caseName=',
 
@@ -36,6 +35,7 @@ const ServerConfigDefaults: Partial<IServerConfig> = {
     oncoprint_hotspots_default: true,
     oncoprint_hide_vus_default: false,
     oncokb_public_api_url: 'oncokb.org/api/v1',
+    oncokb_merge_icons_by_default: true,
 
     pubmed_url: 'https://www.ncbi.nlm.nih.gov/pubmed/<%=pmid%>',
 
@@ -46,8 +46,9 @@ const ServerConfigDefaults: Partial<IServerConfig> = {
     show_pathway_mapper: true,
     show_mutation_mapper_tool_grch38: true,
     show_transcript_dropdown: false,
-    show_signal: false,
+    show_signal: true,
     survival_show_p_q_values_in_survival_type_table: true,
+    survival_min_group_threshold: 3,
     skin_description:
         'The cBioPortal for Cancer Genomics provides visualization, analysis and download of large-scale cancer genomics data sets',
     show_genomenexus: true,
@@ -63,6 +64,7 @@ const ServerConfigDefaults: Partial<IServerConfig> = {
     skin_documentation_markdown: true,
     skin_email_contact: 'cbioportal at googlegroups dot com',
     skin_documentation_faq: 'FAQ.md',
+    skin_footer_show_dev: false,
     skin_login_saml_registration_html: 'Sign in with MSK',
     skin_documentation_news: 'News.md',
     skin_documentation_oql: 'Onco-Query-Language.md',
@@ -71,6 +73,7 @@ const ServerConfigDefaults: Partial<IServerConfig> = {
     skin_right_nav_show_examples: true,
     skin_right_nav_show_testimonials: true,
     skin_right_nav_show_whats_new: true,
+    skin_right_nav_show_twitter: false,
     skin_citation_rule_text:
         'Please cite: <a href="http://cancerdiscovery.aacrjournals.org/content/2/5/401.abstract" target="_blank">Cerami et al., 2012</a> &amp; <a href="http://www.ncbi.nlm.nih.gov/pubmed/23550210" target="_blank">Gao et al., 2013</a>',
     skin_show_about_tab: true,
@@ -136,7 +139,9 @@ const ServerConfigDefaults: Partial<IServerConfig> = {
             STRUCTURAL_VARIANT_GENES_TABLE: 85,
             CNA_GENES_TABLE: 80,
             PATIENT_TREATMENTS_TABLE: 75,
+            PATIENT_TREATMENT_GROUPS_TABLE: 75,
             SAMPLE_TREATMENTS_TABLE: 75,
+            SAMPLE_TREATMENT_GROUPS_TABLE: 75,
             CANCER_STUDIES: 70,
             SEQUENCED: 60,
             HAS_CNA_DATA: 50,
@@ -169,14 +174,24 @@ const ServerConfigDefaults: Partial<IServerConfig> = {
 
     skin_show_gsva: false,
 
+    skin_geneset_hierarchy_default_gsva_score: 0.5,
+
+    skin_geneset_hierarchy_default_p_value: 0.05,
+
     generic_assay_display_text:
-        'TREATMENT_RESPONSE:Treatment Response,MUTATIONAL_SIGNATURE:Mutational Signature',
+        'TREATMENT_RESPONSE:Treatment Response,MUTATIONAL_SIGNATURE:Mutational Signature,ARMLEVEL_CNA:Arm-level CNA',
 
     saml_logout_local: false,
     patient_view_use_legacy_timeline: false,
     enable_request_body_gzip_compression: false,
+    enable_treatment_groups: false,
 
     referenceGenomeVersion: 'hg19',
+
+    skin_home_page_show_unauthorized_studies: false,
+
+    skin_home_page_unauthorized_studies_global_message:
+        'The study is unauthorized. You need to request access.',
 };
 
 export default ServerConfigDefaults;

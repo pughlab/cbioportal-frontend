@@ -3,14 +3,8 @@ import { DefaultTooltip } from 'cbioportal-frontend-commons';
 import { initMutation } from 'test/MutationMockUtils';
 import React from 'react';
 import { assert } from 'chai';
-import Enzyme, { mount, ReactWrapper } from 'enzyme';
-import Adapter from 'enzyme-adapter-react-16';
+import { mount, ReactWrapper } from 'enzyme';
 
-Enzyme.configure({ adapter: new Adapter() });
-
-/**
- * @author Selcuk Onur Sumer
- */
 describe('SampleColumnFormatter', () => {
     const mutationShort = initMutation({
         sampleId: 'Short_Id',
@@ -23,7 +17,7 @@ describe('SampleColumnFormatter', () => {
     let componentShort: ReactWrapper<any, any>;
     let componentLong: ReactWrapper<any, any>;
 
-    before(() => {
+    beforeAll(() => {
         let data = [mutationShort];
 
         // mount a single cell component (Td) for the mutation with short sample id
@@ -43,19 +37,19 @@ describe('SampleColumnFormatter', () => {
                 .indexOf('Short_Id') > -1,
             'Display value is correct for short sample id'
         );
-        assert.isFalse(
+        assert.isTrue(
             componentLong
                 .find(`span`)
                 .text()
                 .indexOf('This_is_a_quite_long_Sample_Id_in_my_opinion!') > -1,
-            'Display value for long sample id should not be equal to the actual value'
+            'Display value is correct for long sample id'
         );
     });
 
     it('generates component tooltip', () => {
-        assert.isFalse(
+        assert.isTrue(
             componentShort.find(DefaultTooltip).exists(),
-            'Tooltip should not exists for short sample id'
+            'Tooltip should exists for short sample id'
         );
         assert.isTrue(
             componentLong.find(DefaultTooltip).exists(),

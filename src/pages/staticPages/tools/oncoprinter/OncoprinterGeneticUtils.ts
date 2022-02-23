@@ -1,5 +1,5 @@
 import { observable } from 'mobx';
-import AppConfig from 'appConfig';
+import { getServerConfig } from 'config/config';
 import { default as OncoprinterStore } from './OncoprinterStore';
 import _ from 'lodash';
 import {
@@ -100,6 +100,7 @@ export type OncoprinterGeneticInputLineType2 = OncoprinterGeneticInputLineType1 
     isGermline?: boolean;
     isCustomDriver?: boolean;
     proteinChange?: string;
+    eventInfo?: string;
 };
 /* Leaving commented only for reference, this will be replaced by unified input strategy
 export type OncoprinterInputLineType3_Incomplete = OncoprinterInputLineType1 & {
@@ -153,7 +154,7 @@ export function initDriverAnnotationSettings(store: OncoprinterStore) {
         _oncoKb,
         _cbioportalCount,
         _customBinary,
-        _excludeVUS: false,
+        _includeVUS: true,
         hotspots: false, // for now
 
         get customBinary() {
@@ -176,16 +177,16 @@ export function initDriverAnnotationSettings(store: OncoprinterStore) {
         },
         get oncoKb() {
             return !!(
-                AppConfig.serverConfig.show_oncokb &&
+                getServerConfig().show_oncokb &&
                 this._oncoKb &&
                 !store.didOncoKbFail
             );
         },
-        set excludeVUS(val: boolean) {
-            this._excludeVUS = val;
+        set includeVUS(val: boolean) {
+            this._includeVUS = val;
         },
-        get excludeVUS() {
-            return this._excludeVUS && this.driversAnnotated;
+        get includeVUS() {
+            return this._includeVUS || !this.driversAnnotated;
         },
         get driversAnnotated() {
             const anySelected =
@@ -350,6 +351,7 @@ export function makeGeneticTrackDatum_Data(
         // these are the same always or almost always
         hugoGeneSymbol: oncoprinterInputLine.hugoGeneSymbol,
         proteinChange: oncoprinterInputLine.proteinChange,
+        eventInfo: oncoprinterInputLine.eventInfo,
         mutationStatus: oncoprinterInputLine.isGermline
             ? MUTATION_STATUS_GERMLINE
             : '',
@@ -856,7 +858,7 @@ export function parseGeneticInput(
                             );
                         } else {
                             ret.alteration = 'structuralVariant';
-                            ret.proteinChange = alteration;
+                            ret.eventInfo = alteration;
                         }
                         break;
                     default:

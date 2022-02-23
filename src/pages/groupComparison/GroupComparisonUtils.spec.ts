@@ -36,7 +36,10 @@ import { Sample, StudyViewFilter } from 'cbioportal-ts-api-client';
 import ComplexKeyMap from '../../shared/lib/complexKeyDataStructures/ComplexKeyMap';
 import { assertDeepEqualInAnyOrder } from '../../shared/lib/SpecUtils';
 import ComplexKeyGroupsMap from '../../shared/lib/complexKeyDataStructures/ComplexKeyGroupsMap';
-import { DataType } from 'pages/studyView/StudyViewUtils';
+import {
+    DataType,
+    geneFilterQueryFromOql,
+} from 'pages/studyView/StudyViewUtils';
 
 chai.use(deepEqualInAnyOrder);
 
@@ -1044,7 +1047,7 @@ describe('GroupComparisonUtils', () => {
             { sampleId: 'sample3', studyId: 'study2' },
         ];
         let sampleSet: ComplexKeyMap<any>;
-        before(() => {
+        beforeAll(() => {
             sampleSet = new ComplexKeyMap<any>();
             sampleSet.set(sampleIds[0], {
                 patientId: 'patient1',
@@ -2488,7 +2491,7 @@ describe('GroupComparisonUtils', () => {
             },
         ];
         let patientToSamplesSet: ComplexKeyGroupsMap<Pick<Sample, 'sampleId'>>;
-        before(() => {
+        beforeAll(() => {
             patientToSamplesSet = new ComplexKeyGroupsMap<
                 Pick<Sample, 'sampleId'>
             >();
@@ -3222,7 +3225,14 @@ describe('GroupComparisonUtils', () => {
             filters.geneFilters = [
                 {
                     molecularProfileIds: ['acc_tcga_mutations'],
-                    geneQueries: [['TP53', 'CTNNB1'], ['ERCC2'], ['NCOR2']],
+                    geneQueries: [
+                        [
+                            geneFilterQueryFromOql('TP53'),
+                            geneFilterQueryFromOql('CTNNB1'),
+                        ],
+                        [geneFilterQueryFromOql('ERCC2')],
+                        [geneFilterQueryFromOql('NCOR2')],
+                    ],
                 },
             ];
             assert.equal(

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { observer } from 'mobx-react';
 import { CategorizedConfigItems } from '../../../config/IAppConfig';
 import { DefaultTooltip } from 'cbioportal-frontend-commons';
@@ -21,7 +21,6 @@ export default class QuickSelectButtons extends React.Component<
 
                     const buttonEl = (
                         <button
-                            data-test="selectPanCan"
                             className={'btn btn-default btn-xs'}
                             onClick={() => this.props.onSelect(values)}
                         >

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { inject, Observer, observer } from 'mobx-react';
 import { MSKTab, MSKTabs } from '../../shared/components/MSKTabs/MSKTabs';
 import { action, computed, observable, makeObservable } from 'mobx';
@@ -32,7 +32,7 @@ import { Else, If, Then } from 'react-if';
 import CustomCaseSelection from './addChartButton/customCaseSelection/CustomCaseSelection';
 import { AppStore } from '../../AppStore';
 import ActionButtons from './studyPageHeader/ActionButtons';
-import onMobxPromise from '../../shared/lib/onMobxPromise';
+import { onMobxPromise } from 'cbioportal-frontend-commons';
 import {
     GACustomFieldsEnum,
     serializeEvent,
@@ -40,10 +40,9 @@ import {
 } from '../../shared/lib/tracking';
 import ComparisonGroupManager from '../groupComparison/comparisonGroupManager/ComparisonGroupManager';
 import classNames from 'classnames';
-import AppConfig from 'appConfig';
-import SocialAuthButton from '../../shared/components/SocialAuthButton';
-import { ServerConfigHelpers } from '../../config/config';
+import { getServerConfig, ServerConfigHelpers } from '../../config/config';
 import {
+    AlterationMenuHeader,
     getButtonNameWithDownPointer,
     ChartMetaDataTypeEnum,
 } from './StudyViewUtils';
@@ -63,8 +62,13 @@ import ResourcesTab, { RESOURCES_TAB_NAME } from './resources/ResourcesTab';
 import { ResourceData } from 'cbioportal-ts-api-client';
 import $ from 'jquery';
 import { StudyViewComparisonGroup } from 'pages/groupComparison/GroupComparisonUtils';
-import { CustomChart } from 'shared/api/sessionServiceAPI';
 import { parse } from 'query-string';
+import SettingsMenu from 'shared/components/driverAnnotations/SettingsMenu';
+import ErrorScreen from 'shared/components/errorScreen/ErrorScreen';
+import { CustomChartData } from 'shared/api/session-service/sessionServiceModels';
+import { HelpWidget } from 'shared/components/HelpWidget/HelpWidget';
+import URL from 'url';
+import { buildCBioPortalPageUrl } from 'shared/api/urls';
 
 export interface IStudyViewPageProps {
     routing: any;
@@ -116,6 +120,7 @@ export default class StudyViewPage extends React.Component<
     @observable private toolbarLeft: number = 0;
 
     @observable showCustomSelectTooltip = false;
+    @observable showAlterationFilterTooltip = false;
     @observable private showReturnToDefaultChartListModal: boolean = false;
 
     constructor(props: IStudyViewPageProps) {
@@ -333,7 +338,7 @@ export default class StudyViewPage extends React.Component<
     async getBookmarkUrl(): Promise<ShareUrls> {
         const bitlyUrl = await getBitlyShortenedUrl(
             this.studyViewFullUrlWithFilter,
-            AppConfig.serverConfig.bitly_access_token
+            getServerConfig().bitly_access_token
         );
 
         return {
@@ -348,12 +353,15 @@ export default class StudyViewPage extends React.Component<
             return [
                 ..._.values(this.store.clinicalDataBinPromises),
                 ..._.values(this.store.clinicalDataCountPromises),
+                ..._.values(this.store.genericAssayDataCountPromises),
                 this.store.mutationProfiles,
                 this.store.cnaProfiles,
                 this.store.selectedSamples,
                 this.store.molecularProfileSampleCounts,
                 this.store.sampleTreatments,
                 this.store.patientTreatments,
+                this.store.patientTreatmentGroups,
+                this.store.sampleTreatmentGroups,
             ];
         },
         invoke: async () => {
@@ -522,23 +530,6 @@ export default class StudyViewPage extends React.Component<
                 )}
 
                 {this.store.comparisonConfirmationModal}
-                {this.store.unknownQueriedIds.isComplete &&
-                    this.store.unknownQueriedIds.result.length > 0 && (
-                        <Alert bsStyle="danger">
-                            <span>
-                                Unknown/Unauthorized studies{' '}
-                                {this.store.unknownQueriedIds.result.join(', ')}
-                            </span>
-                        </Alert>
-                    )}
-                <LoadingIndicator
-                    size={'big'}
-                    isLoading={
-                        this.store.queriedSampleIdentifiers.isPending ||
-                        this.store.invalidSampleIds.isPending
-                    }
-                    center={true}
-                />
                 {this.store.queriedSampleIdentifiers.isComplete &&
                     this.store.invalidSampleIds.isComplete &&
                     this.store.unknownQueriedIds.isComplete &&
@@ -563,6 +554,15 @@ export default class StudyViewPage extends React.Component<
                                     getPaginationWidth={() => {
                                         return this.toolbarLeft;
                                     }} // dont run into other study view UI
+                                    contentWindowExtra={
+                                        <HelpWidget
+                                            path={
+                                                this.props.routing.location
+                                                    .pathname
+                                            }
+                                        />
+                                    }
+                                    hrefRoot={buildCBioPortalPageUrl('study')}
                                 >
                                     <MSKTab
                                         key={0}
@@ -750,7 +750,7 @@ export default class StudyViewPage extends React.Component<
                                                                         .result
                                                                 }
                                                                 onSubmit={(
-                                                                    chart: CustomChart
+                                                                    chart: CustomChartData
                                                                 ) => {
                                                                     this.showCustomSelectTooltip = false;
                                                                     this.store.updateCustomSelect(
@@ -784,6 +784,57 @@ export default class StudyViewPage extends React.Component<
                                                     </button>
                                                 </DefaultTooltip>
                                             </>
+                                        )}
+                                        {getServerConfig()
+                                            .skin_show_settings_menu && (
+                                            <DefaultTooltip
+                                                trigger={['click']}
+                                                placement={'bottomLeft'}
+                                                overlay={
+                                                    <SettingsMenu
+                                                        store={this.store}
+                                                        infoElement={
+                                                            <AlterationMenuHeader
+                                                                includeCnaTable={
+                                                                    this.store
+                                                                        .hasCnaProfileData
+                                                                }
+                                                            />
+                                                        }
+                                                        customDriverSourceName={
+                                                            getServerConfig()
+                                                                .oncoprint_custom_driver_annotation_binary_menu_label!
+                                                        }
+                                                        showDriverAnnotationSection={
+                                                            this.store
+                                                                .doShowDriverAnnotationSectionInGlobalMenu
+                                                        }
+                                                        showTierAnnotationSection={
+                                                            this.store
+                                                                .doShowTierAnnotationSectionInGlobalMenu
+                                                        }
+                                                    />
+                                                }
+                                                visible={
+                                                    this
+                                                        .showAlterationFilterTooltip
+                                                }
+                                                onVisibleChange={visible => {
+                                                    this.showAlterationFilterTooltip = !!visible;
+                                                }}
+                                            >
+                                                <button
+                                                    data-test="AlterationFilterButton"
+                                                    style={{
+                                                        marginLeft: '10px',
+                                                    }}
+                                                    className="btn btn-primary btn-sm"
+                                                >
+                                                    {getButtonNameWithDownPointer(
+                                                        'Alteration Filter'
+                                                    )}
+                                                </button>
+                                            </DefaultTooltip>
                                         )}
                                         {this.enableAddChartInTabs.includes(
                                             this.store.currentTab
@@ -893,6 +944,37 @@ export default class StudyViewPage extends React.Component<
         );
     }
 
+    private readonly body = MakeMobxView({
+        await: () => [
+            this.store.unknownQueriedIds,
+            this.store.queriedPhysicalStudyIds,
+        ],
+        render: () => {
+            // we can tell if there are any valid studies
+            // by looking to see if there is anything in queriedPhysicalStudyIds
+            // we have to do this because studyIds property has the virtualStudy id (in that setting)
+            if (
+                this.store.unknownQueriedIds.result.length &&
+                this.store.queriedPhysicalStudyIds.result.length === 0
+            ) {
+                const pluralForm =
+                    this.store.unknownQueriedIds.result.length > 1
+                        ? 'Studies'
+                        : 'Study';
+                return (
+                    <ErrorScreen
+                        title={`Unknown/Unauthorized ${pluralForm}`}
+                        body={`The following studies are unknown or you lack privileges to view them:
+                            ${this.store.unknownQueriedIds.result.join(', ')}
+                            `}
+                    />
+                );
+            } else {
+                return this.content();
+            }
+        },
+    });
+
     componentWillUnmount(): void {
         this.store.destroy();
         clearInterval(this.toolbarLeftUpdater);
@@ -905,7 +987,16 @@ export default class StudyViewPage extends React.Component<
                 hideFooter={true}
                 className={'subhead-dark'}
             >
-                {this.content()}
+                <LoadingIndicator
+                    size={'big'}
+                    isLoading={
+                        this.store.queriedSampleIdentifiers.isPending ||
+                        this.store.invalidSampleIds.isPending ||
+                        this.body.isPending
+                    }
+                    center={true}
+                />
+                {this.body.component}
             </PageLayout>
         );
     }

@@ -1,12 +1,14 @@
 import * as React from 'react';
-import { observer } from 'mobx-react';
 import {
     IMutationTableProps,
     MutationTableColumnType,
     default as MutationTable,
+    MutationTableColumn,
 } from 'shared/components/mutationTable/MutationTable';
 import TumorAlleleFreqColumnFormatter from 'shared/components/mutationTable/column/TumorAlleleFreqColumnFormatter';
 import CancerTypeColumnFormatter from 'shared/components/mutationTable/column/CancerTypeColumnFormatter';
+import _ from 'lodash';
+import { createNamespaceColumns } from 'shared/components/mutationTable/MutationTableUtils';
 
 export interface IStandaloneMutationTableProps extends IMutationTableProps {
     // add standalone specific props here if needed
@@ -23,7 +25,7 @@ export default class StandaloneMutationTable extends MutationTable<
         ...MutationTable.defaultProps,
         columns: [
             MutationTableColumnType.SAMPLE_ID,
-            MutationTableColumnType.CANCER_TYPE,
+            MutationTableColumnType.CANCER_TYPE_DETAILED,
             MutationTableColumnType.ANNOTATION,
             MutationTableColumnType.HGVSG,
             MutationTableColumnType.FUNCTIONAL_IMPACT,
@@ -56,6 +58,17 @@ export default class StandaloneMutationTable extends MutationTable<
     protected generateColumns() {
         super.generateColumns();
 
+        // generate namespace columns
+        const namespaceColumns = createNamespaceColumns(
+            this.props.namespaceColumns
+        );
+        _.forIn(
+            namespaceColumns,
+            (column: MutationTableColumn, columnName: string) => {
+                this._columns[columnName] = column;
+            }
+        );
+
         // override default visibility for some columns
         this._columns[
             MutationTableColumnType.TUMOR_ALLELE_FREQ
@@ -65,7 +78,7 @@ export default class StandaloneMutationTable extends MutationTable<
                 : this.props.data
         );
         this._columns[
-            MutationTableColumnType.CANCER_TYPE
+            MutationTableColumnType.CANCER_TYPE_DETAILED
         ].visible = CancerTypeColumnFormatter.isVisible(
             this.props.dataStore
                 ? this.props.dataStore.allData
@@ -77,7 +90,7 @@ export default class StandaloneMutationTable extends MutationTable<
         // order columns
         //this._columns[MutationTableColumnType.STUDY].order = 0;
         this._columns[MutationTableColumnType.SAMPLE_ID].order = 10;
-        this._columns[MutationTableColumnType.CANCER_TYPE].order = 15;
+        this._columns[MutationTableColumnType.CANCER_TYPE_DETAILED].order = 15;
         this._columns[MutationTableColumnType.PROTEIN_CHANGE].order = 20;
         this._columns[MutationTableColumnType.ANNOTATION].order = 30;
         this._columns[MutationTableColumnType.FUNCTIONAL_IMPACT].order = 38;

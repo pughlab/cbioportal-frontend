@@ -2,8 +2,7 @@ import * as React from 'react';
 import { observer } from 'mobx-react';
 import { MakeMobxView } from '../../../shared/components/MobxView';
 import LoadingIndicator from '../../../shared/components/loadingIndicator/LoadingIndicator';
-import { ServerConfigHelpers } from '../../../config/config';
-import AppConfig from 'appConfig';
+import { getServerConfig, ServerConfigHelpers } from '../../../config/config';
 import { MSKTab, MSKTabs } from '../../../shared/components/MSKTabs/MSKTabs';
 import { PatientViewPageStore } from '../clinicalInformation/PatientViewPageStore';
 import SampleManager from '../SampleManager';
@@ -19,9 +18,16 @@ import { GeneFilterOption } from './GeneFilterMenu';
 import { isFusion } from '../../../shared/lib/MutationUtils';
 import PatientViewUrlWrapper from '../PatientViewUrlWrapper';
 import WindowStore from '../../../shared/components/window/WindowStore';
-import VAFChartWrapper from 'pages/patientView/timeline2/VAFChartWrapper';
-import TimelineWrapper from 'pages/patientView/timeline2/TimelineWrapper';
-import VAFChartWrapperStore from '../timeline2/VAFChartWrapperStore';
+import VAFChartWrapper from 'pages/patientView/timeline/VAFChartWrapper';
+import TimelineWrapper from 'pages/patientView/timeline/TimelineWrapper';
+import VAFChartWrapperStore from '../timeline/VAFChartWrapperStore';
+import { ExtendedMutationTableColumnType } from 'shared/components/mutationTable/MutationTable';
+import _ from 'lodash';
+import {
+    createNamespaceColumnName,
+    extractColumnNames,
+} from 'shared/components/mutationMapper/MutationMapperUtils';
+import ResultsViewMutationTable from 'pages/resultsView/mutation/ResultsViewMutationTable';
 
 export interface IPatientViewMutationsTabProps {
     patientViewPageStore: PatientViewPageStore;
@@ -33,6 +39,8 @@ export interface IPatientViewMutationsTabProps {
         columnVisibility?: IColumnVisibilityDef[]
     ) => void;
     sampleManager: SampleManager | null;
+    mergeOncoKbIcons?: boolean;
+    onOncoKbIconToggle?: (mergeIcons: boolean) => void;
 }
 
 enum PlotTab {
@@ -311,20 +319,18 @@ export default class PatientViewMutationsTab extends React.Component<
                         this.props.patientViewPageStore
                             .usingPublicOncoKbInstance
                     }
+                    mergeOncoKbIcons={this.props.mergeOncoKbIcons}
+                    onOncoKbIconToggle={this.props.onOncoKbIconToggle}
                     civicGenes={this.props.patientViewPageStore.civicGenes}
                     civicVariants={
                         this.props.patientViewPageStore.civicVariants
                     }
                     userEmailAddress={ServerConfigHelpers.getUserEmailAddress()}
-                    enableOncoKb={AppConfig.serverConfig.show_oncokb}
-                    enableFunctionalImpact={
-                        AppConfig.serverConfig.show_genomenexus
-                    }
-                    enableHotspot={AppConfig.serverConfig.show_hotspot}
-                    enableMyCancerGenome={
-                        AppConfig.serverConfig.mycancergenome_show
-                    }
-                    enableCivic={AppConfig.serverConfig.show_civic}
+                    enableOncoKb={getServerConfig().show_oncokb}
+                    enableFunctionalImpact={getServerConfig().show_genomenexus}
+                    enableHotspot={getServerConfig().show_hotspot}
+                    enableMyCancerGenome={getServerConfig().mycancergenome_show}
+                    enableCivic={getServerConfig().show_civic}
                     columnVisibility={this.props.mutationTableColumnVisibility}
                     columnVisibilityProps={{
                         onColumnToggled: this.props
@@ -350,10 +356,22 @@ export default class PatientViewMutationsTab extends React.Component<
                         this.props.patientViewPageStore
                             .existsSomeMutationWithAscnProperty
                     }
+                    namespaceColumns={this.dataStore.namespaceColumnConfig}
+                    columns={this.columns}
                 />
             </div>
         ),
     });
+
+    @computed get columns(): ExtendedMutationTableColumnType[] {
+        const namespaceColumnNames = extractColumnNames(
+            this.dataStore.namespaceColumnConfig
+        );
+        return _.concat(
+            PatientViewMutationTable.defaultProps.columns,
+            namespaceColumnNames
+        );
+    }
 
     readonly timeline = MakeMobxView({
         await: () => [this.props.patientViewPageStore.clinicalEvents],

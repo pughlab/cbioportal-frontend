@@ -10,7 +10,7 @@ import {
     legendColorDarkRed,
 } from './OncoprintUtils';
 import { IKeyValueMap, observable } from 'mobx';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { assert } from 'chai';
 import { IQueriedMergedTrackCaseData } from '../../../pages/resultsView/ResultsViewPageStore';
 import { splitHeatmapTextField } from 'shared/components/oncoprint/OncoprintUtils';
@@ -706,7 +706,9 @@ describe('getGenericAssayTrackRuleSetParams', () => {
         ) as IGradientAndCategoricalRuleSetParams;
 
         assert.isDefined(category_to_color);
-        assert.isString(category_to_color!['>8.00']);
+        // make sure its an rgba color as an array
+        assert.isArray(category_to_color!['>8.00']);
+        assert.equal(category_to_color!['>8.00'].length, 4);
     });
 });
 

@@ -13,6 +13,7 @@ import {
     ClinicalTrackSpec,
     GeneticTrackDatum,
     IBaseHeatmapTrackSpec,
+    ICategoricalTrackSpec,
     IHeatmapTrackSpec,
 } from './Oncoprint';
 import {
@@ -29,7 +30,7 @@ import ListIndexedMap, {
 } from '../../lib/ListIndexedMap';
 
 const hotspotsImg = require('../../../rootImages/cancer-hotspots.svg');
-const oncokbImg = require('../../../rootImages/oncokb-oncogenic-1.svg');
+const oncokbImg = require('oncokb-styles/images/oncogenic.svg');
 const customDriverImg = require('../../../rootImages/driver.png');
 const customDriverTiersImg = require('../../../rootImages/driver_tiers.png');
 
@@ -38,7 +39,7 @@ export const TOOLTIP_DIV_CLASS = 'oncoprint__tooltip';
 const tooltipTextElementNaN = 'N/A';
 import './styles.scss';
 import { deriveDisplayTextFromGenericAssayType } from 'pages/resultsView/plots/PlotsTabUtils';
-import { PUTATIVE_DRIVER } from 'shared/lib/StoreUtils';
+import { PUTATIVE_DRIVER, PUTATIVE_PASSENGER } from 'shared/lib/StoreUtils';
 
 function sampleViewAnchorTag(study_id: string, sample_id: string) {
     return `<a class="nobreak" href="${getSampleViewUrl(
@@ -102,6 +103,66 @@ export function linebreakGenesetId(genesetId: string): string {
             .replace(/_/g, '_&#8203;')
             .replace(/\./g, '.&#8203;')
     );
+}
+
+export function makeCategoricalTrackTooltip(
+    track: ICategoricalTrackSpec,
+    link_id?: boolean
+) {
+    return function(dataUnderMouse: any[]) {
+        let ret = '';
+        let attr_val_counts: { [attr_val: string]: number } = {};
+        for (const d of dataUnderMouse) {
+            if (d.attr_val_counts) {
+                for (const key of Object.keys(d.attr_val_counts)) {
+                    attr_val_counts[key] = attr_val_counts[key] || 0;
+                    attr_val_counts[key] += d.attr_val_counts[key];
+                }
+            }
+        }
+        const attr_vals = Object.keys(attr_val_counts);
+        if (attr_vals.length > 1) {
+            ret += track.label + ':<br>';
+            for (let i = 0; i < attr_vals.length; i++) {
+                const val = attr_vals[i];
+                ret +=
+                    '<span class="nobreak"><b>' +
+                    val +
+                    '</b>: ' +
+                    attr_val_counts[val] +
+                    ` sample${
+                        attr_val_counts[val] === 1 ? '' : 's'
+                    }</span><br>`;
+            }
+        } else if (attr_vals.length === 1) {
+            let displayVal = attr_vals[0];
+            ret +=
+                track.label +
+                ': <span class="nobreak"><b>' +
+                displayVal +
+                `</b>${
+                    dataUnderMouse.length > 1
+                        ? ` (${attr_val_counts[attr_vals[0]]} samples)`
+                        : ''
+                }</span><br>`;
+        }
+        let naCount = 0;
+        for (const d of dataUnderMouse) {
+            if (d.na) {
+                naCount += 1;
+            }
+        }
+        if (naCount > 0) {
+            ret += `${track.label}: <b>N/A</b>${
+                dataUnderMouse.length > 1 ? ` (${naCount} samples)` : ''
+            }<br/>`;
+        }
+        return $('<div>')
+            .addClass(TOOLTIP_DIV_CLASS)
+            .append(getCaseViewElt(dataUnderMouse, !!link_id))
+            .append('<br/>')
+            .append(ret);
+    };
 }
 
 export function makeClinicalTrackTooltip(
@@ -200,7 +261,10 @@ export function makeClinicalTrackTooltip(
     };
 }
 export function makeHeatmapTrackTooltip(
-    trackSpec: IBaseHeatmapTrackSpec,
+    trackSpec: Pick<
+        IBaseHeatmapTrackSpec,
+        'tooltipValueLabel' | 'molecularAlterationType'
+    >,
     link_id?: boolean
 ) {
     return function(dataUnderMouse: any[]) {
@@ -396,10 +460,11 @@ export function makeGeneticTrackTooltip_getCoverageInformation(
 }
 
 export function getCaseViewElt(
-    dataUnderMouse: Pick<
-        GeneticTrackDatum,
-        'sample' | 'patient' | 'study_id'
-    >[],
+    dataUnderMouse: {
+        sample?: string;
+        patient: string;
+        study_id: string;
+    }[],
     caseViewLinkout: boolean
 ) {
     if (!dataUnderMouse.length) {
@@ -520,6 +585,18 @@ export function makeGeneticTrackTooltip(
                             `<img src="${customDriverImg}" title="${driver_filter}: ${driver_filter_annotation}" alt="driver filter" style="height:11px; width:11px;margin-left:3px"/>`
                         );
                     }
+                    //If we have data for the binary custom driver annotations, append an icon to the tooltip with the annotation information
+                    else if (
+                        driver_filter &&
+                        driver_filter === PUTATIVE_PASSENGER
+                    ) {
+                        ret.append(
+                            `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" style="height:16px; width:16px; margin-bottom:-2px; margin-right:-2px">
+                                <title>"${driver_filter}: ${driver_filter_annotation}"</title>
+                                <circle cx="10" cy="10" r="5" stroke="#bebebe" stroke-width="2" fill="none"/>
+                            </svg>`
+                        );
+                    }
                     //If we have data for the class custom driver annotations, append an icon to the tooltip with the annotation information
                     if (driver_tiers_filter) {
                         ret.append(
@@ -568,9 +645,11 @@ export function makeGeneticTrackTooltip(
                 }) => {
                     var ret = $('<span>').addClass('nobreak');
                     ret.append(
-                        `<b class="nobreak">${site1HugoSymbol}${
+                        `<b class="nobreak">${site1HugoSymbol || ''}${
                             site2HugoSymbol ? '-' + site2HugoSymbol : ''
-                        }, ${variantClass}, Event Info: ${eventInfo}</b>`
+                        }${
+                            variantClass ? ', ' + variantClass + ',' : ''
+                        } Event Info: ${eventInfo}</b>`
                     );
                     if (oncokb_oncogenic) {
                         ret.append(

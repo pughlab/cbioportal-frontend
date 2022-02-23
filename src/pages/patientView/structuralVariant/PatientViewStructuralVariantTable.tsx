@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { computed } from 'mobx';
+import { action, makeObservable, observable } from 'mobx';
 import { observer } from 'mobx-react';
 import { PatientViewPageStore } from '../clinicalInformation/PatientViewPageStore';
 import LazyMobXTable, {
@@ -10,19 +10,27 @@ import TumorColumnFormatter from '../mutation/column/TumorColumnFormatter';
 import HeaderIconMenu from '../mutation/HeaderIconMenu';
 import GeneFilterMenu from '../mutation/GeneFilterMenu';
 import PanelColumnFormatter from 'shared/components/mutationTable/column/PanelColumnFormatter';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { MakeMobxView } from 'shared/components/MobxView';
 import LoadingIndicator from 'shared/components/loadingIndicator/LoadingIndicator';
 import ErrorMessage from 'shared/components/ErrorMessage';
 import AnnotationColumnFormatter from './column/AnnotationColumnFormatter';
-import AppConfig from 'appConfig';
+import { getServerConfig } from 'config/config';
 import { ServerConfigHelpers } from 'config/config';
 import ChromosomeColumnFormatter from 'shared/components/mutationTable/column/ChromosomeColumnFormatter';
 import { remoteData } from 'cbioportal-frontend-commons';
+import {
+    calculateOncoKbContentPadding,
+    calculateOncoKbContentWidthOnNextFrame,
+    calculateOncoKbContentWidthWithInterval,
+    DEFAULT_ONCOKB_CONTENT_WIDTH,
+    updateOncoKbIconStyle,
+} from 'shared/lib/AnnotationColumnUtils';
 
 export interface IPatientViewStructuralVariantTableProps {
     store: PatientViewPageStore;
     onSelectGenePanel?: (name: string) => void;
+    mergeOncoKbIcons?: boolean;
 }
 
 type CNATableColumn = Column<StructuralVariant[]> & { order: number };
@@ -31,13 +39,33 @@ class StructuralVariantTableComponent extends LazyMobXTable<
     StructuralVariant[]
 > {}
 
+const ANNOTATION_ELEMENT_ID = 'sv-annotation';
+
 @observer
 export default class PatientViewStructuralVariantTable extends React.Component<
     IPatientViewStructuralVariantTableProps,
     {}
 > {
+    @observable mergeOncoKbIcons;
+    @observable oncokbWidth = DEFAULT_ONCOKB_CONTENT_WIDTH;
+    private oncokbInterval: any;
+
     constructor(props: IPatientViewStructuralVariantTableProps) {
         super(props);
+        makeObservable(this);
+
+        // here we wait for the oncokb icons to fully finish rendering
+        // then update the oncokb width in order to align annotation column header icons with the cell content
+        this.oncokbInterval = calculateOncoKbContentWidthWithInterval(
+            ANNOTATION_ELEMENT_ID,
+            oncoKbContentWidth => (this.oncokbWidth = oncoKbContentWidth)
+        );
+
+        this.mergeOncoKbIcons = !!props.mergeOncoKbIcons;
+    }
+
+    public destroy() {
+        clearInterval(this.oncokbInterval);
     }
 
     readonly columns = remoteData({
@@ -198,24 +226,40 @@ export default class PatientViewStructuralVariantTable extends React.Component<
 
             columns.push({
                 name: 'Annotation',
-                render: (d: StructuralVariant[]) =>
-                    AnnotationColumnFormatter.renderFunction(d, {
-                        uniqueSampleKeyToTumorType: this.props.store
-                            .uniqueSampleKeyToTumorType,
-                        oncoKbData: this.props.store
-                            .structuralVariantOncoKbData,
-                        oncoKbCancerGenes: this.props.store.oncoKbCancerGenes,
-                        usingPublicOncoKbInstance: this.props.store
-                            .usingPublicOncoKbInstance,
-                        enableOncoKb: AppConfig.serverConfig
-                            .show_oncokb as boolean,
-                        pubMedCache: this.props.store.pubMedCache,
-                        enableCivic: false,
-                        enableMyCancerGenome: false,
-                        enableHotspot: false,
-                        userEmailAddress: ServerConfigHelpers.getUserEmailAddress(),
-                        studyIdToStudy: this.props.store.studyIdToStudy.result,
-                    }),
+                headerRender: (name: string) =>
+                    AnnotationColumnFormatter.headerRender(
+                        name,
+                        this.oncokbWidth,
+                        this.mergeOncoKbIcons,
+                        this.handleOncoKbIconModeToggle
+                    ),
+                render: (d: StructuralVariant[]) => (
+                    <span id="sv-annotation">
+                        {AnnotationColumnFormatter.renderFunction(d, {
+                            uniqueSampleKeyToTumorType: this.props.store
+                                .uniqueSampleKeyToTumorType,
+                            oncoKbData: this.props.store
+                                .structuralVariantOncoKbData,
+                            oncoKbCancerGenes: this.props.store
+                                .oncoKbCancerGenes,
+                            usingPublicOncoKbInstance: this.props.store
+                                .usingPublicOncoKbInstance,
+                            mergeOncoKbIcons: this.mergeOncoKbIcons,
+                            oncoKbContentPadding: calculateOncoKbContentPadding(
+                                this.oncokbWidth
+                            ),
+                            enableOncoKb: getServerConfig()
+                                .show_oncokb as boolean,
+                            pubMedCache: this.props.store.pubMedCache,
+                            enableCivic: false,
+                            enableMyCancerGenome: false,
+                            enableHotspot: false,
+                            userEmailAddress: ServerConfigHelpers.getUserEmailAddress(),
+                            studyIdToStudy: this.props.store.studyIdToStudy
+                                .result,
+                        })}
+                    </span>
+                ),
                 sortBy: (d: StructuralVariant[]) => {
                     return AnnotationColumnFormatter.sortValue(
                         d,
@@ -345,7 +389,7 @@ export default class PatientViewStructuralVariantTable extends React.Component<
                 ),
                 download: (d: StructuralVariant[]) => d[0].eventInfo,
                 sortBy: (d: StructuralVariant[]) => d[0].eventInfo,
-                visible: false,
+                visible: true,
                 order: 66,
             });
 
@@ -422,5 +466,17 @@ export default class PatientViewStructuralVariantTable extends React.Component<
 
     public render() {
         return this.tableUI.component;
+    }
+
+    @action.bound
+    private handleOncoKbIconModeToggle(mergeIcons: boolean) {
+        this.mergeOncoKbIcons = mergeIcons;
+        updateOncoKbIconStyle({ mergeIcons });
+
+        // we need to set the OncoKB width on the next render cycle, otherwise it is not updated yet
+        calculateOncoKbContentWidthOnNextFrame(
+            ANNOTATION_ELEMENT_ID,
+            width => (this.oncokbWidth = width || DEFAULT_ONCOKB_CONTENT_WIDTH)
+        );
     }
 }

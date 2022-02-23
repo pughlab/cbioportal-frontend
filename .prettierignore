@@ -17,6 +17,8 @@
 *pegjs
 *.template
 *.ejs
+*.toml
+*.xml
 *module.scss.d.ts
 **/generated/**
 src/shared/lib/oql/oql-parser.js
@@ -25,7 +27,8 @@ yarn.lock
 .prettierignore
 .DS_Store
 .gitignore
-.kodiak.toml
+*.toml
+*.maf
 *properties
 *.seg
 end-to-end-test/local/studies/**

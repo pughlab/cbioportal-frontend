@@ -1,4 +1,6 @@
 import { SHOW_ALL_PAGE_SIZE } from '../paginationControls/PaginationControls';
+import { CancerStudy } from 'cbioportal-ts-api-client';
+
 export function maxPage(displayDataLength: number, itemsPerPage: number) {
     if (itemsPerPage === SHOW_ALL_PAGE_SIZE) {
         return 0;

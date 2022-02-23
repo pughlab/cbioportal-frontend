@@ -10,8 +10,8 @@ import {
     oncoKbAnnotationDownload,
 } from 'react-mutation-mapper';
 import {
-    ICivicGene,
-    ICivicVariant,
+    ICivicGeneIndex,
+    ICivicVariantIndex,
     IHotspotIndex,
     IMyCancerGenomeData,
     IOncoKbData,
@@ -20,6 +20,7 @@ import {
 import OncokbPubMedCache from 'shared/cache/PubMedCache';
 import { CancerStudy, Mutation } from 'cbioportal-ts-api-client';
 import { CancerGene } from 'oncokb-ts-api-client';
+import AnnotationHeader from './annotation/AnnotationHeader';
 
 export interface IAnnotationColumnProps extends AnnotationProps {
     pubMedCache?: OncokbPubMedCache;
@@ -35,8 +36,8 @@ export default class AnnotationColumnFormatter {
         myCancerGenomeData?: IMyCancerGenomeData,
         oncoKbData?: RemoteData<IOncoKbData | Error | undefined>,
         usingPublicOncoKbInstance?: boolean,
-        civicGenes?: RemoteData<ICivicGene | undefined>,
-        civicVariants?: RemoteData<ICivicVariant | undefined>,
+        civicGenes?: RemoteData<ICivicGeneIndex | undefined>,
+        civicVariants?: RemoteData<ICivicVariantIndex | undefined>,
         resolveTumorType?: (mutation: Mutation) => string
     ): number[] {
         const annotationData: IAnnotation = getAnnotationData(
@@ -61,8 +62,8 @@ export default class AnnotationColumnFormatter {
         myCancerGenomeData?: IMyCancerGenomeData,
         oncoKbData?: RemoteData<IOncoKbData | Error | undefined>,
         usingPublicOncoKbInstance?: boolean,
-        civicGenes?: RemoteData<ICivicGene | undefined>,
-        civicVariants?: RemoteData<ICivicVariant | undefined>,
+        civicGenes?: RemoteData<ICivicGeneIndex | undefined>,
+        civicVariants?: RemoteData<ICivicVariantIndex | undefined>,
         resolveTumorType?: (mutation: Mutation) => string
     ) {
         const annotationData: IAnnotation = getAnnotationData(
@@ -88,6 +89,22 @@ export default class AnnotationColumnFormatter {
             `CancerHotspot: ${annotationData.isHotspot ? 'yes' : 'no'}`,
             `3DHotspot: ${annotationData.is3dHotspot ? 'yes' : 'no'}`,
         ].join(';');
+    }
+
+    public static headerRender(
+        name: string,
+        width: number,
+        mergeOncoKbIcons?: boolean,
+        onOncoKbIconToggle?: (mergeIcons: boolean) => void
+    ) {
+        return (
+            <AnnotationHeader
+                name={name}
+                width={width}
+                mergeOncoKbIcons={mergeOncoKbIcons}
+                onOncoKbIconToggle={onOncoKbIconToggle}
+            />
+        );
     }
 
     public static renderFunction(

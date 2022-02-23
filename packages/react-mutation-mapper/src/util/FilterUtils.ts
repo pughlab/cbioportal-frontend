@@ -9,6 +9,8 @@ import { MutationFilter, MutationFilterValue } from '../filter/MutationFilter';
 import { MutationStatusFilter } from '../filter/MutationStatusFilter';
 import { PositionFilter } from '../filter/PositionFilter';
 import { ProteinImpactTypeFilter } from '../filter/ProteinImpactTypeFilter';
+import { NumericalFilterValue } from '../filter/NumericalFilter';
+import { CategoricalFilterValue } from '../filter/CategoricalFilter';
 import DataStore from '../model/DataStore';
 import { DataFilter, DataFilterType } from '../model/DataFilter';
 import { ApplyFilterFn } from '../model/FilterApplier';
@@ -60,16 +62,31 @@ export function updatePositionSelectionFilters(
 
 export function updatePositionHighlightFilters(
     dataStore: DataStore,
-    position: number,
+    positions: number[],
     defaultFilters: DataFilter[] = []
 ) {
     dataStore.clearHighlightFilters();
 
     const positionFilter = {
         type: DataFilterType.POSITION,
-        values: [position],
+        values: positions,
     };
     dataStore.setHighlightFilters([...defaultFilters, positionFilter]);
+}
+
+export function updatePositionRangeHighlightFilters(
+    dataStore: DataStore,
+    startPosition: number,
+    endPosition: number,
+    defaultFilters: DataFilter[] = []
+) {
+    const positions: number[] = [];
+
+    for (let i = startPosition; i <= endPosition; i++) {
+        positions.push(i);
+    }
+
+    updatePositionHighlightFilters(dataStore, positions, defaultFilters);
 }
 
 export function findAllUniquePositions(filters: DataFilter[]): number[] {
@@ -206,7 +223,10 @@ export function groupDataByProteinImpactType(sortedFilteredData: any[]) {
 }
 
 export function onFilterOptionSelect(
-    selectedValues: string[],
+    selectedValues:
+        | string[]
+        | NumericalFilterValue[]
+        | CategoricalFilterValue[],
     allValuesSelected: boolean,
     dataStore: DataStore,
     dataFilterType: string,

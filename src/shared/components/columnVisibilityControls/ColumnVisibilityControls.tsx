@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { Dropdown, Checkbox } from 'react-bootstrap';
 import { DropdownToggleProps } from 'react-bootstrap/lib/DropdownToggle';
 import { DropdownMenuProps } from 'react-bootstrap/lib/DropdownMenu';
@@ -19,6 +19,9 @@ export interface IColumnVisibilityControlsProps {
         columnId: string,
         columnVisibility?: IColumnVisibilityDef[]
     ) => void;
+    resetColumnVisibility?: () => void;
+    showResetColumnsButton?: boolean;
+    customDropdown?: (props: IColumnVisibilityControlsProps) => JSX.Element;
 }
 
 /**
@@ -40,6 +43,16 @@ export class ColumnVisibilityControls extends React.Component<
     }
 
     public render() {
+        return (
+            <div>
+                {this.props.customDropdown
+                    ? this.props.customDropdown(this.props)
+                    : this.defaultDropdown}
+            </div>
+        );
+    }
+
+    private get defaultDropdown() {
         return (
             <Dropdown className={this.props.className} id="dropdown-custom-1">
                 <Dropdown.Toggle

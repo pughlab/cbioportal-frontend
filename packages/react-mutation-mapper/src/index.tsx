@@ -57,6 +57,8 @@ export {
     getSignalData,
     getSortValue as signalSortValue,
     download as signalDownload,
+    getSingleSignalValue,
+    SignalTable,
 } from './component/column/Signal';
 
 export {
@@ -86,7 +88,8 @@ export {
 } from './component/filter/MutationStatusBadgeSelector';
 export {
     default as GnomadFrequency,
-    calculateAlleleFrequency as calculateGnomadAlleleFrequency,
+    GnomadFrequencyBreakdown,
+    GnomadFrequencyValue,
 } from './component/gnomad/GnomadFrequency';
 export { default as GnomadFrequencyTable } from './component/gnomad/GnomadFrequencyTable';
 export {
@@ -95,6 +98,7 @@ export {
     download as oncoKbAnnotationDownload,
     IOncoKbProps,
 } from './component/oncokb/OncoKB';
+export { default as OncoKbHelper } from './component/oncokb/OncoKbHelper';
 export { default as OncoKBSuggestAnnotationLinkout } from './component/oncokb/OncoKBSuggestAnnotationLinkout';
 export { default as OncoKbTreatmentTable } from './component/oncokb/OncoKbTreatmentTable';
 export { default as OncoKbFeedback } from './component/oncokb/OncoKbFeedback';
@@ -139,6 +143,14 @@ export { MutationFilter } from './filter/MutationFilter';
 export { OncoKbFilter } from './filter/OncoKbFilter';
 export { PositionFilter } from './filter/PositionFilter';
 export { ProteinImpactTypeFilter } from './filter/ProteinImpactTypeFilter';
+export {
+    NumericalFilter,
+    NumericalFilterValue,
+} from './filter/NumericalFilter';
+export {
+    CategoricalFilter,
+    CategoricalFilterValue,
+} from './filter/CategoricalFilter';
 
 export { DataFilter, DataFilterType } from './model/DataFilter';
 export { DataStore } from './model/DataStore';
@@ -152,7 +164,10 @@ export { SequenceSpec } from './model/SequenceSpec';
 
 export * from './util/DataFetcherUtils';
 export * from './util/FilterUtils';
-export * from 'cbioportal-utils';
+export {
+    calculateGnomadAlleleFrequency,
+    getGnomadData,
+} from './util/GnomadUtils';
 export {
     MUTATION_TYPE_PRIORITY,
     mutationTypeSort,
@@ -162,7 +177,11 @@ export {
 export {
     defaultOncoKbFilter,
     groupOncoKbIndicatorDataByMutations,
+    oncogenicityIconClassNames,
+    normalizeLevel,
+    levelIconClassNames,
 } from './util/OncoKbUtils';
+export * from './util/SelectorUtils';
 export * from './util/TrackUtils';
 
 export { default as DefaultMutationMapperDataFetcher } from './store/DefaultMutationMapperDataFetcher';

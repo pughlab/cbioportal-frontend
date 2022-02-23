@@ -17,6 +17,10 @@ export {
     ClinicalDataCountItem,
     ClinicalDataEnrichment,
     ClinicalDataFilter,
+    ClinicalViolinPlotBoxData,
+    ClinicalViolinPlotData,
+    ClinicalViolinPlotIndividualPoint,
+    ClinicalViolinPlotRowData,
     DataFilterValue,
     CoExpression,
     CoExpressionFilter,
@@ -58,5 +62,6 @@ export {
     ClinicalAttributeCountFilter,
     MutationCountByPosition,
     ResourceDefinition,
+    CustomDriverAnnotationReport,
     default as CBioPortalAPIInternal,
 } from './generated/CBioPortalAPIInternal';

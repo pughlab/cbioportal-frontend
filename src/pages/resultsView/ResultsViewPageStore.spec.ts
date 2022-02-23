@@ -78,11 +78,11 @@ describe('extendSamplesWithCancerType', () => {
             miRnaSampleCount: 0,
             methylationHm27SampleCount: 0,
             rppaSampleCount: 0,
+            massSpectrometrySampleCount: 0,
             completeSampleCount: 0,
             studyId: 'cellline_nci60',
             cancerType: {
                 name: 'Mixed Cancer Types',
-                clinicalTrialKeywords: 'mixed cancer types',
                 dedicatedColor: 'Black',
                 shortName: 'MIXED',
                 parent: 'cup',

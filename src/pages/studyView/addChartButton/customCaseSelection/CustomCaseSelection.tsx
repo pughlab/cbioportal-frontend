@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { Sample } from 'cbioportal-ts-api-client';
 import { observer } from 'mobx-react';
 import styles from './styles.module.scss';
@@ -20,14 +20,14 @@ import {
     ClinicalDataTypeEnum,
     DataType,
 } from '../../StudyViewUtils';
-import { CustomChart } from 'shared/api/sessionServiceAPI';
+import { CustomChartData } from 'shared/api/session-service/sessionServiceModels';
 
 export interface ICustomCaseSelectionProps {
     allSamples: Sample[];
     selectedSamples: Sample[];
     submitButtonText?: string;
     disableSubmitButton?: boolean;
-    onSubmit: (chart: CustomChart) => void;
+    onSubmit: (chart: CustomChartData) => void;
     queriedStudies: string[];
     disableGrouping?: boolean;
     getDefaultChartName?: () => string;
@@ -92,7 +92,7 @@ export default class CustomCaseSelection extends React.Component<
     }
 
     @computed
-    get newChartInfo(): CustomChart {
+    get newChartInfo(): CustomChartData {
         const displayName = this.chartName
             ? this.chartName
             : this.props.getDefaultChartName
@@ -107,7 +107,7 @@ export default class CustomCaseSelection extends React.Component<
                 this.result.validationResult.error.length === 0
                     ? this.result.data
                     : [],
-        } as CustomChart;
+        } as CustomChartData;
     }
 
     @action.bound
@@ -360,6 +360,7 @@ export default class CustomCaseSelection extends React.Component<
                                 className="alert alert-warning"
                                 role="alert"
                                 style={{ marginTop: '10px', marginBottom: '0' }}
+                                data-test="ValidationResultWarning"
                             >
                                 {warning.message.message}
                             </div>

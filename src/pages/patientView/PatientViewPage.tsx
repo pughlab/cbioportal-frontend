@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import GenomicOverview from './genomicOverview/GenomicOverview';
 import {
     CancerStudy,
@@ -13,7 +13,6 @@ import {
 import { Else, If, Then } from 'react-if';
 import SampleManager from './SampleManager';
 import PatientHeader from './patientHeader/PatientHeader';
-import SignificantMutationalSignatures from './patientHeader/SignificantMutationalSignatures';
 import { PaginationControls } from '../../shared/components/paginationControls/PaginationControls';
 import { IColumnVisibilityDef } from 'shared/components/columnVisibilityControls/ColumnVisibilityControls';
 import { toggleColumnVisibility } from 'cbioportal-frontend-commons';
@@ -24,11 +23,9 @@ import {
 } from './clinicalInformation/PatientViewPageStore';
 import ClinicalInformationPatientTable from './clinicalInformation/ClinicalInformationPatientTable';
 import ClinicalInformationSamples from './clinicalInformation/ClinicalInformationSamplesTable';
-import { inject, Observer, observer } from 'mobx-react';
-import { getSpanElementsFromCleanData } from './clinicalInformation/lib/clinicalAttributesUtil.js';
+import { inject, observer } from 'mobx-react';
 import CopyNumberTableWrapper from './copyNumberAlterations/CopyNumberTableWrapper';
 import { action, computed, observable, reaction, makeObservable } from 'mobx';
-import Timeline from './timeline/Timeline';
 import { default as PatientViewMutationTable } from './mutation/PatientViewMutationTable';
 import PathologyReport from './pathologyReport/PathologyReport';
 import { MSKTab, MSKTabs } from '../../shared/components/MSKTabs/MSKTabs';
@@ -36,19 +33,17 @@ import { validateParametersPatientView } from '../../shared/lib/validateParamete
 import LoadingIndicator from 'shared/components/loadingIndicator/LoadingIndicator';
 import ValidationAlert from 'shared/components/ValidationAlert';
 import PatientViewMutationsDataStore from './mutation/PatientViewMutationsDataStore';
-import AppConfig from 'appConfig';
-import { getMouseIcon } from './SVGIcons';
 
 import './patient.scss';
 import IFrameLoader from '../../shared/components/iframeLoader/IFrameLoader';
 import {
+    buildCBioPortalPageUrl,
     getDigitalSlideArchiveIFrameUrl,
-    getSampleViewUrl,
     getWholeSlideViewerUrl,
 } from '../../shared/api/urls';
 import { PageLayout } from '../../shared/components/PageLayout/PageLayout';
 import Helmet from 'react-helmet';
-import { ServerConfigHelpers } from '../../config/config';
+import { getServerConfig, ServerConfigHelpers } from '../../config/config';
 import autobind from 'autobind-decorator';
 import { showCustomTab } from '../../shared/lib/customTabs';
 import { StudyLink } from '../../shared/components/StudyLink/StudyLink';
@@ -79,12 +74,15 @@ import ResourcesTab, { RESOURCES_TAB_NAME } from './resources/ResourcesTab';
 import { MakeMobxView } from '../../shared/components/MobxView';
 import ResourceTab from '../../shared/components/resources/ResourceTab';
 import PatientViewStructuralVariantTable from './structuralVariant/PatientViewStructuralVariantTable';
-import TimelineWrapper from './timeline2/TimelineWrapper';
+import TimelineWrapper from './timeline/TimelineWrapper';
 import { isFusion } from '../../shared/lib/MutationUtils';
 import { Mutation } from 'cbioportal-ts-api-client';
-import ClinicalEventsTables from './timeline2/ClinicalEventsTables';
+import ClinicalEventsTables from './timeline/ClinicalEventsTables';
 import MutationalSignaturesContainer from './mutationalSignatures/MutationalSignaturesContainer';
 import SampleSummaryList from './sampleHeader/SampleSummaryList';
+import { updateOncoKbIconStyle } from 'shared/lib/AnnotationColumnUtils';
+import { ExtendedMutationTableColumnType } from 'shared/components/mutationTable/MutationTable';
+import { extractColumnNames } from 'shared/components/mutationMapper/MutationMapperUtils';
 
 export interface IPatientViewPageProps {
     params: any; // react route
@@ -118,7 +116,7 @@ export default class PatientViewPage extends React.Component<
         | { [columnId: string]: boolean }
         | undefined;
     @observable genePanelModal = { genePanelId: '', isOpen: false };
-
+    @observable mergeMutationTableOncoKbIcons;
     // use this wrapper rather than interacting with the url directly
     @observable
     public urlWrapper: PatientViewUrlWrapper;
@@ -206,6 +204,8 @@ export default class PatientViewPage extends React.Component<
             },
             { fireImmediately: true }
         );
+
+        this.mergeMutationTableOncoKbIcons = this.patientViewPageStore.mergeOncoKbIcons;
     }
 
     private dataStore: PatientViewMutationsDataStore;
@@ -231,11 +231,11 @@ export default class PatientViewPage extends React.Component<
     }
 
     public get showNewTimeline() {
-        return !AppConfig.serverConfig.patient_view_use_legacy_timeline;
+        return !getServerConfig().patient_view_use_legacy_timeline;
     }
 
     public get showOldTimeline() {
-        return AppConfig.serverConfig.patient_view_use_legacy_timeline;
+        return getServerConfig().patient_view_use_legacy_timeline;
     }
 
     @action.bound
@@ -263,6 +263,12 @@ export default class PatientViewPage extends React.Component<
         } else {
             this.urlWrapper.updateURL({ caseId: id, sampleId: undefined });
         }
+    }
+
+    @action.bound
+    protected handleOncoKbIconToggle(mergeIcons: boolean) {
+        this.mergeMutationTableOncoKbIcons = mergeIcons;
+        updateOncoKbIconStyle({ mergeIcons });
     }
 
     @computed get cnaTableStatus() {
@@ -550,6 +556,16 @@ export default class PatientViewPage extends React.Component<
         this.patientViewPageStore.setMutationalSignaturesVersion(version);
     }
 
+    @computed get columns(): ExtendedMutationTableColumnType[] {
+        const namespaceColumnNames = extractColumnNames(
+            this.dataStore.namespaceColumnConfig
+        );
+        return _.concat(
+            PatientViewMutationTable.defaultProps.columns,
+            namespaceColumnNames
+        );
+    }
+
     public render() {
         let sampleManager: SampleManager | null = null;
         if (this.patientViewPageStore.sampleManager.isComplete) {
@@ -557,6 +573,8 @@ export default class PatientViewPage extends React.Component<
         }
         let cohortNav: JSX.Element | null = null;
         let studyName: JSX.Element | null = null;
+
+        (window as any).sampleManager = sampleManager;
 
         if (this.patientViewPageStore.urlValidationError) {
             return (
@@ -787,6 +805,7 @@ export default class PatientViewPage extends React.Component<
                                     this.urlWrapper.setActiveTab(id)
                                 }
                                 className="mainTabs"
+                                hrefRoot={buildCBioPortalPageUrl('patient')}
                                 getPaginationWidth={WindowStore.getWindowWidth}
                             >
                                 <MSKTab
@@ -861,29 +880,6 @@ export default class PatientViewPage extends React.Component<
                                                         />
                                                     )}
                                                 </div>
-
-                                                {this.showOldTimeline && (
-                                                    <div
-                                                        style={{
-                                                            marginTop: 20,
-                                                        }}
-                                                    >
-                                                        <Timeline
-                                                            store={
-                                                                this
-                                                                    .patientViewPageStore
-                                                            }
-                                                            width={
-                                                                WindowStore.size
-                                                                    .width - 60
-                                                            }
-                                                            sampleManager={
-                                                                sampleManager
-                                                            }
-                                                        />
-                                                    </div>
-                                                )}
-
                                                 <hr />
                                             </div>
                                         )}
@@ -1141,6 +1137,14 @@ export default class PatientViewPage extends React.Component<
                                                             .patientViewPageStore
                                                             .usingPublicOncoKbInstance
                                                     }
+                                                    mergeOncoKbIcons={
+                                                        this
+                                                            .mergeMutationTableOncoKbIcons
+                                                    }
+                                                    onOncoKbIconToggle={
+                                                        this
+                                                            .handleOncoKbIconToggle
+                                                    }
                                                     civicGenes={
                                                         this
                                                             .patientViewPageStore
@@ -1153,23 +1157,23 @@ export default class PatientViewPage extends React.Component<
                                                     }
                                                     userEmailAddress={ServerConfigHelpers.getUserEmailAddress()}
                                                     enableOncoKb={
-                                                        AppConfig.serverConfig
+                                                        getServerConfig()
                                                             .show_oncokb
                                                     }
                                                     enableFunctionalImpact={
-                                                        AppConfig.serverConfig
+                                                        getServerConfig()
                                                             .show_genomenexus
                                                     }
                                                     enableHotspot={
-                                                        AppConfig.serverConfig
+                                                        getServerConfig()
                                                             .show_hotspot
                                                     }
                                                     enableMyCancerGenome={
-                                                        AppConfig.serverConfig
+                                                        getServerConfig()
                                                             .mycancergenome_show
                                                     }
                                                     enableCivic={
-                                                        AppConfig.serverConfig
+                                                        getServerConfig()
                                                             .show_civic
                                                     }
                                                     columnVisibility={
@@ -1230,6 +1234,11 @@ export default class PatientViewPage extends React.Component<
                                                             .patientViewPageStore
                                                             .existsSomeMutationWithAscnProperty
                                                     }
+                                                    namespaceColumns={
+                                                        this.dataStore
+                                                            .namespaceColumnConfig
+                                                    }
+                                                    columns={this.columns}
                                                 />
                                             </div>
                                         )}
@@ -1248,6 +1257,10 @@ export default class PatientViewPage extends React.Component<
                                         store={this.patientViewPageStore}
                                         onSelectGenePanel={
                                             this.toggleGenePanelModal
+                                        }
+                                        mergeOncoKbIcons={
+                                            this.patientViewPageStore
+                                                .mergeOncoKbIcons
                                         }
                                     />
 
@@ -1318,16 +1331,21 @@ export default class PatientViewPage extends React.Component<
                                                             .patientViewPageStore
                                                             .usingPublicOncoKbInstance
                                                     }
+                                                    mergeOncoKbIcons={
+                                                        this
+                                                            .patientViewPageStore
+                                                            .mergeOncoKbIcons
+                                                    }
                                                     enableOncoKb={
-                                                        AppConfig.serverConfig
+                                                        getServerConfig()
                                                             .show_oncokb
                                                     }
                                                     enableCivic={
-                                                        AppConfig.serverConfig
+                                                        getServerConfig()
                                                             .show_civic
                                                     }
                                                     userEmailAddress={
-                                                        AppConfig.serverConfig
+                                                        getServerConfig()
                                                             .user_email_address
                                                     }
                                                     pubMedCache={
@@ -1427,6 +1445,13 @@ export default class PatientViewPage extends React.Component<
                                                 }
                                                 sampleManager={sampleManager}
                                                 urlWrapper={this.urlWrapper}
+                                                mergeOncoKbIcons={
+                                                    this
+                                                        .mergeMutationTableOncoKbIcons
+                                                }
+                                                onOncoKbIconToggle={
+                                                    this.handleOncoKbIconToggle
+                                                }
                                             />
                                         </MSKTab>
                                     )}
@@ -1551,9 +1576,7 @@ export default class PatientViewPage extends React.Component<
                                             }
                                             url={getDigitalSlideArchiveIFrameUrl(
                                                 this.patientViewPageStore
-                                                    .patientId,
-                                                this.patientViewPageStore
-                                                    .studyId
+                                                    .patientId
                                             )}
                                         />
                                     </div>
@@ -1645,17 +1668,21 @@ export default class PatientViewPage extends React.Component<
 
                                 {this.resourceTabs.component}
 
-                                {AppConfig.serverConfig.custom_tabs &&
-                                    AppConfig.serverConfig.custom_tabs
-                                        .filter(
+                                {getServerConfig().custom_tabs &&
+                                    getServerConfig()
+                                        .custom_tabs.filter(
                                             (tab: any) =>
                                                 tab.location === 'PATIENT_PAGE'
                                         )
                                         .map((tab: any, i: number) => {
                                             return (
                                                 <MSKTab
-                                                    key={100 + i}
-                                                    id={'customTab' + 1}
+                                                    key={getPatientViewResourceTabId(
+                                                        'customTab' + i
+                                                    )}
+                                                    id={getPatientViewResourceTabId(
+                                                        'customTab' + i
+                                                    )}
                                                     unmountOnHide={
                                                         tab.unmountOnHide ===
                                                         true

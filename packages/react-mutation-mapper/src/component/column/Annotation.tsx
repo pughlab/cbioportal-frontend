@@ -4,8 +4,8 @@ import {
     getMyCancerGenomeLinks,
     getRemoteDataGroupStatus,
     ICivicEntry,
-    ICivicGene,
-    ICivicVariant,
+    ICivicGeneIndex,
+    ICivicVariantIndex,
     IHotspotIndex,
     IMyCancerGenomeData,
     IOncoKbData,
@@ -44,12 +44,14 @@ export type AnnotationProps = {
     oncoKbData?: RemoteData<IOncoKbData | Error | undefined>;
     oncoKbCancerGenes?: RemoteData<CancerGene[] | Error | undefined>;
     usingPublicOncoKbInstance: boolean;
+    mergeOncoKbIcons?: boolean;
+    oncoKbContentPadding?: number;
     pubMedCache?: MobxCache;
     resolveEntrezGeneId?: (mutation: Mutation) => number;
     resolveTumorType?: (mutation: Mutation) => string;
     myCancerGenomeData?: IMyCancerGenomeData;
-    civicGenes?: RemoteData<ICivicGene | undefined>;
-    civicVariants?: RemoteData<ICivicVariant | undefined>;
+    civicGenes?: RemoteData<ICivicGeneIndex | undefined>;
+    civicVariants?: RemoteData<ICivicVariantIndex | undefined>;
     userEmailAddress?: string;
 };
 
@@ -59,6 +61,8 @@ export type GenericAnnotationProps = {
     enableHotspot: boolean;
     enableMyCancerGenome: boolean;
     enableOncoKb: boolean;
+    mergeOncoKbIcons?: boolean;
+    oncoKbContentPadding?: number;
     pubMedCache?: MobxCache;
     userEmailAddress?: string;
 };
@@ -103,6 +107,7 @@ function getDefaultTumorType(): string {
     return 'Unknown';
 }
 
+const memoized: Map<string, IAnnotation> = new Map();
 export function getAnnotationData(
     mutation?: Mutation,
     oncoKbCancerGenes?: RemoteData<CancerGene[] | Error | undefined>,
@@ -110,14 +115,36 @@ export function getAnnotationData(
     myCancerGenomeData?: IMyCancerGenomeData,
     oncoKbData?: RemoteData<IOncoKbData | Error | undefined>,
     usingPublicOncoKbInstance?: boolean,
-    civicGenes?: RemoteData<ICivicGene | undefined>,
-    civicVariants?: RemoteData<ICivicVariant | undefined>,
+    civicGenes?: RemoteData<ICivicGeneIndex | undefined>,
+    civicVariants?: RemoteData<ICivicVariantIndex | undefined>,
     resolveTumorType: (mutation: Mutation) => string = getDefaultTumorType,
     resolveEntrezGeneId: (mutation: Mutation) => number = getDefaultEntrezGeneId
 ): IAnnotation {
     let value: Partial<IAnnotation>;
 
     if (mutation) {
+        let key = '';
+        const memoize =
+            !!oncoKbCancerGenes &&
+            oncoKbCancerGenes?.isComplete &&
+            !!hotspotData &&
+            hotspotData?.isComplete &&
+            !!myCancerGenomeData &&
+            !!oncoKbData &&
+            oncoKbData?.isComplete &&
+            !!civicGenes &&
+            civicGenes?.isComplete &&
+            !!civicVariants &&
+            civicVariants?.isComplete;
+
+        if (memoize) {
+            key = JSON.stringify(mutation) + !!usingPublicOncoKbInstance;
+            const val = memoized.get(key);
+            if (val) {
+                return val;
+            }
+        }
+
         const entrezGeneId = resolveEntrezGeneId(mutation);
 
         let oncoKbIndicator: IndicatorQueryResp | undefined;
@@ -231,12 +258,21 @@ export function getAnnotationData(
                 oncoKbIndicator,
                 oncoKbAvailableDataTypes,
             };
+        } else if (oncoKbData && oncoKbData.isPending) {
+            value = {
+                ...value,
+                oncoKbStatus: 'pending',
+                oncoKbIndicator: undefined,
+            };
         } else {
             value = {
                 ...value,
                 oncoKbStatus: 'complete',
                 oncoKbIndicator: undefined,
             };
+        }
+        if (memoize) {
+            memoized.set(key, value as any);
         }
     } else {
         value = DEFAULT_ANNOTATION_DATA;
@@ -268,6 +304,8 @@ export function GenericAnnotation(props: GenericAnnotationProps): JSX.Element {
         enableOncoKb,
         pubMedCache,
         userEmailAddress,
+        mergeOncoKbIcons,
+        oncoKbContentPadding,
     } = props;
 
     return (
@@ -283,8 +321,10 @@ export function GenericAnnotation(props: GenericAnnotationProps): JSX.Element {
                     status={annotation.oncoKbStatus}
                     indicator={annotation.oncoKbIndicator}
                     availableDataTypes={annotation.oncoKbAvailableDataTypes}
+                    mergeAnnotationIcons={mergeOncoKbIcons}
                     pubMedCache={pubMedCache}
                     userEmailAddress={userEmailAddress}
+                    contentPadding={oncoKbContentPadding}
                 />
             )}
             {enableCivic && (

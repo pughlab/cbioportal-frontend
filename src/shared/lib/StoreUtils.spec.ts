@@ -7,6 +7,7 @@ import {
     fetchStudiesForSamplesWithoutCancerTypeClinicalData,
     filterAndAnnotateMolecularData,
     filterAndAnnotateMutations,
+    findMrnaRankMolecularProfileId,
     findSamplesWithoutCancerTypeClinicalData,
     generateMutationIdByEvent,
     generateMutationIdByGeneAndProteinChangeAndEvent,
@@ -17,7 +18,7 @@ import {
     PUTATIVE_DRIVER,
     PUTATIVE_PASSENGER,
 } from './StoreUtils';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { assert } from 'chai';
 import sinon from 'sinon';
 import { MobxPromise } from 'mobxpromise';
@@ -48,7 +49,7 @@ describe('StoreUtils', () => {
     let mutationDataWithMutationsOnly: MobxPromise<Mutation[]>;
     let mutationDataWithBothMutationsAndFusions: MobxPromise<Mutation[]>;
 
-    before(() => {
+    beforeAll(() => {
         emptyMutationData = {
             result: [],
             status: 'complete' as 'complete',
@@ -263,7 +264,7 @@ describe('StoreUtils', () => {
 
     describe('makeStudyToCancerTypeMap', () => {
         let studies: CancerStudy[];
-        before(() => {
+        beforeAll(() => {
             studies = [];
             studies.push({
                 studyId: '0',
@@ -1468,6 +1469,49 @@ describe('StoreUtils', () => {
                 getOncoKbOncogenic({ oncogenic: undefined } as any),
                 ''
             );
+        });
+    });
+
+    describe('findMrnaRankMolecularProfileId', () => {
+        it('requires `rna_seq` in profile name', () => {
+            const list = [
+                'ucec_tcga_pub_rppa',
+                'ucec_tcga_pub_rppa_Zscores',
+                'ucec_tcga_pub_gistic',
+                'ucec_tcga_pub_linear_CNA',
+                'ucec_tcga_pub_mutations',
+                'ucec_tcga_pub_methylation_hm27',
+                'ucec_tcga_pub_mrna',
+                'ucec_tcga_pub_mrna_median_Zscores',
+                ',ucec_tcga_pub_mrna_median_all_sample_Zscores',
+                'ucec_tcga_pub_rna_seq_v2_mrna',
+                'ucec_tcga_pub_rna_seq_v2_mrna_median_Zscores',
+                'ucec_tcga_pub_rna_seq_v2_mrna_median_all_sample_Zscores',
+            ];
+
+            assert.equal(
+                findMrnaRankMolecularProfileId(list),
+                'ucec_tcga_pub_rna_seq_v2_mrna_median_Zscores'
+            );
+        });
+
+        it('does not match rppa profiles', () => {
+            const list = [
+                'brca_tcga_pub_rppa',
+                'brca_tcga_pub_rppa_Zscores',
+                'brca_tcga_pub_gistic',
+                'brca_tcga_pub_mrna',
+                'brca_tcga_pub_mrna_median_Zscores',
+                'brca_tcga_pub_linear_CNA',
+                'brca_tcga_pub_methylation_hm27',
+                'brca_tcga_pub_mutations',
+                'brca_tcga_pub_mirna',
+                'brca_tcga_pub_mirna_median_Zscores',
+                'brca_tcga_pub_mrna_merged_median_Zscores',
+                'brca_tcga_pub_mrna_median_all_sample_Zscores',
+            ];
+
+            assert.equal(findMrnaRankMolecularProfileId(list), null);
         });
     });
 });

@@ -49,6 +49,7 @@ yarn run start
 Example pages:
  - http://localhost:3000/
  - http://localhost:3000/patient?studyId=lgg_ucsf_2014&caseId=P04
+> **Tip:** If you see dependency errors, especially the error that the script cannot identify the packages managed by lerna(monorepo), you could do a `yarn buildModules` first before starting the project.
 
 To run unit/integration tests
 ```
@@ -132,53 +133,19 @@ End-to-end tests can be run against public cbioportal instances or against a loc
 
 ## Run of `remote e2e-tests`
 
-First, install webdriver-manager, which manages standalone Selenium installation:
-```
-yarn global add webdriver-manager
-```
-Run updater to get necessary binaries
-```
-webdriver-manager update
-
-// ALTERNATIVE
-// Specify chrome version if your local chrome version is not up to date.
-// This ensures that chromedriver is compatible with your local chrome
-// If it's out of sync, tests will not run
-webdriver-manager update --versions.chrome=[e.g. 86.0.4240.198]
+Follow instructions to boot up frontend dev server. This is the frontend that will be under test in the e2e tests (running against production backend/api)
 
 ```
-Start the webdriver-manager
-```
-webdriver-manager start
-```
-
-> **Tip:** To verify that your webdriver-manager is running, go to:  http://127.0.0.1:4444/wd/hub/static/resource/hub.html.
-
-> **Windows Tip:** If you are developing on Ubuntu under Windows Subsystem for Linux (WSL), we recommend that you install and run webdriver-manager via Powershell/Windows.  If you install and run webdriver-manager via Ubuntu, webdriver-manager has a hard time finding the Chrome browser, and this will cause all the end-to-end tests to fail.
-
-In a second terminal, run the frontend
-```bash
-# set the environment variables for your branch
-export BRANCH_ENV=master # or rc if branching from rc
-# export any custom external API URLs by editing env/custom.sh
-yarn run startSSL
-```
-> **Tip:** Before going to the next step, verify that your front end code is running by going to: https://localhost:3000/.
-
-In a third terminal, run the e2e tests
-```bash
-export SPEC_FILE_PATTERN=./remote/specs/**/*.spec.js
-export SCREENSHOT_DIRECTORY=./remote/screenshots
-export BRANCH_ENV=master # or rc if branching from rc
-# export any custom external API URLs in env/custom.sh
 cd end-to-end-test
-yarn install
-yarn run test-webdriver-manager
-# use `test-webdriver-manager-debug` for debugging of tests
-```
-If all goes well, you will soon seen the end-to-end tests running via your Chrome browser.
 
-> **Tip:** If you want to run just one end-to-end test, you can modify `SPEC_FILE_PATTERN` accordingly.  For example, if you want to only run the `genomicEvolution.spec.js` test, you can use:  `export SPEC_FILE_PATTERN=./remote/specs/core/genomicEvolution.spec.js`.
+// install deps
+yarn 
+
+```
+
+```
+yarn run e2e:remote --grep=some.spec* 
+```
 
 ### Mount of frontend onto HTTPS backend
 A custom frontend can be tested against any backend in the web browser using a local node server (command `yarn run start`) and the `localdev` flag passed to th e browser (see section 'Check in cBioPortal context'). For remote backends that communicate over a HTTP over SSL (https) connection (e.g., cbioportal.org or rc.cbioportal.org), the frontend has to be served over SSL as well. In this case run `yarn run startSSL` in stead of `yarn run start`.
@@ -190,87 +157,49 @@ Files for the local database e2e-tests are located in the `./end-to-end-test/loc
 
 ### Running `localdb` e2e-tests for development
 
-1. Start cBioPortal (including session service) using the [cBioPortal docker compose solution](https://docs.cbioportal.org/2.1.1-deploy-with-docker-recommended/docker#quick-start).
-cBioPortal must be accessible on _http://localhost:8080_.
+1. You need to have Docker installed and running.
 
-```
-cd
-git clone https://github.com/cBioPortal/cbioportal-docker-compose.git
-cd cbioportal-docker-compose
-./init.sh
-docker-compose up -d
-```
+2. You need to have the [jq](https://stedolan.github.io/jq/) package installed on your system. E.g. using brew:
+   ```brew install jq```
 
-:warning: If the frontend requires a specific backend version, make sure to deploy this instead of the default version supported by the docker compose solution.
-
-2. Install gene panels and gene sets for study_es_0:
-
-```
-cd ~/cbioportal-docker-compose
-docker-compose run --rm cbioportal sh -c '
-    cd /cbioportal/core/src/main/scripts/ \
-    && ./importGenePanel.pl --data /cbioportal/core/src/test/scripts/test_data/study_es_0/data_gene_panel_testpanel1.txt \
-    && ./importGenePanel.pl --data /cbioportal/core/src/test/scripts/test_data/study_es_0/data_gene_panel_testpanel2.txt \
-    && ./importGenesetData.pl --data /cbioportal/core/src/test/resources/genesets/study_es_0_genesets.gmt --new-version msigdb_6.1 \
-    && ./importGenesetHierarchy.pl --data /cbioportal/core/src/test/resources/genesets/study_es_0_tree.yaml'
-```
-
-Restart cBioPortal
-```
-docker-compose restart cbioportal
-```
-
-3. Load study_es_0 of the deployed (!) backend version and all studies in [end-to-end-test/local/studies](end-to-end-test/local/studies). At the moment of this writing:
-
-```
-docker-compose run --rm  -v <e2e_study_dir>:/studies cbioportal sh -c '
-    cd /cbioportal/core/src/main/scripts/importer \
-    && ./cbioportalImporter.py -s /cbioportal/core/src/test/scripts/test_data/study_es_0 \
-    && ./cbioportalImporter.py -s /studies/genepanel_test_study'
-    # add other studies if present
-```
-
-:info: The `<e2e_study_dir>` entry refer to the absolute path to [end-to-end-test/local/studies](end-to-end-test/local/studies) on the host system.
-
-4. Add `export CBIOPORTAL_URL="http://localhost:8080"` to `/env/custom.sh`.
-
-5. In a terminal, install webdriver-manager:
-
-```bash
-yarn global add webdriver-manager
-```
-
-:warning: Add path to webdriver-manager installation (needed on Ubuntu Linux):
-```
-export PATH=$PATH:$(yarn global dir)/node_modules/webdriver-manager/bin
-```
-
-and start webdriver-manager:
-```
-webdriver-manager update
-webdriver-manager start
-```
-
-6. If not already running at _localhost:3000_, open a second terminal and start the frontend dev server:
+In a terminal, start the frontend dev server
 
 ```
 export BRANCH_ENV=custom
-yarn install --frozen-lockfile
-yarn buildDLL:dev
+yarn install --frozen-lockfile // only necessary first time
+yarn buildDLL:dev // only necessary first tiem
 yarn start
 ```
 
-7. In a third terminal, run the tests:
+3. Install dev dependencies:
+```bash
+cd end-to-end-test
+yarn
+```
+5. In a second terminal at project root, spinup the backend (api) instance:
 
 ```
-export BRANCH_ENV=custom
-eval "$(./scripts/env_vars.sh)"
-export SPEC_FILE_PATTERN=./local/specs/**/*.spec.js
-export SCREENSHOT_DIRECTORY=./local/screenshots
-cd end-to-end-test
-yarn install
-yarn run test-webdriver-manager-debug
+// if you are running for first time, you will need to build the docker containers.
+// Answer yes when it prompts you to do so. This will take at least 20 minutes depending
+// on your system speed.
+// Once you have done this, you can answer no on subsequent attempts
+
+yarn run e2e:spinup
 ```
+
+6. When backend instance is operational, you can run tests. Upon executing
+the command below, a browser should open and you should see your tests execute.
+
+```
+//grep accepts fragments of file name, 
+//but you MUST using trailing *
+//you need only match the file name, not path
+
+yarn run e2e:local --grep=some.spec*   
+
+```
+
+
 
 ### Running e2e-localdb tests _CircleCI_ or _CircleCI+PR_ context
 E2e-tests on _CircleCI_ and _CircleCI+PR_ context are triggered via _hooks_ configured on GitHub. Configuration of hooks falls beyond the scope of this manual.

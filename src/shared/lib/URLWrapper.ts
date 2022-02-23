@@ -18,16 +18,16 @@ import ExtendedRouterStore, {
     PortalSession,
     saveRemoteSession,
 } from './ExtendedRouterStore';
-import hashString from 'shared/lib/hashString';
-import * as _ from 'lodash';
+import { hashString } from 'cbioportal-frontend-commons';
+import _ from 'lodash';
 import { log } from 'shared/lib/consoleLog';
-import ResultsViewURLWrapper from 'pages/resultsView/ResultsViewURLWrapper';
 import { MapValues, Omit } from './TypeScriptUtils';
 import { QueryParams } from 'url';
 
 export type Property<T, NestedObjectType = any> = {
     name: keyof T;
     isSessionProp: boolean;
+    isHashedProp?: boolean;
     doubleURIEncode?: boolean;
     nestedObjectProps?: { [prop in keyof Required<NestedObjectType>]: any };
     aliases?: string[];
@@ -41,6 +41,13 @@ export function needToLoadSession(obj: Partial<URLWrapper<any>>): boolean {
             obj.localSessionData.id !== obj.sessionId)
     );
 }
+
+export type PropertiesMap<QueryParamsType> = {
+    [property in keyof Required<QueryParamsType>]: Omit<
+        Property<QueryParamsType, Required<QueryParamsType[property]>>,
+        'name'
+    >;
+};
 
 export default class URLWrapper<
     QueryParamsType extends { [key: string]: string | Object | undefined }
@@ -56,12 +63,7 @@ export default class URLWrapper<
     constructor(
         protected routing: ExtendedRouterStore,
         // pass it in in a map so that typescript can ensure that every property is accounted for
-        protected propertiesMap: {
-            [property in keyof Required<QueryParamsType>]: Omit<
-                Property<QueryParamsType, Required<QueryParamsType[property]>>,
-                'name'
-            >;
-        },
+        protected propertiesMap: PropertiesMap<QueryParamsType>,
         public sessionEnabled = false,
         public urlCharThresholdForSession = 1500,
         protected backwardsCompatibilityMapping?: (oldParams: {
@@ -527,18 +529,13 @@ export default class URLWrapper<
 
     @computed get hash(): number {
         const stringifiedProps = this.stringifyProps(this.query);
-        const stringified = _.reduce(
-            this.properties,
-            (acc, nextVal) => {
-                // @ts-ignore
-                if (nextVal.isSessionProp)
-                    acc = `${acc},${nextVal.name}:${
-                        stringifiedProps[nextVal.name]
-                    }`;
-                return acc;
-            },
-            ''
-        );
+        const stringified = this.properties.reduce((acc, nextVal) => {
+            if (nextVal.isHashedProp)
+                acc = `${acc},${nextVal.name}:${
+                    stringifiedProps[nextVal.name]
+                }`;
+            return acc;
+        }, '');
         return hashString(stringified);
     }
 

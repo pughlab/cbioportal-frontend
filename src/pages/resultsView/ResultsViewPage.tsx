@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import $ from 'jquery';
 import URL from 'url';
 import { inject, observer } from 'mobx-react';
@@ -16,13 +16,12 @@ import CancerSummaryContainer from 'pages/resultsView/cancerSummary/CancerSummar
 import Mutations from './mutation/Mutations';
 import MutualExclusivityTab from './mutualExclusivity/MutualExclusivityTab';
 import DownloadTab from './download/DownloadTab';
-import AppConfig from 'appConfig';
+import { getServerConfig } from 'config/config';
 import CNSegments from './cnSegments/CNSegments';
 import './styles.scss';
 import ResultsViewPathwayMapper from './pathwayMapper/ResultsViewPathwayMapper';
 import ResultsViewOncoprint from 'shared/components/oncoprint/ResultsViewOncoprint';
 import QuerySummary from './querySummary/QuerySummary';
-import ExpressionWrapper from './expression/ExpressionWrapper';
 import PlotsTab from './plots/PlotsTab';
 import { MSKTab, MSKTabs } from '../../shared/components/MSKTabs/MSKTabs';
 import { PageLayout } from '../../shared/components/PageLayout/PageLayout';
@@ -48,7 +47,7 @@ import GeneSymbolValidationError from 'shared/components/query/GeneSymbolValidat
 import ResultsViewURLWrapper from 'pages/resultsView/ResultsViewURLWrapper';
 import setWindowVariable from 'shared/lib/setWindowVariable';
 import LoadingIndicator from 'shared/components/loadingIndicator/LoadingIndicator';
-import onMobxPromise from 'shared/lib/onMobxPromise';
+import { onMobxPromise } from 'cbioportal-frontend-commons';
 import { createQueryStore } from 'shared/lib/createQueryStore';
 import {
     handleLegacySubmission,
@@ -60,7 +59,11 @@ import OQLTextArea, {
 } from 'shared/components/GeneSelectionBox/OQLTextArea';
 import browser from 'bowser';
 import { QueryStore } from '../../shared/components/query/QueryStore';
-import UserMessager from 'shared/components/userMessager/UserMessage';
+import UserMessager, {
+    IUserMessage,
+} from 'shared/components/userMessager/UserMessage';
+import { HelpWidget } from 'shared/components/HelpWidget/HelpWidget';
+import { buildCBioPortalPageUrl } from 'shared/api/urls';
 
 export function initStore(
     appStore: AppStore,
@@ -346,6 +349,7 @@ export default class ResultsViewPage extends React.Component<
                             key={6}
                             id={ResultsViewTab.CN_SEGMENTS}
                             linkText="CN Segments"
+                            className="cnSegmentsMSKTab"
                         >
                             <CNSegments store={store} />
                         </MSKTab>
@@ -383,7 +387,7 @@ export default class ResultsViewPage extends React.Component<
                 id: ResultsViewTab.PATHWAY_MAPPER,
                 hide: () =>
                     browser.name === 'Internet Explorer' ||
-                    !AppConfig.serverConfig.show_pathway_mapper ||
+                    !getServerConfig().show_pathway_mapper ||
                     !this.resultsViewPageStore.studies.isComplete,
                 getTab: () => {
                     const showPM =
@@ -444,9 +448,11 @@ export default class ResultsViewPage extends React.Component<
             .map(tab => tab.getTab());
 
         // now add custom tabs
-        if (AppConfig.serverConfig.custom_tabs) {
-            const customResultsTabs = AppConfig.serverConfig.custom_tabs
-                .filter((tab: any) => tab.location === 'RESULTS_PAGE')
+        if (getServerConfig().custom_tabs) {
+            const customResultsTabs = getServerConfig()
+                .custom_tabs.filter(
+                    (tab: any) => tab.location === 'RESULTS_PAGE'
+                )
                 .map((tab: any, i: number) => {
                     return (
                         <MSKTab
@@ -471,7 +477,7 @@ export default class ResultsViewPage extends React.Component<
 
     @autobind
     public evaluateTabInclusion(tab: ITabConfiguration) {
-        const excludedTabs = AppConfig.serverConfig.disabled_tabs || '';
+        const excludedTabs = getServerConfig().disabled_tabs || '';
         const isExcludedInList = parseConfigDisabledTabs(excludedTabs).includes(
             tab.id
         );
@@ -536,61 +542,28 @@ export default class ResultsViewPage extends React.Component<
     @autobind
     private getTabHref(tabId: string) {
         return URL.format({
-            pathname: tabId,
+            pathname: buildCBioPortalPageUrl(`./results/${tabId}`),
             query: this.props.routing.query,
             hash: this.props.routing.location.hash,
         });
     }
 
-    readonly userMessages = remoteData({
+    readonly userMessages = remoteData<IUserMessage[]>({
         await: () => [
             this.resultsViewPageStore.expressionProfiles,
             this.resultsViewPageStore.studies,
         ],
         invoke: () => {
-            // TODO: This is only here temporarily to shepherd users from
-            //      now-deleted Expression tab to the Plots tab.
-            //  Remove a few months after 10/2020
-            if (
-                this.resultsViewPageStore.expressionProfiles.result.length >
-                    0 &&
-                this.resultsViewPageStore.studies.result.length > 1
-            ) {
-                return Promise.resolve([
-                    {
-                        dateEnd: 10000000000000000000,
-                        content: (
-                            <span>
-                                Looking for the <strong>Expression</strong> tab?
-                                {` `}
-                                That functionality is now available{` `}
-                                <a
-                                    style={{
-                                        color: 'white',
-                                        textDecoration: 'underline',
-                                    }}
-                                    onClick={() =>
-                                        this.urlWrapper.updateURL(
-                                            {},
-                                            `results/${ResultsViewTab.EXPRESSION_REDIRECT}`
-                                        )
-                                    }
-                                >
-                                    in the <strong>Plots</strong> tab.
-                                </a>
-                            </span>
-                        ),
-                        id: '2020_merge_expression_to_plots',
-                    },
-                ]);
-            } else {
-                return Promise.resolve([]);
-            }
+            // TODO: make this configurable from outside app
+            return Promise.resolve([]);
         },
     });
 
     @computed get pageContent() {
-        if (this.resultsViewPageStore.invalidStudyIds.result.length > 0) {
+        if (
+            this.resultsViewPageStore.hugoGeneSymbols.length === 0 ||
+            this.resultsViewPageStore.invalidStudyIds.result.length > 0
+        ) {
             return (
                 <div>
                     <div className={'headBlock'}></div>
@@ -613,13 +586,13 @@ export default class ResultsViewPage extends React.Component<
             const tabsReady =
                 this.showTabs &&
                 !this.resultsViewPageStore.genesInvalid &&
-                !this.resultsViewPageStore.isQueryInvalid &&
+                !this.resultsViewPageStore.queryExceedsLimit &&
                 this.resultsViewPageStore.customDriverAnnotationReport
                     .isComplete;
             return (
                 <>
                     {// if query invalid(we only check gene count * sample count < 1,000,000 for now), return error page
-                    this.resultsViewPageStore.isQueryInvalid && (
+                    this.resultsViewPageStore.queryExceedsLimit && (
                         <div
                             className="alert alert-danger queryInvalid"
                             style={{ marginBottom: '40px' }}
@@ -631,11 +604,9 @@ export default class ResultsViewPage extends React.Component<
                                         .length
                                 }
                                 queryProductLimit={
-                                    AppConfig.serverConfig.query_product_limit
+                                    getServerConfig().query_product_limit
                                 }
-                                email={
-                                    AppConfig.serverConfig.skin_email_contact
-                                }
+                                email={getServerConfig().skin_email_contact}
                             />
                         </div>
                     )}
@@ -712,6 +683,9 @@ export default class ResultsViewPage extends React.Component<
                                 </div>
                                 {tabsReady && (
                                     <MSKTabs
+                                        // When important parts of the query change (included in the hash), we
+                                        //  want to remount the tabs so that we rerun any initialization code
+                                        //  that depends on the query.
                                         key={this.urlWrapper.hash}
                                         activeTabId={
                                             this.resultsViewPageStore.tabId
@@ -723,7 +697,17 @@ export default class ResultsViewPage extends React.Component<
                                             )
                                         }
                                         className="mainTabs"
-                                        getTabHref={this.getTabHref}
+                                        hrefRoot={buildCBioPortalPageUrl(
+                                            'results'
+                                        )}
+                                        contentWindowExtra={
+                                            <HelpWidget
+                                                path={
+                                                    this.props.routing.location
+                                                        .pathname
+                                                }
+                                            />
+                                        }
                                     >
                                         {this.tabs}
                                     </MSKTabs>
@@ -752,10 +736,16 @@ export default class ResultsViewPage extends React.Component<
             );
         }
 
+        // if we don't have a tabId, we need figure out
+        // which tab should be default based upon
+        // characteristics of study (handled in tabId getter)
         if (
             this.resultsViewPageStore.studies.isComplete &&
             !this.resultsViewPageStore.tabId
         ) {
+            // we have to use timeout in order to
+            // circumvent restriction on updating state
+            // inside of render
             setTimeout(() => {
                 this.resultsViewPageStore.handleTabChange(
                     this.resultsViewPageStore.tabId,

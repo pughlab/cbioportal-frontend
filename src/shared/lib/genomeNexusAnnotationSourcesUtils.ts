@@ -1,5 +1,7 @@
-import AppConfig from 'appConfig';
+import { getServerConfig } from 'config/config';
 
-export const SHOW_MUTATION_ASSESSOR = RegExp('mutation_assessor', 'gi').test(
-    AppConfig.serverConfig.show_genomenexus_annotation_sources
-);
+export function shouldShowMutationAssessor() {
+    return RegExp('mutation_assessor', 'gi').test(
+        getServerConfig().show_genomenexus_annotation_sources
+    );
+}

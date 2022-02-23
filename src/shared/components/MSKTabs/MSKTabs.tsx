@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import classnames from 'classnames';
 import { ThreeBounce } from 'better-react-spinkit';
 import ReactResizeDetector from 'react-resize-detector';
@@ -10,6 +10,7 @@ import LoadingIndicator from '../loadingIndicator/LoadingIndicator';
 import {
     action,
     autorun,
+    computed,
     IReactionDisposer,
     makeObservable,
     observable,
@@ -20,6 +21,9 @@ import { observer } from 'mobx-react';
 import { JsxElement } from 'typescript';
 import MemoizedHandlerFactory from '../../lib/MemoizedHandlerFactory';
 import WindowStore from '../window/WindowStore';
+import URL from 'url';
+import { buildCBioPortalPageUrl } from 'shared/api/urls';
+import { getBrowserWindow } from 'cbioportal-frontend-commons';
 
 export interface IMSKTabProps {
     inactive?: boolean;
@@ -106,13 +110,14 @@ interface IMSKTabsProps {
     id?: string;
     activeTabId?: string;
     onTabClick?: (tabId: string, datum: any) => void;
-    getTabHref?: (tabId: string) => string;
     getPaginationWidth?: () => number;
     // only used when pagination is true to style arrows
     arrowStyle?: { [k: string]: string | number | boolean };
     tabButtonStyle?: string;
     unmountOnHide?: boolean;
     loadingComponent?: JSX.Element;
+    contentWindowExtra?: JSX.Element;
+    hrefRoot?: string;
 }
 
 @observer
@@ -197,9 +202,10 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
                 IMSKTabProps
             >[];
 
-            const toArrayedChildren: ReactChild[] = React.Children.toArray(
-                children
-            );
+            const toArrayedChildren: (
+                | ReactChild
+                | {}
+            )[] = React.Children.toArray(children);
 
             const targetTabId = (() => {
                 if (
@@ -266,6 +272,7 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
                             />
                         }
                     >
+                        {this.props.contentWindowExtra}
                         {arr}
                     </DeferredRender>
                 </div>
@@ -324,6 +331,19 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
         );
     }
 
+    private getTabHref(tabId: string) {
+        if (this.props.hrefRoot) {
+            return URL.format({
+                pathname: `${this.props.hrefRoot}/${tabId}`,
+                search: getBrowserWindow().location.search,
+                hash: getBrowserWindow().location.hash,
+            });
+        } else {
+            // will disable without losing styles
+            return undefined;
+        }
+    }
+
     protected tabPages(
         children: React.ReactElement<IMSKTabProps>[],
         effectiveActiveTab: string
@@ -367,6 +387,8 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
                     );
                 }
 
+                const href = this.getTabHref(tab.props.id);
+
                 pages[currentPage - 1].push(
                     <li
                         key={tab.props.id}
@@ -381,10 +403,7 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
                                 tab.props.anchorClassName
                             )}
                             onClick={this.tabClickHandlers(tab.props)}
-                            href={
-                                this.props.getTabHref &&
-                                this.props.getTabHref(tab.props.id)
-                            }
+                            href={href}
                             style={tab.props.anchorStyle}
                         >
                             {tab.props.linkText}

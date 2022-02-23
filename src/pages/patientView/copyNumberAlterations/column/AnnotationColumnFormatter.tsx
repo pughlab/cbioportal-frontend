@@ -1,14 +1,14 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import {
     buildCivicEntry,
     calculateOncoKbAvailableDataType,
     generateQueryVariantId,
     ICivicEntry,
-    ICivicGene,
-    ICivicGeneData,
-    ICivicVariant,
-    ICivicVariantData,
+    ICivicGeneIndex,
+    ICivicGeneSummary,
+    ICivicVariantIndex,
+    ICivicVariantSummary,
     IOncoKbData,
     OncoKbCardDataType,
     RemoteData,
@@ -26,6 +26,7 @@ import { IAnnotationColumnProps } from 'shared/components/mutationTable/column/A
 import { CancerGene, IndicatorQueryResp } from 'oncokb-ts-api-client';
 import { getAlterationString } from 'shared/lib/CopyNumberUtils';
 import { getCivicCNAVariants } from 'shared/lib/CivicUtils';
+import AnnotationHeader from 'shared/components/mutationTable/column/annotation/AnnotationHeader';
 
 /**
  * @author Selcuk Onur Sumer
@@ -37,8 +38,8 @@ export default class AnnotationColumnFormatter {
         oncoKbData?: RemoteData<IOncoKbData | Error | undefined>,
         usingPublicOncoKbInstance?: boolean,
         uniqueSampleKeyToTumorType?: { [sampleId: string]: string },
-        civicGenes?: RemoteData<ICivicGene | undefined>,
-        civicVariants?: RemoteData<ICivicVariant | undefined>,
+        civicGenes?: RemoteData<ICivicGeneIndex | undefined>,
+        civicVariants?: RemoteData<ICivicVariantIndex | undefined>,
         studyIdToStudy?: { [studyId: string]: CancerStudy }
     ) {
         let value: IAnnotation;
@@ -161,21 +162,21 @@ export default class AnnotationColumnFormatter {
      */
     public static getCivicEntry(
         copyNumberData: DiscreteCopyNumberData[],
-        civicGenes: ICivicGene,
-        civicVariants: ICivicVariant
+        civicGenes: ICivicGeneIndex,
+        civicVariants: ICivicVariantIndex
     ): ICivicEntry | null {
         let civicEntry = null;
         let geneSymbol: string = copyNumberData[0].gene.hugoGeneSymbol;
         let geneVariants: {
-            [name: string]: ICivicVariantData;
+            [name: string]: ICivicVariantSummary;
         } = getCivicCNAVariants(copyNumberData, geneSymbol, civicVariants);
-        let geneEntry: ICivicGeneData = civicGenes[geneSymbol];
+        let geneSummary: ICivicGeneSummary = civicGenes[geneSymbol];
         //geneEntry must exists, and only return data for genes with variants or it has a description provided by the Civic API
         if (
-            geneEntry &&
-            (!_.isEmpty(geneVariants) || geneEntry.description !== '')
+            geneSummary &&
+            (!_.isEmpty(geneVariants) || geneSummary.description !== '')
         ) {
-            civicEntry = buildCivicEntry(geneEntry, geneVariants);
+            civicEntry = buildCivicEntry(geneSummary, geneVariants);
         }
 
         return civicEntry;
@@ -200,16 +201,16 @@ export default class AnnotationColumnFormatter {
 
     public static hasCivicVariants(
         copyNumberData: DiscreteCopyNumberData[],
-        civicGenes: ICivicGene,
-        civicVariants: ICivicVariant
+        civicGenes: ICivicGeneIndex,
+        civicVariants: ICivicVariantIndex
     ): boolean {
         let geneSymbol: string = copyNumberData[0].gene.hugoGeneSymbol;
         let geneVariants: {
-            [name: string]: ICivicVariantData;
+            [name: string]: ICivicVariantSummary;
         } = getCivicCNAVariants(copyNumberData, geneSymbol, civicVariants);
-        let geneEntry: ICivicGeneData = civicGenes[geneSymbol];
+        let geneSummary: ICivicGeneSummary = civicGenes[geneSymbol];
 
-        if (geneEntry && _.isEmpty(geneVariants)) {
+        if (geneSummary && _.isEmpty(geneVariants)) {
             return false;
         }
 
@@ -255,8 +256,8 @@ export default class AnnotationColumnFormatter {
         usingPublicOncoKbInstance?: boolean,
         oncoKbData?: RemoteData<IOncoKbData | Error | undefined>,
         uniqueSampleKeyToTumorType?: { [sampleId: string]: string },
-        civicGenes?: RemoteData<ICivicGene | undefined>,
-        civicVariants?: RemoteData<ICivicVariant | undefined>
+        civicGenes?: RemoteData<ICivicGeneIndex | undefined>,
+        civicVariants?: RemoteData<ICivicVariantIndex | undefined>
     ): number[] {
         const annotationData: IAnnotation = AnnotationColumnFormatter.getData(
             data,
@@ -291,5 +292,21 @@ export default class AnnotationColumnFormatter {
         );
 
         return <GenericAnnotation {...columnProps} annotation={annotation} />;
+    }
+
+    public static headerRender(
+        name: string,
+        width: number,
+        mergeOncoKbIcons?: boolean,
+        onOncoKbIconToggle?: (mergeIcons: boolean) => void
+    ) {
+        return (
+            <AnnotationHeader
+                name={name}
+                width={width}
+                mergeOncoKbIcons={mergeOncoKbIcons}
+                onOncoKbIconToggle={onOncoKbIconToggle}
+            />
+        );
     }
 }

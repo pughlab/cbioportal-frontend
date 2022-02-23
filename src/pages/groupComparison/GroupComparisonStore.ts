@@ -13,10 +13,6 @@ import comparisonClient from '../../shared/api/comparisonGroupClientInstance';
 import _ from 'lodash';
 import autobind from 'autobind-decorator';
 import { pickClinicalDataColors } from 'pages/studyView/StudyViewUtils';
-import {
-    Session,
-    SessionGroupData,
-} from '../../shared/api/ComparisonGroupClient';
 import { AppStore } from '../../AppStore';
 import { GACustomFieldsEnum, trackEvent } from 'shared/lib/tracking';
 import ifNotDefined from '../../shared/lib/ifNotDefined';
@@ -24,9 +20,14 @@ import GroupComparisonURLWrapper from './GroupComparisonURLWrapper';
 import ComparisonStore, {
     OverlapStrategy,
 } from '../../shared/lib/comparison/ComparisonStore';
-import { VirtualStudy } from 'shared/model/VirtualStudy';
 import sessionServiceClient from 'shared/api//sessionServiceInstance';
 import { COLORS } from '../studyView/StudyViewUtils';
+import {
+    ComparisonSession,
+    SessionGroupData,
+    VirtualStudy,
+} from 'shared/api/session-service/sessionServiceModels';
+import ComplexKeySet from 'shared/lib/complexKeyDataStructures/ComplexKeySet';
 
 export default class GroupComparisonStore extends ComparisonStore {
     @observable.ref private sessionId: string;
@@ -123,7 +124,7 @@ export default class GroupComparisonStore extends ComparisonStore {
     }
 
     @action
-    protected async saveAndGoToSession(newSession: Session) {
+    protected async saveAndGoToSession(newSession: ComparisonSession) {
         const { id } = await comparisonClient.addComparisonSession(newSession);
         this.urlWrapper.updateURL({ comparisonId: id });
     }
@@ -132,11 +133,11 @@ export default class GroupComparisonStore extends ComparisonStore {
         return this.__session;
     }
 
-    private readonly __session = remoteData<Session>({
+    private readonly __session = remoteData<ComparisonSession>({
         invoke: () => {
             return comparisonClient.getComparisonSession(this.sessionId);
         },
-        onResult(data: Session) {
+        onResult(data: ComparisonSession) {
             try {
                 const studies = _.chain(data.groups)
                     .flatMap(group => group.studies)
@@ -276,24 +277,39 @@ export default class GroupComparisonStore extends ComparisonStore {
     }
     private readonly _samples = remoteData({
         await: () => [this._session],
-        invoke: () => {
-            const sampleIdentifiers = [];
+        invoke: async () => {
+            const allStudies = _(this._session.result!.groups)
+                .flatMapDeep(groupData => groupData.studies.map(s => s.id))
+                .uniq()
+                .value();
+
+            // fetch all samples - faster backend processing time
+            const allSamples = await client.fetchSamplesUsingPOST({
+                sampleFilter: {
+                    sampleListIds: allStudies.map(studyId => `${studyId}_all`),
+                } as SampleFilter,
+                projection: 'DETAILED',
+            });
+
+            // filter to get samples in our groups
+            const sampleSet = new ComplexKeySet();
             for (const groupData of this._session.result!.groups) {
                 for (const studySpec of groupData.studies) {
                     const studyId = studySpec.id;
                     for (const sampleId of studySpec.samples) {
-                        sampleIdentifiers.push({
+                        sampleSet.add({
                             studyId,
                             sampleId,
                         });
                     }
                 }
             }
-            return client.fetchSamplesUsingPOST({
-                sampleFilter: {
-                    sampleIdentifiers,
-                } as SampleFilter,
-                projection: 'DETAILED',
+
+            return allSamples.filter(sample => {
+                return sampleSet.has({
+                    studyId: sample.studyId,
+                    sampleId: sample.sampleId,
+                });
             });
         },
     });
@@ -407,4 +423,12 @@ export default class GroupComparisonStore extends ComparisonStore {
         },
         []
     );
+
+    @computed get hasCustomDriverAnnotations() {
+        return (
+            this.customDriverAnnotationReport.isComplete &&
+            (!!this.customDriverAnnotationReport.result!.hasBinary ||
+                this.customDriverAnnotationReport.result!.tiers.length > 0)
+        );
+    }
 }

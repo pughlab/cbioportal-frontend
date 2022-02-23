@@ -1,12 +1,11 @@
 import { IndicatorQueryResp } from 'oncokb-ts-api-client';
-import classnames from 'classnames';
 import { computed, makeObservable } from 'mobx';
 import { observer } from 'mobx-react';
 import * as React from 'react';
 
 import { ICache } from '../../model/SimpleCache';
 
-import oncoKbLogoImgSrc from '../../images/oncokb_logo.png';
+import oncoKbLogoImgSrc from '../../images/oncokb.svg';
 import mainStyles from './main.module.scss';
 import { OncoKbCardTitle } from './OncoKbCardTitle';
 import { OncoKbCardBody } from './OncoKbCardBody';
@@ -20,6 +19,7 @@ export type OncoKbCardProps = {
     usingPublicOncoKbInstance: boolean;
     pmidData: ICache;
     indicator?: IndicatorQueryResp;
+    displayHighestLevelInTabTitle?: boolean;
     handleFeedbackOpen?: React.EventHandler<any>;
 };
 
@@ -33,7 +33,7 @@ export default class OncoKbCard extends React.Component<OncoKbCardProps> {
     get oncokbLinkOut() {
         let link: string | undefined = undefined;
         if (this.props.hugoSymbol) {
-            link = `https://oncokb.org/gene/${this.props.hugoSymbol}`;
+            link = `https://www.oncokb.org/gene/${this.props.hugoSymbol}`;
             if (
                 !this.props.geneNotExist &&
                 this.props.indicator &&
@@ -45,7 +45,6 @@ export default class OncoKbCard extends React.Component<OncoKbCardProps> {
         return link;
     }
 
-    // TODO we should replace the tabs with an actual ReactBootstrap Tab,
     public render() {
         const oncokbLogo = (
             <img
@@ -78,24 +77,26 @@ export default class OncoKbCard extends React.Component<OncoKbCardProps> {
                         usingPublicOncoKbInstance={
                             this.props.usingPublicOncoKbInstance
                         }
+                        displayHighestLevelInTabTitle={
+                            this.props.displayHighestLevelInTabTitle
+                        }
                     />
                     <div className={mainStyles.footer}>
                         {this.oncokbLinkOut === undefined ? (
                             { oncokbLogo }
                         ) : (
-                            <a href={`${this.oncokbLinkOut}`} target="_blank">
+                            <a
+                                href={`${this.oncokbLinkOut}`}
+                                target="_blank"
+                                className={mainStyles['oncokb-logo']}
+                            >
                                 {oncokbLogo}
                             </a>
                         )}
                         {this.props.handleFeedbackOpen && (
-                            <span
-                                className={classnames(
-                                    'pull-right',
-                                    mainStyles.feedback
-                                )}
-                            >
+                            <span>
                                 <button
-                                    className="btn btn-default btn-sm btn-xs"
+                                    className="btn btn-default btn-xs"
                                     onClick={this.props.handleFeedbackOpen}
                                 >
                                     Feedback

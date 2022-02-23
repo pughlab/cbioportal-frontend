@@ -129,6 +129,16 @@ export type CountByTumorType = {
         'variantCount': number
 
 };
+export type CuriousCases = {
+    'comment': string
+
+        'genomicLocation': string
+
+        'hugoGeneSymbol': string
+
+        'pubmedIds': Array < number >
+
+};
 export type Dbsnp = {
     '_class': string
 
@@ -279,6 +289,28 @@ export type HrdScore = {
         'lst': number
 
         'ntelomericAi': number
+
+};
+export type Index = {
+    'cdna': Array < string >
+
+        'hgvsc': Array < string >
+
+        'hgvsp': Array < string >
+
+        'hgvspShort': Array < string >
+
+        'hugoSymbol': Array < string >
+
+        'rsid': Array < string >
+
+        'variant': string
+
+};
+export type IndexSearch = {
+    'queryType': "GENE_HGVSPSHORT" | "GENE_CDNA" | "GENE_HGVSP" | "HGVSG" | "HGVSC"
+
+        'results': Array < Index >
 
 };
 export type IntegerRange = {
@@ -1379,6 +1411,82 @@ export default class GenomeNexusAPIInternal {
                 return response.body;
             });
         };
+    fetchCuriousCasesGETURL(parameters: {
+        'genomicLocation': string,
+        $queryParameters ? : any
+    }): string {
+        let queryParameters: any = {};
+        let path = '/curious_cases/{genomicLocation}';
+
+        path = path.replace('{genomicLocation}', parameters['genomicLocation'] + '');
+
+        if (parameters.$queryParameters) {
+            Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+                var parameter = parameters.$queryParameters[parameterName];
+                queryParameters[parameterName] = parameter;
+            });
+        }
+        let keys = Object.keys(queryParameters);
+        return this.domain + path + (keys.length > 0 ? '?' + (keys.map(key => key + '=' + encodeURIComponent(queryParameters[key])).join('&')) : '');
+    };
+
+    /**
+     * Retrieves Curious Cases info by a genomic location
+     * @method
+     * @name GenomeNexusAPIInternal#fetchCuriousCasesGET
+     * @param {string} genomicLocation - Genomic location, for example: 7,116411883,116411905,TTCTTTCTCTCTGTTTTAAGATC,-
+     */
+    fetchCuriousCasesGETWithHttpInfo(parameters: {
+        'genomicLocation': string,
+        $queryParameters ? : any,
+        $domain ? : string
+    }): Promise < request.Response > {
+        const domain = parameters.$domain ? parameters.$domain : this.domain;
+        const errorHandlers = this.errorHandlers;
+        const request = this.request;
+        let path = '/curious_cases/{genomicLocation}';
+        let body: any;
+        let queryParameters: any = {};
+        let headers: any = {};
+        let form: any = {};
+        return new Promise(function(resolve, reject) {
+            headers['Accept'] = 'application/json';
+            headers['Content-Type'] = 'application/json';
+
+            path = path.replace('{genomicLocation}', parameters['genomicLocation'] + '');
+
+            if (parameters['genomicLocation'] === undefined) {
+                reject(new Error('Missing required  parameter: genomicLocation'));
+                return;
+            }
+
+            if (parameters.$queryParameters) {
+                Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+                    var parameter = parameters.$queryParameters[parameterName];
+                    queryParameters[parameterName] = parameter;
+                });
+            }
+
+            request('GET', domain + path, body, headers, queryParameters, form, reject, resolve, errorHandlers);
+
+        });
+    };
+
+    /**
+     * Retrieves Curious Cases info by a genomic location
+     * @method
+     * @name GenomeNexusAPIInternal#fetchCuriousCasesGET
+     * @param {string} genomicLocation - Genomic location, for example: 7,116411883,116411905,TTCTTTCTCTCTGTTTTAAGATC,-
+     */
+    fetchCuriousCasesGET(parameters: {
+        'genomicLocation': string,
+        $queryParameters ? : any,
+        $domain ? : string
+    }): Promise < CuriousCases > {
+        return this.fetchCuriousCasesGETWithHttpInfo(parameters).then(function(response: request.Response) {
+            return response.body;
+        });
+    };
     postMutationAssessorAnnotationURL(parameters: {
         'variants': Array < string > ,
         $queryParameters ? : any
@@ -1838,6 +1946,99 @@ export default class GenomeNexusAPIInternal {
             return response.body;
         });
     };
+    searchAnnotationByKeywordGETUsingGETURL(parameters: {
+        'keyword': string,
+        'limit' ? : number,
+        $queryParameters ? : any
+    }): string {
+        let queryParameters: any = {};
+        let path = '/search';
+        if (parameters['keyword'] !== undefined) {
+            queryParameters['keyword'] = parameters['keyword'];
+        }
+
+        if (parameters['limit'] !== undefined) {
+            queryParameters['limit'] = parameters['limit'];
+        }
+
+        if (parameters.$queryParameters) {
+            Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+                var parameter = parameters.$queryParameters[parameterName];
+                queryParameters[parameterName] = parameter;
+            });
+        }
+        let keys = Object.keys(queryParameters);
+        return this.domain + path + (keys.length > 0 ? '?' + (keys.map(key => key + '=' + encodeURIComponent(queryParameters[key])).join('&')) : '');
+    };
+
+    /**
+     * Performs index search.
+     * @method
+     * @name GenomeNexusAPIInternal#searchAnnotationByKeywordGETUsingGET
+     * @param {string} keyword - keyword. For example 13:g.32890665G>A, TP53 p.R273C, BRAF c.1799T>A
+     * @param {integer} limit - Max number of matching results to return
+     */
+    searchAnnotationByKeywordGETUsingGETWithHttpInfo(parameters: {
+        'keyword': string,
+        'limit' ? : number,
+        $queryParameters ? : any,
+        $domain ? : string
+    }): Promise < request.Response > {
+        const domain = parameters.$domain ? parameters.$domain : this.domain;
+        const errorHandlers = this.errorHandlers;
+        const request = this.request;
+        let path = '/search';
+        let body: any;
+        let queryParameters: any = {};
+        let headers: any = {};
+        let form: any = {};
+        return new Promise(function(resolve, reject) {
+            headers['Accept'] = 'application/json';
+            headers['Content-Type'] = 'application/json';
+
+            if (parameters['keyword'] !== undefined) {
+                queryParameters['keyword'] = parameters['keyword'];
+            }
+
+            if (parameters['keyword'] === undefined) {
+                reject(new Error('Missing required  parameter: keyword'));
+                return;
+            }
+
+            if (parameters['limit'] !== undefined) {
+                queryParameters['limit'] = parameters['limit'];
+            }
+
+            if (parameters.$queryParameters) {
+                Object.keys(parameters.$queryParameters).forEach(function(parameterName) {
+                    var parameter = parameters.$queryParameters[parameterName];
+                    queryParameters[parameterName] = parameter;
+                });
+            }
+
+            request('GET', domain + path, body, headers, queryParameters, form, reject, resolve, errorHandlers);
+
+        });
+    };
+
+    /**
+     * Performs index search.
+     * @method
+     * @name GenomeNexusAPIInternal#searchAnnotationByKeywordGETUsingGET
+     * @param {string} keyword - keyword. For example 13:g.32890665G>A, TP53 p.R273C, BRAF c.1799T>A
+     * @param {integer} limit - Max number of matching results to return
+     */
+    searchAnnotationByKeywordGETUsingGET(parameters: {
+            'keyword': string,
+            'limit' ? : number,
+            $queryParameters ? : any,
+            $domain ? : string
+        }): Promise < Array < IndexSearch >
+        > {
+            return this.searchAnnotationByKeywordGETUsingGETWithHttpInfo(parameters).then(function(response: request.Response) {
+                return response.body;
+            });
+        };
     fetchSignalMutationsByHugoSymbolGETUsingGETURL(parameters: {
         'hugoGeneSymbol' ? : string,
         $queryParameters ? : any

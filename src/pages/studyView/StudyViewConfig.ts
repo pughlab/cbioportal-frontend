@@ -1,7 +1,7 @@
-import AppConfig from 'appConfig';
+import { getServerConfig } from 'config/config';
 import { StudyView } from '../../config/IAppConfig';
 import { Layout } from 'react-grid-layout';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { ChartType } from './StudyViewUtils';
 
 export type StudyViewColor = {
@@ -66,13 +66,16 @@ export enum ChartTypeEnum {
     SURVIVAL = 'SURVIVAL',
     TABLE = 'TABLE',
     SCATTER = 'SCATTER',
+    VIOLIN_PLOT_TABLE = 'VIOLIN_PLOT_TABLE',
     MUTATED_GENES_TABLE = 'MUTATED_GENES_TABLE',
     STRUCTURAL_VARIANT_GENES_TABLE = 'STRUCTURAL_VARIANT_GENES_TABLE',
     CNA_GENES_TABLE = 'CNA_GENES_TABLE',
     GENOMIC_PROFILES_TABLE = 'GENOMIC_PROFILES_TABLE',
     CASE_LIST_TABLE = 'CASE_LIST_TABLE',
     SAMPLE_TREATMENTS_TABLE = 'SAMPLE_TREATMENTS_TABLE',
+    SAMPLE_TREATMENT_GROUPS_TABLE = 'SAMPLE_TREATMENT_GROUPS_TABLE',
     PATIENT_TREATMENTS_TABLE = 'PATIENT_TREATMENTS_TABLE',
+    PATIENT_TREATMENT_GROUPS_TABLE = 'PATIENT_TREATMENT_GROUPS_TABLE',
     NONE = 'NONE',
 }
 
@@ -82,6 +85,7 @@ export enum ChartTypeNameEnum {
     SURVIVAL = 'survival plot',
     TABLE = 'table',
     SCATTER = 'density plot',
+    VIOLIN_PLOT_TABLE = 'table',
     MUTATED_GENES_TABLE = 'table',
     STRUCTURAL_VARIANT_GENES_TABLE = 'table',
     CNA_GENES_TABLE = 'table',
@@ -89,6 +93,8 @@ export enum ChartTypeNameEnum {
     CASE_LIST_TABLE = 'table',
     SAMPLE_TREATMENTS_TABLE = 'table',
     PATIENT_TREATMENTS_TABLE = 'table',
+    SAMPLE_TREATMENT_GROUPS_TABLE = 'table',
+    PATIENT_TREATMENT_GROUPS_TABLE = 'table',
     NONE = 'none',
 }
 
@@ -112,12 +118,13 @@ const studyViewFrontEnd = {
         DFS_SURVIVAL: 300,
         DSS_SURVIVAL: 250,
         PFS_SURVIVAL: 250,
-        MUTATION_COUNT_CNA_FRACTION: 200,
         MUTATED_GENES_TABLE: 90,
         STRUCTURAL_VARIANT_GENES_TABLE: 85,
         CNA_GENES_TABLE: 80,
         PATIENT_TREATMENTS_TABLE: 75,
         SAMPLE_TREATMENTS_TABLE: 75,
+        SAMPLE_TREATMENT_GROUPS_TABLE: 75,
+        PATIENT_TREATMENT_GROUPS_TABLE: 75,
         CANCER_STUDIES: 70,
         SEQUENCED: 60,
         HAS_CNA_DATA: 50,
@@ -134,6 +141,7 @@ const studyViewFrontEnd = {
         TUMOR_TYPE: 8,
         SUBTYPE: 8,
         TUMOR_SITE: 8,
+        'X-VS-Y-FRACTION_GENOME_ALTERED-MUTATION_COUNT': 200,
     },
     thresholds: {
         pieToTable: 20,
@@ -166,6 +174,11 @@ const studyViewFrontEnd = {
             [ChartTypeEnum.SCATTER]: {
                 w: 2,
                 h: 2,
+            },
+            [ChartTypeEnum.VIOLIN_PLOT_TABLE]: {
+                w: 2,
+                h: 2,
+                minW: 2,
             },
             [ChartTypeEnum.TABLE]: {
                 w: 2,
@@ -211,6 +224,16 @@ const studyViewFrontEnd = {
                 h: 2,
                 minW: 2,
             },
+            [ChartTypeEnum.SAMPLE_TREATMENT_GROUPS_TABLE]: {
+                w: 2,
+                h: 2,
+                minW: 2,
+            },
+            [ChartTypeEnum.PATIENT_TREATMENT_GROUPS_TABLE]: {
+                w: 2,
+                h: 2,
+                minW: 2,
+            },
             [ChartTypeEnum.NONE]: {
                 w: 0,
                 h: 0,
@@ -235,5 +258,5 @@ const studyViewFrontEnd = {
 
 export const STUDY_VIEW_CONFIG: StudyViewConfig = _.assign(
     studyViewFrontEnd,
-    (AppConfig.serverConfig || {}).study_view
+    (getServerConfig() || {}).study_view
 );

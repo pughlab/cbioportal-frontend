@@ -14,12 +14,11 @@ import {
 import { GroupComparisonTab } from '../../../pages/groupComparison/GroupComparisonTabs';
 import {
     findFirstMostCommonElt,
-    getBrowserWindow,
     remoteData,
     stringListToMap,
 } from 'cbioportal-frontend-commons';
 import {
-    AlterationEnrichment,
+    AlterationFilter,
     CancerStudy,
     ClinicalAttribute,
     ClinicalData,
@@ -38,7 +37,6 @@ import {
     IReactionDisposer,
     makeObservable,
     observable,
-    runInAction,
 } from 'mobx';
 import client from '../../api/cbioportalClientInstance';
 import comparisonClient from '../../api/comparisonGroupClientInstance';
@@ -59,15 +57,12 @@ import {
 import internalClient from '../../api/cbioportalInternalClientInstance';
 import autobind from 'autobind-decorator';
 import { PatientSurvival } from 'shared/model/PatientSurvival';
-import {
-    getClinicalDataOfPatientSurvivalStatus,
-    getPatientSurvivals,
-} from 'pages/resultsView/SurvivalStoreHelper';
+import { getPatientSurvivals } from 'pages/resultsView/SurvivalStoreHelper';
 import {
     getFilteredMolecularProfilesByAlterationType,
     getPatientIdentifiers,
+    buildSelectedDriverTiersMap,
 } from 'pages/studyView/StudyViewUtils';
-import { Session, SessionGroupData } from '../../api/ComparisonGroupClient';
 import { calculateQValues } from 'shared/lib/calculation/BenjaminiHochbergFDRCalculator';
 import ComplexKeyMap from '../complexKeyDataStructures/ComplexKeyMap';
 import ComplexKeyGroupsMap from '../complexKeyDataStructures/ComplexKeyGroupsMap';
@@ -85,7 +80,7 @@ import {
     ResultsViewPageStore,
 } from '../../../pages/resultsView/ResultsViewPageStore';
 import { getSurvivalStatusBoolean } from 'pages/resultsView/survival/SurvivalUtil';
-import onMobxPromise from '../onMobxPromise';
+import { onMobxPromise } from 'cbioportal-frontend-commons';
 import {
     cnaEventTypeSelectInit,
     CopyNumberEnrichmentEventType,
@@ -94,23 +89,41 @@ import {
     getMutationEventTypesAPIParameter,
     MutationEnrichmentEventType,
     mutationEventTypeSelectInit,
-    mutationGroup,
     StructuralVariantEnrichmentEventType,
-    structuralVariantEventTypeSelectInit,
 } from 'shared/lib/comparison/ComparisonStoreUtils';
-import URLWrapper from '../URLWrapper';
+import {
+    buildDriverAnnotationSettings,
+    DriverAnnotationSettings,
+    IAnnotationFilterSettings,
+    IDriverAnnotationReport,
+    initializeCustomDriverAnnotationSettings,
+} from 'shared/alterationFiltering/AnnotationFilteringSettings';
+import { getServerConfig } from 'config/config';
 import IComparisonURLWrapper from 'pages/groupComparison/IComparisonURLWrapper';
+import {
+    ComparisonSession,
+    SessionGroupData,
+} from 'shared/api/session-service/sessionServiceModels';
 
 export enum OverlapStrategy {
     INCLUDE = 'Include',
     EXCLUDE = 'Exclude',
 }
 
-export default abstract class ComparisonStore {
+export default abstract class ComparisonStore
+    implements IAnnotationFilterSettings {
     private tabHasBeenShown = observable.map<GroupComparisonTab, boolean>();
 
     private tabHasBeenShownReactionDisposer: IReactionDisposer;
     @observable public newSessionPending = false;
+
+    @observable
+    driverAnnotationSettings: DriverAnnotationSettings = buildDriverAnnotationSettings(
+        () => false
+    );
+    @observable includeGermlineMutations = true;
+    @observable includeSomaticMutations = true;
+    @observable includeUnknownStatusMutations = true;
 
     constructor(
         protected appStore: AppStore,
@@ -245,10 +258,10 @@ export default abstract class ComparisonStore {
     public deselectAllGroups() {
         throw new Error(`deselectAllGroups must be implemented in subclass`);
     }
-    protected async saveAndGoToSession(newSession: Session) {
+    protected async saveAndGoToSession(newSession: ComparisonSession) {
         throw new Error(`saveAndGoToSession must be implemented in subclass`);
     }
-    abstract get _session(): MobxPromise<Session>;
+    abstract get _session(): MobxPromise<ComparisonSession>;
     abstract _originalGroups: MobxPromise<ComparisonGroup[]>;
     abstract get overlapStrategy(): OverlapStrategy;
     abstract get usePatientLevelEnrichments(): boolean;
@@ -456,17 +469,11 @@ export default abstract class ComparisonStore {
 
     readonly molecularProfilesInActiveStudies = remoteData<MolecularProfile[]>(
         {
-            await: () => [this.activeStudyIds],
+            await: () => [this.activeStudyIds, this.molecularProfilesInStudies],
             invoke: async () => {
-                if (this.activeStudyIds.result!.length > 0) {
-                    return client.fetchMolecularProfilesUsingPOST({
-                        molecularProfileFilter: {
-                            studyIds: this.activeStudyIds.result!,
-                        } as MolecularProfileFilter,
-                    });
-                } else {
-                    return Promise.resolve([]);
-                }
+                return _.filter(this.molecularProfilesInStudies.result!, s =>
+                    this.activeStudyIds.result!.includes(s.studyId)
+                );
             },
         },
         []
@@ -614,7 +621,7 @@ export default abstract class ComparisonStore {
         [studyId: string]: MolecularProfile;
     } = {};
     @observable.ref
-    private _genericAssayEnrichmentProfileMapGroupedByGenericAssayType: {
+    private _selectedGenericAssayEnrichmentProfileMapGroupedByGenericAssayType: {
         [geneircAssayType: string]: {
             [studyId: string]: MolecularProfile;
         };
@@ -791,7 +798,7 @@ export default abstract class ComparisonStore {
                 if (
                     _.isEmpty(
                         this
-                            ._genericAssayEnrichmentProfileMapGroupedByGenericAssayType
+                            ._selectedGenericAssayEnrichmentProfileMapGroupedByGenericAssayType
                     )
                 ) {
                     return Promise.resolve(
@@ -815,7 +822,7 @@ export default abstract class ComparisonStore {
                 } else {
                     return Promise.resolve(
                         this
-                            ._genericAssayEnrichmentProfileMapGroupedByGenericAssayType
+                            ._selectedGenericAssayEnrichmentProfileMapGroupedByGenericAssayType
                     );
                 }
             },
@@ -871,14 +878,14 @@ export default abstract class ComparisonStore {
         },
         genericAssayType: string
     ) {
-        this._genericAssayEnrichmentProfileMapGroupedByGenericAssayType[
-            genericAssayType
-        ] = profileMap;
-        // trigger the function to recompute
         const clonedMap = _.clone(
-            this._genericAssayEnrichmentProfileMapGroupedByGenericAssayType
+            this
+                .selectedGenericAssayEnrichmentProfileMapGroupedByGenericAssayType
+                .result!
         );
-        this._genericAssayEnrichmentProfileMapGroupedByGenericAssayType = clonedMap;
+        clonedMap[genericAssayType] = profileMap;
+        // trigger the function to recompute
+        this._selectedGenericAssayEnrichmentProfileMapGroupedByGenericAssayType = clonedMap;
     }
 
     readonly alterationsEnrichmentAnalysisGroups = remoteData({
@@ -1006,26 +1013,50 @@ export default abstract class ComparisonStore {
         referenceGenesPromise: this.hugoGeneSymbolToReferenceGene,
         fetchData: () => {
             if (
-                this.alterationsEnrichmentDataRequestGroups.result!.length > 1
+                (this.alterationsEnrichmentDataRequestGroups.result &&
+                    this.alterationsEnrichmentDataRequestGroups.result.length >
+                        1 &&
+                    (_(this.selectedMutationEnrichmentEventTypes)
+                        .values()
+                        .some() ||
+                        _(this.selectedCopyNumberEnrichmentEventTypes)
+                            .values()
+                            .some())) ||
+                this.isStructuralVariantEnrichmentSelected
             ) {
+                const groupsAndAlterationTypes = {
+                    molecularProfileCasesGroupFilter: this
+                        .alterationsEnrichmentDataRequestGroups.result!,
+                    alterationEventTypes: ({
+                        copyNumberAlterationEventTypes: getCopyNumberEventTypesAPIParameter(
+                            this.selectedCopyNumberEnrichmentEventTypes
+                        ),
+                        mutationEventTypes: getMutationEventTypesAPIParameter(
+                            this.selectedMutationEnrichmentEventTypes
+                        ),
+                        structuralVariants: !!this
+                            .isStructuralVariantEnrichmentSelected,
+                        includeDriver: this.driverAnnotationSettings
+                            .includeDriver,
+                        includeVUS: this.driverAnnotationSettings.includeVUS,
+                        includeUnknownOncogenicity: this
+                            .driverAnnotationSettings
+                            .includeUnknownOncogenicity,
+                        tiersBooleanMap: this.selectedDriverTiersMap,
+                        includeUnknownTier: this.driverAnnotationSettings
+                            .includeUnknownTier,
+                        includeGermline: this.includeGermlineMutations,
+                        includeSomatic: this.includeSomaticMutations,
+                        includeUnknownStatus: this
+                            .includeUnknownStatusMutations,
+                    } as unknown) as AlterationFilter,
+                };
+
                 return internalClient.fetchAlterationEnrichmentsUsingPOST({
                     enrichmentType: this.usePatientLevelEnrichments
                         ? 'PATIENT'
                         : 'SAMPLE',
-                    groupsAndAlterationTypes: {
-                        molecularProfileCasesGroupFilter: this
-                            .alterationsEnrichmentDataRequestGroups.result!,
-                        alterationEventTypes: {
-                            copyNumberAlterationEventTypes: getCopyNumberEventTypesAPIParameter(
-                                this.selectedCopyNumberEnrichmentEventTypes
-                            ),
-                            mutationEventTypes: getMutationEventTypesAPIParameter(
-                                this.selectedMutationEnrichmentEventTypes
-                            ),
-                            structuralVariants: !!this
-                                .isStructuralVariantEnrichmentSelected,
-                        },
-                    },
+                    groupsAndAlterationTypes,
                 });
             }
             return Promise.resolve([]);
@@ -2003,6 +2034,124 @@ export default abstract class ComparisonStore {
                 }
             );
         });
+    }
+
+    readonly molecularProfilesInStudies = remoteData<MolecularProfile[]>(
+        {
+            await: () => [this.studies],
+            invoke: () => {
+                const studyIds = _.map(
+                    this.studies.result,
+                    (s: CancerStudy) => s.studyId
+                );
+                return client.fetchMolecularProfilesUsingPOST({
+                    molecularProfileFilter: {
+                        studyIds: studyIds,
+                    } as MolecularProfileFilter,
+                });
+            },
+        },
+        []
+    );
+
+    readonly customDriverAnnotationProfiles = remoteData<MolecularProfile[]>(
+        {
+            await: () => [this.molecularProfilesInStudies],
+            invoke: () => {
+                return Promise.resolve(
+                    _.filter(
+                        this.molecularProfilesInStudies.result,
+                        (molecularProfile: MolecularProfile) =>
+                            // discrete CNA's
+                            (molecularProfile.molecularAlterationType ===
+                                AlterationTypeConstants.COPY_NUMBER_ALTERATION &&
+                                molecularProfile.datatype ===
+                                    DataTypeConstants.DISCRETE) ||
+                            // mutations
+                            molecularProfile.molecularAlterationType ===
+                                AlterationTypeConstants.MUTATION_EXTENDED ||
+                            // structural variants
+                            molecularProfile.molecularAlterationType ===
+                                AlterationTypeConstants.STRUCTURAL_VARIANT
+                    )
+                );
+            },
+        },
+        []
+    );
+
+    readonly customDriverAnnotationReport = remoteData<IDriverAnnotationReport>(
+        {
+            await: () => [this.customDriverAnnotationProfiles],
+            invoke: async () => {
+                const molecularProfileIds = _.map(
+                    this.customDriverAnnotationProfiles.result,
+                    (p: MolecularProfile) => p.molecularProfileId
+                );
+                const report = await internalClient.fetchAlterationDriverAnnotationReportUsingPOST(
+                    {
+                        molecularProfileIds,
+                    }
+                );
+                return {
+                    ...report,
+                    hasCustomDriverAnnotations:
+                        report.hasBinary || report.tiers.length > 0,
+                };
+            },
+            onResult: result => {
+                initializeCustomDriverAnnotationSettings(
+                    result!,
+                    this.driverAnnotationSettings,
+                    this.driverAnnotationSettings.customTiersDefault
+                );
+            },
+            default: {
+                hasBinary: false,
+                tiers: [],
+            },
+        }
+    );
+
+    @computed get showDriverAnnotationMenuSection() {
+        return !!(
+            this.customDriverAnnotationReport.isComplete &&
+            this.customDriverAnnotationReport.result!.hasBinary &&
+            getServerConfig()
+                .oncoprint_custom_driver_annotation_binary_menu_label &&
+            getServerConfig()
+                .oncoprint_custom_driver_annotation_tiers_menu_label
+        );
+    }
+
+    @computed get showDriverTierAnnotationMenuSection() {
+        return !!(
+            this.customDriverAnnotationReport.isComplete &&
+            this.customDriverAnnotationReport.result!.tiers.length > 0 &&
+            getServerConfig()
+                .oncoprint_custom_driver_annotation_binary_menu_label &&
+            getServerConfig()
+                .oncoprint_custom_driver_annotation_tiers_menu_label
+        );
+    }
+
+    @computed get selectedDriverTiers() {
+        return this.allDriverTiers.filter(tier =>
+            this.driverAnnotationSettings.driverTiers.get(tier)
+        );
+    }
+
+    @computed get allDriverTiers() {
+        return this.customDriverAnnotationReport.isComplete
+            ? this.customDriverAnnotationReport.result!.tiers
+            : [];
+    }
+
+    @computed get selectedDriverTiersMap() {
+        return buildSelectedDriverTiersMap(
+            this.selectedDriverTiers || [],
+            this.customDriverAnnotationReport.result!.tiers
+        );
     }
 
     @computed get hasMutationEnrichmentData(): boolean {

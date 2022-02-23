@@ -1,14 +1,11 @@
 import { assert } from 'chai';
-import Enzyme, { shallow } from 'enzyme';
+import { shallow } from 'enzyme';
 import * as React from 'react';
 import {
     CancerSummaryChart,
     HORIZONTAL_SCROLLING_THRESHOLD,
     mergeAlterationDataAcrossAlterationTypes,
 } from './CancerSummaryChart';
-import Adapter from 'enzyme-adapter-react-16';
-
-Enzyme.configure({ adapter: new Adapter() });
 
 describe('CancerSummaryChart', () => {
     it('Allows chart container to be horizontally scrolled when bar threshold is reached', () => {
@@ -301,29 +298,39 @@ describe('CancerSummaryChart', () => {
                     alterationType: 'multiple',
                     x: 'Colorectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
                 {
                     alterationType: 'multiple',
                     x: 'Rectal Adenocarcinoma',
                     y: 2.083333333333333,
+                    alterationCount: 0,
                 },
-                { alterationType: 'multiple', x: 'Colon Adenocarcinoma', y: 0 },
+                {
+                    alterationType: 'multiple',
+                    x: 'Colon Adenocarcinoma',
+                    y: 0,
+                    alterationCount: 0,
+                },
             ],
             [
                 {
                     alterationType: 'protExpressionLow',
                     x: 'Colorectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
                 {
                     alterationType: 'protExpressionLow',
                     x: 'Rectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
                 {
                     alterationType: 'protExpressionLow',
                     x: 'Colon Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
             ],
             [
@@ -331,16 +338,19 @@ describe('CancerSummaryChart', () => {
                     alterationType: 'protExpressionHigh',
                     x: 'Colorectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
                 {
                     alterationType: 'protExpressionHigh',
                     x: 'Rectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
                 {
                     alterationType: 'protExpressionHigh',
                     x: 'Colon Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
             ],
             [
@@ -348,16 +358,19 @@ describe('CancerSummaryChart', () => {
                     alterationType: 'mrnaExpressionLow',
                     x: 'Colorectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
                 {
                     alterationType: 'mrnaExpressionLow',
                     x: 'Rectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
                 {
                     alterationType: 'mrnaExpressionLow',
                     x: 'Colon Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
             ],
             [
@@ -365,16 +378,19 @@ describe('CancerSummaryChart', () => {
                     alterationType: 'mrnaExpressionHigh',
                     x: 'Colorectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
                 {
                     alterationType: 'mrnaExpressionHigh',
                     x: 'Rectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
                 {
                     alterationType: 'mrnaExpressionHigh',
                     x: 'Colon Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
             ],
             [
@@ -382,61 +398,119 @@ describe('CancerSummaryChart', () => {
                     alterationType: 'hetloss',
                     x: 'Colorectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
-                { alterationType: 'hetloss', x: 'Rectal Adenocarcinoma', y: 0 },
-                { alterationType: 'hetloss', x: 'Colon Adenocarcinoma', y: 0 },
+                {
+                    alterationType: 'hetloss',
+                    x: 'Rectal Adenocarcinoma',
+                    y: 0,
+                    alterationCount: 0,
+                },
+                {
+                    alterationType: 'hetloss',
+                    x: 'Colon Adenocarcinoma',
+                    y: 0,
+                    alterationCount: 0,
+                },
             ],
             [
                 {
                     alterationType: 'homdel',
                     x: 'Colorectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
-                { alterationType: 'homdel', x: 'Rectal Adenocarcinoma', y: 0 },
-                { alterationType: 'homdel', x: 'Colon Adenocarcinoma', y: 0 },
+                {
+                    alterationType: 'homdel',
+                    x: 'Rectal Adenocarcinoma',
+                    y: 0,
+                    alterationCount: 0,
+                },
+                {
+                    alterationType: 'homdel',
+                    x: 'Colon Adenocarcinoma',
+                    y: 0,
+                    alterationCount: 0,
+                },
             ],
             [
                 {
                     alterationType: 'gain',
                     x: 'Colorectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
-                { alterationType: 'gain', x: 'Rectal Adenocarcinoma', y: 0 },
-                { alterationType: 'gain', x: 'Colon Adenocarcinoma', y: 0 },
+                {
+                    alterationType: 'gain',
+                    x: 'Rectal Adenocarcinoma',
+                    y: 0,
+                    alterationCount: 0,
+                },
+                {
+                    alterationType: 'gain',
+                    x: 'Colon Adenocarcinoma',
+                    y: 0,
+                    alterationCount: 0,
+                },
             ],
             [
-                { alterationType: 'amp', x: 'Colorectal Adenocarcinoma', y: 0 },
+                {
+                    alterationType: 'amp',
+                    x: 'Colorectal Adenocarcinoma',
+                    y: 0,
+                    alterationCount: 0,
+                },
                 {
                     alterationType: 'amp',
                     x: 'Rectal Adenocarcinoma',
                     y: 2.083333333333333,
+                    alterationCount: 0,
                 },
-                { alterationType: 'amp', x: 'Colon Adenocarcinoma', y: 0 },
+                {
+                    alterationType: 'amp',
+                    x: 'Colon Adenocarcinoma',
+                    y: 0,
+                    alterationCount: 0,
+                },
             ],
             [
                 {
                     alterationType: 'fusion',
                     x: 'Colorectal Adenocarcinoma',
                     y: 0,
+                    alterationCount: 0,
                 },
-                { alterationType: 'fusion', x: 'Rectal Adenocarcinoma', y: 0 },
-                { alterationType: 'fusion', x: 'Colon Adenocarcinoma', y: 0 },
+                {
+                    alterationType: 'fusion',
+                    x: 'Rectal Adenocarcinoma',
+                    y: 0,
+                    alterationCount: 0,
+                },
+                {
+                    alterationType: 'fusion',
+                    x: 'Colon Adenocarcinoma',
+                    y: 0,
+                    alterationCount: 0,
+                },
             ],
             [
                 {
                     alterationType: 'mutated',
                     x: 'Colorectal Adenocarcinoma',
                     y: 78.26086956521739,
+                    alterationCount: 0,
                 },
                 {
                     alterationType: 'mutated',
                     x: 'Rectal Adenocarcinoma',
                     y: 54.166666666666664,
+                    alterationCount: 0,
                 },
                 {
                     alterationType: 'mutated',
                     x: 'Colon Adenocarcinoma',
                     y: 46.808510638297875,
+                    alterationCount: 0,
                 },
             ],
         ];

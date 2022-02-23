@@ -1,5 +1,5 @@
 /* tslint:disable: indent linebreak-style */
-import * as _ from 'lodash';
+import _ from 'lodash';
 import client from '../../api/cbioportalClientInstance';
 import {
     ObservableMap,
@@ -32,7 +32,6 @@ import internalClient from '../../api/cbioportalInternalClientInstance';
 import { SingleGeneQuery, SyntaxError } from '../../lib/oql/oql-parser';
 import { parseOQLQuery } from '../../lib/oql/oqlfilter';
 import memoize from 'memoize-weak-decorator';
-import AppConfig from 'appConfig';
 import { ComponentGetsStoreContext } from '../../lib/ContextUtils';
 import URL from 'url';
 import { buildCBioPortalPageUrl, redirectToStudyView } from '../../api/urls';
@@ -50,7 +49,6 @@ import {
     getOqlMessages,
 } from 'shared/lib/StoreUtils';
 import sessionServiceClient from 'shared/api//sessionServiceInstance';
-import { VirtualStudy } from 'shared/model/VirtualStudy';
 import {
     getGenesetsFromHierarchy,
     getVolcanoPlotMinYValue,
@@ -58,7 +56,7 @@ import {
 } from 'shared/components/query/GenesetsSelectorStore';
 import SampleListsInStudyCache from 'shared/cache/SampleListsInStudyCache';
 import formSubmit from '../../lib/formSubmit';
-import { ServerConfigHelpers } from '../../../config/config';
+import { getServerConfig, ServerConfigHelpers } from '../../../config/config';
 import { AlterationTypeConstants } from '../../../pages/resultsView/ResultsViewPageStore';
 import {
     ResultsViewURLQuery,
@@ -66,6 +64,8 @@ import {
 } from 'pages/resultsView/ResultsViewURLWrapper';
 import { isMixedReferenceGenome } from 'shared/lib/referenceGenomeUtils';
 import { getSuffixOfMolecularProfile } from 'shared/lib/molecularProfileUtils';
+import { VirtualStudy } from 'shared/api/session-service/sessionServiceModels';
+import { isQueriedStudyAuthorized } from 'pages/studyView/StudyViewUtils';
 
 // interface for communicating
 export type CancerStudyQueryUrlParams = {
@@ -122,7 +122,10 @@ export enum Focus {
 // mobx observable
 export class QueryStore {
     constructor(urlWithInitialParams?: string) {
+        getBrowserWindow().activeQueryStore = this;
+
         makeObservable(this);
+
         this.initialize(urlWithInitialParams);
     }
 
@@ -463,6 +466,13 @@ export class QueryStore {
         this._selectedSampleListId = value;
     }
 
+    @computed
+    public get selectedSampleList() {
+        return this.selectedSampleListId
+            ? this.dict_sampleListId_sampleList[this.selectedSampleListId]
+            : undefined;
+    }
+
     @observable caseIds = '';
 
     // this variable is used to set set custom case ids if the query is a shared virtual study query
@@ -512,7 +522,7 @@ export class QueryStore {
     @observable showGenesetsHierarchyPopup = false;
     @observable showGenesetsVolcanoPopup = false;
     @observable priorityStudies = ServerConfigHelpers.parseConfigFormat(
-        AppConfig.serverConfig.priority_studies
+        getServerConfig().priority_studies
     );
     @observable showSelectedStudiesOnly: boolean = false;
     @observable.shallow selectedCancerTypeIds: string[] = [];
@@ -524,7 +534,7 @@ export class QueryStore {
     } = { label: '75%', value: '75' };
 
     @observable private _maxTreeDepth: number = parseInt(
-        AppConfig.serverConfig.skin_query_max_tree_depth!,
+        getServerConfig().skin_query_max_tree_depth!,
         10
     );
     @computed get maxTreeDepth() {
@@ -823,7 +833,9 @@ export class QueryStore {
             let result: { [studyId: string]: string[] } = {};
 
             _.each(this.physicalStudiesSet.result, (study, studyId) => {
-                result[studyId] = [studyId];
+                if (isQueriedStudyAuthorized(study)) {
+                    result[studyId] = [studyId];
+                }
             });
 
             _.each(
@@ -980,14 +992,15 @@ export class QueryStore {
                                 profile.molecularAlterationType +
                                 profile.datatype
                         )
-                        .map(alterationTypeProfiles => {
-                            // A study can have multiple profiles for same alteration type and datatpye.
-                            // we need just one profile of each
-                            return getSuffixOfMolecularProfile(
-                                alterationTypeProfiles[0]
+                        .reduce((agg: string[], alterationTypeProfiles) => {
+                            const profileTypes = alterationTypeProfiles.map(
+                                p => {
+                                    return getSuffixOfMolecularProfile(p);
+                                }
                             );
-                        })
-                        .value();
+                            agg.push(...profileTypes);
+                            return agg;
+                        }, []);
                 })
                 .value();
 
@@ -1017,6 +1030,10 @@ export class QueryStore {
             all: 0,
         },
     });
+
+    @computed get sampleCountForSelectedStudies() {
+        return _.sumBy(this.selectableSelectedStudies, s => s.allSampleCount);
+    }
 
     readonly sampleLists = remoteData({
         invoke: async () => {
@@ -1752,7 +1769,7 @@ export class QueryStore {
                 Number(this.volcanoPlotSelectedPercentile.value),
                 0,
                 1,
-                this.defaultSelectedSampleListId
+                this.selectedSampleListId
             );
             return hierarchyData;
         },
@@ -1853,13 +1870,13 @@ export class QueryStore {
     @computed get isQueryLimitReached(): boolean {
         return (
             this.oql.query.length * this.approxSampleCount >
-            AppConfig.serverConfig.query_product_limit
+            getServerConfig().query_product_limit
         );
     }
 
     @computed get geneLimit(): number {
         return Math.floor(
-            AppConfig.serverConfig.query_product_limit / this.approxSampleCount
+            getServerConfig().query_product_limit / this.approxSampleCount
         );
     }
 

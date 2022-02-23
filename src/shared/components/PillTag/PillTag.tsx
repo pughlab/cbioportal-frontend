@@ -1,13 +1,14 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import styles from './styles.module.scss';
 import { If } from 'react-if';
 import contrast from 'contrast';
 import { computed, makeObservable } from 'mobx';
 
 export interface IPillTagProps {
-    content: string;
+    content: JSX.Element | string;
     backgroundColor: string;
+    infoSection?: JSX.Element | null;
     onDelete?: () => void;
 }
 
@@ -36,7 +37,16 @@ export class PillTag extends React.Component<IPillTagProps, {}> {
                     color: this.contentColor,
                 }}
             >
-                <span className={styles.content}>{this.props.content}</span>
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                    }}
+                >
+                    <span className={styles.content}>{this.props.content}</span>
+                    {this.props.infoSection}
+                </div>
                 <If condition={_.isFunction(this.props.onDelete)}>
                     <span
                         data-test="pill-tag-delete"

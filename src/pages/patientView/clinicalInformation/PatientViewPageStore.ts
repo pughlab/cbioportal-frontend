@@ -1,4 +1,4 @@
-import * as _ from 'lodash';
+import _ from 'lodash';
 import {
     CBioPortalAPIInternal,
     ClinicalData,
@@ -32,11 +32,7 @@ import {
     runInAction,
     makeObservable,
 } from 'mobx';
-import {
-    getBrowserWindow,
-    remoteData,
-    stringListToSet,
-} from 'cbioportal-frontend-commons';
+import { remoteData, stringListToSet } from 'cbioportal-frontend-commons';
 import { IGisticData } from 'shared/model/Gistic';
 import { cached, labelMobxPromises } from 'mobxpromise';
 import MrnaExprRankCache from 'shared/cache/MrnaExprRankCache';
@@ -64,7 +60,6 @@ import VariantCountCache from 'shared/cache/VariantCountCache';
 import CopyNumberCountCache from './CopyNumberCountCache';
 import CancerTypeCache from 'shared/cache/CancerTypeCache';
 import MutationCountCache from 'shared/cache/MutationCountCache';
-import AppConfig from 'appConfig';
 import {
     concatMutationData,
     evaluateDiscreteCNAPutativeDriverInfo,
@@ -159,8 +154,8 @@ import { getFilteredMolecularProfilesByAlterationType } from 'pages/studyView/St
 import {
     getMyCancerGenomeData,
     getMyVariantInfoAnnotationsFromIndexedVariantAnnotations,
-    ICivicGene,
-    ICivicVariant,
+    ICivicGeneIndex,
+    ICivicVariantIndex,
     IHotspotIndex,
     IMyCancerGenomeData,
     IMyVariantInfoIndex,
@@ -202,6 +197,8 @@ import {
     MutationalSignatureStableIdKeyWord,
     validateMutationalSignatureRawData,
 } from 'shared/lib/GenericAssayUtils/MutationalSignaturesUtils';
+import { getServerConfig } from 'config/config';
+import { getOncoKbIconStyle } from 'shared/lib/AnnotationColumnUtils';
 
 type PageMode = 'patient' | 'sample';
 type ResourceId = string;
@@ -347,15 +344,15 @@ export class PatientViewPageStore {
 
     @observable
     public mutationTableGeneFilterOption: GeneFilterOption = getGeneFilterDefault(
-        getBrowserWindow().frontendConfig
+        { serverConfig: getServerConfig() }
     );
     @observable
     public copyNumberTableGeneFilterOption: GeneFilterOption = getGeneFilterDefault(
-        getBrowserWindow().frontendConfig
+        { serverConfig: getServerConfig() }
     );
     @observable
     public structuralVariantTableGeneFilterOption: GeneFilterOption = getGeneFilterDefault(
-        getBrowserWindow().frontendConfig
+        { serverConfig: getServerConfig() }
     );
 
     @computed get sampleId() {
@@ -388,7 +385,8 @@ export class PatientViewPageStore {
         invoke: async () =>
             findMutationMolecularProfile(
                 this.molecularProfilesInStudy,
-                this.studyId
+                this.studyId,
+                AlterationTypeConstants.MUTATION_EXTENDED
             ),
     });
 
@@ -613,13 +611,15 @@ export class PatientViewPageStore {
                 )
                 .value();
 
-            return client.fetchGenericAssayMetaDataUsingPOST({
-                genericAssayMetaFilter: {
-                    genericAssayStableIds: mutationalSignatureContributionStableIds
-                        ? mutationalSignatureContributionStableIds
-                        : [],
-                } as GenericAssayMetaFilter,
-            });
+            if (mutationalSignatureContributionStableIds.length > 0) {
+                return client.fetchGenericAssayMetaDataUsingPOST({
+                    genericAssayMetaFilter: {
+                        genericAssayStableIds: mutationalSignatureContributionStableIds,
+                    } as GenericAssayMetaFilter,
+                });
+            } else {
+                return Promise.resolve([]);
+            }
         },
     });
 
@@ -1031,11 +1031,11 @@ export class PatientViewPageStore {
                         GENOME_NEXUS_ARG_FIELD_ENUM.ANNOTATION_SUMMARY,
                         GENOME_NEXUS_ARG_FIELD_ENUM.HOTSPOTS,
                         GENOME_NEXUS_ARG_FIELD_ENUM.CLINVAR,
-                        AppConfig.serverConfig.show_signal
+                        getServerConfig().show_signal
                             ? GENOME_NEXUS_ARG_FIELD_ENUM.SIGNAL
                             : '',
                     ].filter(f => f),
-                    AppConfig.serverConfig.isoformOverrideSource,
+                    getServerConfig().isoformOverrideSource,
                     this.genomeNexusClient
                 ),
             onError: (err: Error) => {
@@ -1056,7 +1056,7 @@ export class PatientViewPageStore {
                     this.uncalledMutationData
                 ),
                 [GENOME_NEXUS_ARG_FIELD_ENUM.MY_VARIANT_INFO],
-                AppConfig.serverConfig.isoformOverrideSource,
+                getServerConfig().isoformOverrideSource,
                 this.genomeNexusClient
             );
             return getMyVariantInfoAnnotationsFromIndexedVariantAnnotations(
@@ -1180,14 +1180,14 @@ export class PatientViewPageStore {
             if (this.clinicalEvents.result.length > 0) {
                 return new SampleManager(
                     patientData.samples!,
-                    this.clinicalEvents.result,
-                    this.sampleIds
+                    this.sampleIds,
+                    this.clinicalEvents.result
                 );
             } else {
                 return new SampleManager(
                     patientData.samples!,
-                    undefined,
-                    this.sampleIds
+                    this.sampleIds,
+                    undefined
                 );
             }
         },
@@ -1310,7 +1310,11 @@ export class PatientViewPageStore {
         {
             await: () => [this.molecularProfilesInStudy],
             invoke: async () =>
-                findMrnaRankMolecularProfileId(this.molecularProfilesInStudy),
+                findMrnaRankMolecularProfileId(
+                    this.molecularProfilesInStudy.result!.map(
+                        p => p.molecularProfileId
+                    )
+                ),
         },
         null
     );
@@ -1365,13 +1369,15 @@ export class PatientViewPageStore {
         {
             await: () => [this.patientViewData],
             invoke: async () => {
-                return await internalClient.getAllClinicalEventsOfPatientInStudyUsingGET(
+                const events = await internalClient.getAllClinicalEventsOfPatientInStudyUsingGET(
                     {
                         studyId: this.studyId,
                         patientId: this.patientId,
                         projection: 'DETAILED',
                     }
                 );
+
+                return _.sortBy(events, e => e.startNumberOfDaysSinceDiagnosis);
             },
         },
         []
@@ -1409,7 +1415,7 @@ export class PatientViewPageStore {
     readonly darwinUrl = remoteData({
         await: () => [this.derivedPatientId],
         invoke: async () => {
-            if (AppConfig.serverConfig.enable_darwin === true) {
+            if (getServerConfig().enable_darwin === true) {
                 let resp = await request.get(
                     getDarwinUrl(this.sampleIds, this.patientId)
                 );
@@ -1645,7 +1651,7 @@ export class PatientViewPageStore {
     readonly oncoKbCancerGenes = remoteData(
         {
             invoke: () => {
-                if (AppConfig.serverConfig.show_oncokb) {
+                if (getServerConfig().show_oncokb) {
                     return fetchOncoKbCancerGenes();
                 } else {
                     return Promise.resolve([]);
@@ -1658,7 +1664,7 @@ export class PatientViewPageStore {
     readonly oncoKbInfo = remoteData(
         {
             invoke: () => {
-                if (AppConfig.serverConfig.show_oncokb) {
+                if (getServerConfig().show_oncokb) {
                     return fetchOncoKbInfo();
                 } else {
                     return Promise.resolve(ONCOKB_DEFAULT_INFO);
@@ -1674,11 +1680,15 @@ export class PatientViewPageStore {
             : USE_DEFAULT_PUBLIC_INSTANCE_FOR_ONCOKB;
     }
 
+    @computed get mergeOncoKbIcons() {
+        return getOncoKbIconStyle().mergeIcons;
+    }
+
     readonly oncoKbAnnotatedGenes = remoteData(
         {
             await: () => [this.oncoKbCancerGenes],
             invoke: () => {
-                if (AppConfig.serverConfig.show_oncokb) {
+                if (getServerConfig().show_oncokb) {
                     return Promise.resolve(
                         _.reduce(
                             this.oncoKbCancerGenes.result,
@@ -1713,7 +1723,7 @@ export class PatientViewPageStore {
                 this.studies,
             ],
             invoke: () => {
-                if (AppConfig.serverConfig.show_oncokb) {
+                if (getServerConfig().show_oncokb) {
                     return fetchOncoKbData(
                         this.uniqueSampleKeyToTumorType,
                         this.oncoKbAnnotatedGenes.result || {},
@@ -1735,7 +1745,7 @@ export class PatientViewPageStore {
         ONCOKB_DEFAULT
     );
 
-    readonly civicGenes = remoteData<ICivicGene | undefined>(
+    readonly civicGenes = remoteData<ICivicGeneIndex | undefined>(
         {
             await: () => [
                 this.mutationData,
@@ -1743,7 +1753,7 @@ export class PatientViewPageStore {
                 this.clinicalDataForSamples,
             ],
             invoke: async () =>
-                AppConfig.serverConfig.show_civic
+                getServerConfig().show_civic
                     ? fetchCivicGenes(
                           this.mutationData,
                           this.uncalledMutationData
@@ -1756,7 +1766,7 @@ export class PatientViewPageStore {
         undefined
     );
 
-    readonly civicVariants = remoteData<ICivicVariant | undefined>(
+    readonly civicVariants = remoteData<ICivicVariantIndex | undefined>(
         {
             await: () => [
                 this.civicGenes,
@@ -1764,12 +1774,9 @@ export class PatientViewPageStore {
                 this.uncalledMutationData,
             ],
             invoke: async () => {
-                if (
-                    AppConfig.serverConfig.show_civic &&
-                    this.civicGenes.result
-                ) {
+                if (getServerConfig().show_civic && this.civicGenes.result) {
                     return fetchCivicVariants(
-                        this.civicGenes.result as ICivicGene,
+                        this.civicGenes.result as ICivicGeneIndex,
                         this.mutationData,
                         this.uncalledMutationData
                     );
@@ -1793,7 +1800,7 @@ export class PatientViewPageStore {
                 this.studies,
             ],
             invoke: async () => {
-                if (AppConfig.serverConfig.show_oncokb) {
+                if (getServerConfig().show_oncokb) {
                     return fetchCnaOncoKbData(
                         this.uniqueSampleKeyToTumorType,
                         this.oncoKbAnnotatedGenes.result || {},
@@ -1819,7 +1826,7 @@ export class PatientViewPageStore {
                 this.studies,
             ],
             invoke: async () => {
-                if (AppConfig.serverConfig.show_oncokb) {
+                if (getServerConfig().show_oncokb) {
                     return fetchStructuralVariantOncoKbData(
                         this.uniqueSampleKeyToTumorType,
                         this.oncoKbAnnotatedGenes.result || {},
@@ -1836,11 +1843,11 @@ export class PatientViewPageStore {
         ONCOKB_DEFAULT
     );
 
-    readonly cnaCivicGenes = remoteData<ICivicGene | undefined>(
+    readonly cnaCivicGenes = remoteData<ICivicGeneIndex | undefined>(
         {
             await: () => [this.discreteCNAData, this.clinicalDataForSamples],
             invoke: async () =>
-                AppConfig.serverConfig.show_civic
+                getServerConfig().show_civic
                     ? fetchCnaCivicGenes(this.discreteCNAData)
                     : {},
             onError: (err: Error) => {
@@ -1850,13 +1857,13 @@ export class PatientViewPageStore {
         undefined
     );
 
-    readonly cnaCivicVariants = remoteData<ICivicVariant | undefined>(
+    readonly cnaCivicVariants = remoteData<ICivicVariantIndex | undefined>(
         {
             await: () => [this.civicGenes, this.mutationData],
             invoke: async () => {
                 if (this.cnaCivicGenes.status == 'complete') {
                     return fetchCivicVariants(
-                        this.cnaCivicGenes.result as ICivicGene
+                        this.cnaCivicGenes.result as ICivicGeneIndex
                     );
                 }
             },

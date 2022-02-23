@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import styles from './tables.module.scss';
 import classnames from 'classnames';
 import {
@@ -67,6 +67,7 @@ export class GeneCell extends React.Component<IGeneCellProps, {}> {
                 destroyTooltipOnHide={true}
             >
                 <div
+                    data-test="geneNameCell"
                     className={classnames(
                         styles.geneSymbol,
                         styles.displayFlex

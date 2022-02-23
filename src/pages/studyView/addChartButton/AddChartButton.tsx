@@ -1,5 +1,12 @@
 import * as React from 'react';
-import { action, computed, makeObservable, observable } from 'mobx';
+import {
+    action,
+    computed,
+    IReactionDisposer,
+    makeObservable,
+    observable,
+    when,
+} from 'mobx';
 import { observer } from 'mobx-react';
 import 'react-mfb/mfb.css';
 import {
@@ -10,7 +17,7 @@ import {
 } from '../StudyViewPageStore';
 import { StudyViewPageTabKeyEnum } from 'pages/studyView/StudyViewPageTabs';
 import autobind from 'autobind-decorator';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import AddChartByType from './addChartByType/AddChartByType';
 import { DefaultTooltip, remoteData } from 'cbioportal-frontend-commons';
 import CustomCaseSelection from './customCaseSelection/CustomCaseSelection';
@@ -33,11 +40,12 @@ import GenericAssaySelection from './genericAssaySelection/GenericAssaySelection
 import { makeGenericAssayOption } from 'shared/lib/GenericAssayUtils/GenericAssayCommonUtils';
 import { DataTypeConstants } from 'pages/resultsView/ResultsViewPageStore';
 import { getInfoMessageForGenericAssayChart } from './AddChartButtonHelper';
-import LoadingIndicator from 'shared/components/loadingIndicator/LoadingIndicator';
 import classnames from 'classnames';
 import styles from './styles.module.scss';
 import { openSocialAuthWindow } from 'shared/lib/openSocialAuthWindow';
-import { CustomChart } from 'shared/api/sessionServiceAPI';
+import { CustomChartData } from 'shared/api/session-service/sessionServiceModels';
+import ReactSelect from 'react-select';
+import { GenericAssayMeta } from 'cbioportal-ts-api-client';
 
 export interface IAddChartTabsProps {
     store: StudyViewPageStore;
@@ -87,7 +95,20 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
         this.props.defaultActiveTab || ChartMetaDataTypeEnum.CLINICAL;
     @observable infoMessage: string = '';
     @observable tabsWidth = 0;
+    // Record user selected profile in each Generic Assay type
+    private selectedGenericAssayProfileIdByType = observable.map<
+        string,
+        string
+    >({}, { deep: true });
+    @observable XvsYSelection: {
+        x?: { value: string; label: string };
+        y?: { value: string; label: string };
+    } = {
+        x: undefined,
+        y: undefined,
+    };
     private readonly tabsDivRef: React.RefObject<HTMLDivElement>;
+    private genericAssayEntityOptionsReaction: IReactionDisposer;
 
     public static defaultProps = {
         disableGenomicTab: false,
@@ -100,12 +121,60 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
         super(props, context);
         makeObservable(this);
         this.tabsDivRef = React.createRef<HTMLDivElement>();
+
+        // Using the first profile as default profile option to initialze genericAssayProfileOptionsByType
+        this.genericAssayEntityOptionsReaction = when(
+            () =>
+                !_.isEmpty(
+                    this.props.store.genericAssayProfileOptionsByType.result
+                ),
+            () =>
+                _.forEach(
+                    this.props.store.genericAssayProfileOptionsByType.result,
+                    (options, type) => {
+                        this.selectedGenericAssayProfileIdByType.set(
+                            type,
+                            options[0].value
+                        );
+                    }
+                )
+        );
     }
 
     componentDidMount(): void {
         this.setTabsWidth(this.tabsDivRef.current);
     }
 
+    componentWillUnmount(): void {
+        this.genericAssayEntityOptionsReaction();
+    }
+
+    readonly XvsYClinicalAttributes = remoteData({
+        await: () => [this.props.store.chartClinicalAttributes],
+        invoke: () => {
+            let attributes = this.props.store.chartClinicalAttributes.result!;
+            if (localStorage.getItem('XvsYCategorical') !== 'true') {
+                attributes = attributes.filter(attr => {
+                    return attr.datatype === 'NUMBER';
+                });
+            }
+            return Promise.resolve(attributes);
+        },
+        default: [],
+    });
+
+    readonly XvsYOptions = remoteData({
+        await: () => [this.XvsYClinicalAttributes],
+        invoke: () => {
+            return Promise.resolve(
+                this.XvsYClinicalAttributes.result!.map(attr => ({
+                    value: attr.clinicalAttributeId,
+                    label: attr.displayName,
+                }))
+            );
+        },
+        default: [],
+    });
     readonly dataCount = remoteData<ChartDataCountSet>({
         await: () => [
             this.props.store.dataWithCount,
@@ -278,7 +347,7 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
         return (
             this.props.disableGenericAssayTabs ||
             !this.props.store.genericAssayProfiles.isComplete ||
-            !this.props.store.genericAssayEntitiesGroupedByGenericAssayType
+            !this.props.store.genericAssayEntitiesGroupedByProfileId
                 .isComplete ||
             (this.props.store.genericAssayProfiles.isComplete &&
                 _.isEmpty(this.props.store.genericAssayProfiles.result))
@@ -292,15 +361,40 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
             charts,
             this.selectedAttrs
         );
-        // TODO: (GA) Add other datatype by using another function
-        if (
-            _.every(
-                charts,
-                chart => chart.dataType === DataTypeConstants.LIMITVALUE
-            )
-        ) {
-            this.props.store.addGenericAssayContinuousCharts(charts);
+        const chartsGroupedByDataType = _.groupBy(
+            charts,
+            chart => chart.dataType
+        );
+        // Add LIMITVALUE data as continuous chart
+        if (!_.isEmpty(chartsGroupedByDataType[DataTypeConstants.LIMITVALUE])) {
+            this.props.store.addGenericAssayContinuousCharts(
+                chartsGroupedByDataType[DataTypeConstants.LIMITVALUE]
+            );
         }
+        // Add BINARY or CATEGORICAL data as categorical chart
+        if (!_.isEmpty(chartsGroupedByDataType[DataTypeConstants.BINARY])) {
+            this.props.store.addGenericAssayBinaryOrCategoricalCharts(
+                chartsGroupedByDataType[DataTypeConstants.BINARY]
+            );
+        }
+        if (
+            !_.isEmpty(chartsGroupedByDataType[DataTypeConstants.CATEGORICAL])
+        ) {
+            this.props.store.addGenericAssayBinaryOrCategoricalCharts(
+                chartsGroupedByDataType[DataTypeConstants.CATEGORICAL]
+            );
+        }
+    }
+
+    @action.bound
+    private onSelectGenericAssayProfileByType(
+        genericAssayType: string,
+        profileId: string
+    ) {
+        this.selectedGenericAssayProfileIdByType.set(
+            genericAssayType,
+            profileId
+        );
     }
 
     @action.bound
@@ -420,13 +514,33 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
         tabs = _.map(
             this.props.store.genericAssayProfileOptionsByType.result,
             (options, type) => {
-                const genericAssayEntityOptions = _.map(
-                    this.props.store
-                        .genericAssayEntitiesGroupedByGenericAssayType.result![
-                        type
-                    ],
-                    entity => makeGenericAssayOption(entity, false)
+                // Generic Assay tabs will assign one Generic Assay type to one tab
+                // And one tab can only has one selected profile at a time
+                // selectedGenericAssayProfileIdByType been initialzed at the begining
+                // so we know we can always find a selected profile for each Generic Assay type
+                const molecularProfileIdsInType =
+                    options.find(
+                        option =>
+                            option.value ===
+                            this.selectedGenericAssayProfileIdByType.get(type)
+                    )?.profileIds || [];
+
+                const entitityMap = molecularProfileIdsInType.reduce(
+                    (acc, profileId) => {
+                        this.props.store.genericAssayEntitiesGroupedByProfileId.result![
+                            profileId
+                        ].forEach(meta => {
+                            acc[meta.stableId] = meta;
+                        });
+                        return acc;
+                    },
+                    {} as { [stableId: string]: GenericAssayMeta }
                 );
+
+                const genericAssayEntityOptions = _.map(entitityMap, entity =>
+                    makeGenericAssayOption(entity, false)
+                );
+
                 const shouldShowChartOptionTable =
                     this.genericAssayChartOptionsByGenericAssayType[type] &&
                     this.genericAssayChartOptionsByGenericAssayType[type]
@@ -434,7 +548,9 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
                 const molecularProfileOptions = options.map(option => {
                     return {
                         ...option,
-                        label: `${option.label} (${option.count} samples)`,
+                        label: `${option.label} (${option.count} ${
+                            option.patientLevel ? 'patients' : 'samples'
+                        })`,
                         profileName: option.label,
                     };
                 });
@@ -454,6 +570,12 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
                                 genericAssayEntityOptions
                             }
                             onChartSubmit={this.onGenericAssaySubmit}
+                            onSelectGenericAssayProfile={profileId =>
+                                this.onSelectGenericAssayProfileByType(
+                                    type,
+                                    profileId
+                                )
+                            }
                         />
                         {shouldShowChartOptionTable && (
                             <div style={{ marginTop: 10 }}>
@@ -575,6 +697,91 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
     }
 
     @observable private savingCustomData = false;
+
+    @computed private get addXvsYChartButton() {
+        let disabled = false;
+        let text: string;
+        let type: 'scatter' | 'violin';
+        let categoricalAttrId: string;
+        let numericalAttrId: string;
+        if (!this.XvsYSelection.x || !this.XvsYSelection.y) {
+            disabled = true;
+            text = 'Add Chart';
+        } else if (this.XvsYSelection.x.value === this.XvsYSelection.y.value) {
+            disabled = true;
+            text = 'Please choose two different attributes.';
+        } else if (
+            this.props.store.isXvsYChartVisible(
+                this.XvsYSelection.x.value,
+                this.XvsYSelection.y.value
+            )
+        ) {
+            disabled = true;
+            text = 'A chart with these attributes already exists';
+        } else {
+            const clinicalAttributes = this.props.store
+                .clinicalAttributeIdToClinicalAttribute.result!;
+            const attr1 = clinicalAttributes[this.XvsYSelection.x.value];
+            const attr2 = clinicalAttributes[this.XvsYSelection.y.value];
+
+            if (attr1.datatype === 'STRING' && attr2.datatype === 'STRING') {
+                disabled = true;
+                text =
+                    "Can't add a chart with two categorical attributes (yet).";
+            } else if (
+                (attr1.datatype === 'NUMBER' && attr2.datatype === 'STRING') ||
+                (attr1.datatype === 'STRING' && attr2.datatype === 'NUMBER')
+            ) {
+                text = 'Add violin plot table';
+                type = 'violin';
+
+                if (attr1.datatype === 'STRING') {
+                    categoricalAttrId = attr1.clinicalAttributeId;
+                    numericalAttrId = attr2.clinicalAttributeId;
+                } else {
+                    categoricalAttrId = attr2.clinicalAttributeId;
+                    numericalAttrId = attr1.clinicalAttributeId;
+                }
+            } else {
+                text = 'Add density plot';
+                type = 'scatter';
+            }
+        }
+
+        return (
+            <button
+                className="btn btn-primary btn-sm"
+                data-test={'x-vs-y-submit-btn'}
+                disabled={disabled}
+                onClick={
+                    disabled
+                        ? undefined
+                        : action(() => {
+                              if (type === 'scatter') {
+                                  this.props.store.addXvsYScatterChart({
+                                      xAttrId: this.XvsYSelection.x!.value,
+                                      yAttrId: this.XvsYSelection.y!.value,
+                                  });
+                              } else {
+                                  this.props.store.addXvsYViolinChart({
+                                      categoricalAttrId,
+                                      numericalAttrId,
+                                  });
+                              }
+                              this.updateInfoMessage(
+                                  `${this.XvsYSelection.y!.label} vs ${
+                                      this.XvsYSelection.x!.label
+                                  } added.`
+                              );
+                              this.XvsYSelection.x = undefined;
+                              this.XvsYSelection.y = undefined;
+                          })
+                }
+            >
+                {text}
+            </button>
+        );
+    }
 
     render() {
         return (
@@ -718,7 +925,7 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
                                             .getDefaultCustomChartName
                                     }
                                     disableSubmitButton={this.savingCustomData}
-                                    onSubmit={(chart: CustomChart) => {
+                                    onSubmit={(chart: CustomChartData) => {
                                         this.showAddNewChart = false;
                                         this.savingCustomData = true;
                                         this.updateInfoMessage(
@@ -788,6 +995,63 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
                             </>
                         </div>
                     </MSKTab>
+                    <MSKTab
+                        id={'X_Vs_Y'}
+                        linkText={
+                            <span>
+                                X vs Y
+                                <strong
+                                    style={{ marginLeft: 5 }}
+                                    className={'beta-text'}
+                                >
+                                    Beta!
+                                </strong>
+                            </span>
+                        }
+                        key={4}
+                    >
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                            }}
+                        >
+                            <div style={{ paddingBottom: 5 }}>
+                                <ReactSelect
+                                    name="x-vs-y-select-x"
+                                    className={'xvsy-x-axis-selector'}
+                                    placeholder={`Select first clinical attribute`}
+                                    closeMenuOnSelect={true}
+                                    value={[this.XvsYSelection.x]}
+                                    isMulti={false}
+                                    isClearable={false}
+                                    options={this.XvsYOptions.result}
+                                    onChange={action((opt: any) => {
+                                        this.XvsYSelection.x = opt;
+                                    })}
+                                />
+                            </div>
+                            <span style={{ margin: 'auto', marginBottom: 6 }}>
+                                vs.
+                            </span>
+                            <div style={{ paddingBottom: 15 }}>
+                                <ReactSelect
+                                    name="x-vs-y-select-y"
+                                    className={'xvsy-y-axis-selector'}
+                                    placeholder={`Select second clinical attribute`}
+                                    closeMenuOnSelect={true}
+                                    value={[this.XvsYSelection.y]}
+                                    isMulti={false}
+                                    isClearable={false}
+                                    options={this.XvsYOptions.result}
+                                    onChange={action((opt: any) => {
+                                        this.XvsYSelection.y = opt;
+                                    })}
+                                />
+                            </div>
+                            {this.addXvsYChartButton}
+                        </div>
+                    </MSKTab>
                     {!this.hideGenericAssayTabs && this.genericAssayTabs}
                 </MSKTabs>
                 {this.showResetButton && (
@@ -839,8 +1103,7 @@ export default class AddChartButton extends React.Component<
         return (
             this.props.store.genericAssayProfileOptionsByType.isPending ||
             this.props.store.molecularProfileOptions.isPending ||
-            this.props.store.genericAssayEntitiesGroupedByGenericAssayType
-                .isPending
+            this.props.store.genericAssayEntitiesGroupedByProfileId.isPending
         );
     }
 

@@ -1,4 +1,4 @@
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { action, computed, observable, makeObservable } from 'mobx';
 import autobind from 'autobind-decorator';
 import {
@@ -194,6 +194,19 @@ export default class MutationMapperDataStore
     @computed
     get duplicateMutationCountInMultipleSamples(): number {
         return countDuplicateMutations(this.tableDataGroupedByPatients);
+    }
+
+    @computed
+    get tableDataSamples() {
+        return _.uniqBy(_.flatten(this.tableData), m => m.sampleId).map(m => ({
+            sampleId: m.sampleId,
+            studyId: m.studyId,
+        }));
+    }
+
+    @computed
+    get tableDataPatients() {
+        return _.uniq(_.flatten(this.tableData).map(m => m.patientId));
     }
 
     constructor(

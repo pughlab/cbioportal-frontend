@@ -41,7 +41,8 @@ import _ from 'lodash';
 import { deriveDisplayTextFromGenericAssayType } from 'pages/resultsView/plots/PlotsTabUtils';
 import AlterationEnrichments from './AlterationEnrichments';
 import AlterationEnrichmentTypeSelector from '../../shared/lib/comparison/AlterationEnrichmentTypeSelector';
-import { buildAlterationsTabName } from 'shared/lib/comparison/ComparisonStoreUtils';
+import { AlterationFilterMenuSection } from 'pages/groupComparison/GroupComparisonUtils';
+import { getServerConfig } from 'config/config';
 
 export interface IGroupComparisonPageProps {
     routing: any;
@@ -93,15 +94,6 @@ export default class GroupComparisonPage extends React.Component<
         return GENOMIC_ALTERATIONS_TAB_NAME;
     }
 
-    @autobind
-    private getTabHref(tabId: string) {
-        return URL.format({
-            pathname: tabId,
-            query: this.props.routing.query,
-            hash: this.props.routing.location.hash,
-        });
-    }
-
     @computed get selectedGroupsKey() {
         // for components which should remount whenever selected groups change
         const selectedGroups = this.store._selectedGroups.result || [];
@@ -134,7 +126,7 @@ export default class GroupComparisonPage extends React.Component<
                     activeTabId={this.urlWrapper.tabId}
                     onTabClick={this.urlWrapper.setTabId}
                     className="primaryTabs mainTabs"
-                    getTabHref={this.getTabHref}
+                    hrefRoot={buildCBioPortalPageUrl('comparison')}
                 >
                     <MSKTab id={GroupComparisonTab.OVERLAP} linkText="Overlap">
                         <Overlap
@@ -174,20 +166,33 @@ export default class GroupComparisonPage extends React.Component<
                                     : ''
                             }
                         >
-                            <AlterationEnrichmentTypeSelector
-                                store={this.store}
-                                updateSelectedEnrichmentEventTypes={
-                                    this.store
-                                        .updateSelectedEnrichmentEventTypes
-                                }
-                                showMutations={
-                                    this.store.hasMutationEnrichmentData
-                                }
-                                showCnas={this.store.hasCnaEnrichmentData}
-                                showStructuralVariants={
-                                    this.store.hasStructuralVariantData
-                                }
-                            />
+                            {(getServerConfig().skin_show_settings_menu && (
+                                <AlterationFilterMenuSection
+                                    store={this.store}
+                                    updateSelectedEnrichmentEventTypes={
+                                        this.store
+                                            .updateSelectedEnrichmentEventTypes
+                                    }
+                                />
+                            )) || (
+                                <AlterationEnrichmentTypeSelector
+                                    classNames={
+                                        styles.inlineAlterationTypeSelectorMenu
+                                    }
+                                    store={this.store}
+                                    updateSelectedEnrichmentEventTypes={
+                                        this.store
+                                            .updateSelectedEnrichmentEventTypes
+                                    }
+                                    showMutations={
+                                        this.store.hasMutationEnrichmentData
+                                    }
+                                    showCnas={this.store.hasCnaEnrichmentData}
+                                    showStructuralVariants={
+                                        this.store.hasStructuralVariantData
+                                    }
+                                />
+                            )}
                             <AlterationEnrichments store={this.store} />
                         </MSKTab>
                     )}

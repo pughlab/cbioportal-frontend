@@ -21,6 +21,18 @@ import {
 import './styles.scss';
 import { ShapeParams } from 'oncoprintjs/dist/js/oncoprintshape';
 
+export type CategoricalTrackDatum = {
+    entity: string;
+    profile_name: string;
+    study_id?: string;
+    sample?: string;
+    patient: string;
+    uid: string;
+    attr_val_counts: { [val: string]: number };
+    attr_val?: string | number | CategoricalTrackDatum['attr_val_counts'];
+    na?: boolean;
+};
+
 export type ClinicalTrackDatum = {
     attr_id: string;
     study_id?: string;
@@ -46,7 +58,7 @@ export type ClinicalTrackSpec = {
     | {
           datatype: 'counts';
           countsCategoryLabels: string[];
-          countsCategoryFills: string[];
+          countsCategoryFills: [number, number, number, number][];
       }
     | {
           datatype: 'number';
@@ -55,7 +67,10 @@ export type ClinicalTrackSpec = {
       }
     | {
           datatype: 'string';
-          category_to_color?: { [category: string]: string };
+          category_to_color?: {
+              [category: string]: [number, number, number, number];
+          };
+          universal_rule_categories?: { [category: string]: any };
       }
 );
 
@@ -183,6 +198,24 @@ export interface IGenesetHeatmapTrackSpec extends IBaseHeatmapTrackSpec {
     expansionCallback: () => void;
 }
 
+export interface ICategoricalTrackSpec {
+    key: string;
+    label: string;
+    molecularProfileId: string;
+    molecularProfileName: string;
+    molecularAlterationType: MolecularProfile['molecularAlterationType'];
+    genericAssayType: string;
+    datatype: MolecularProfile['datatype'];
+    data: CategoricalTrackDatum[];
+    trackGroupIndex: number;
+    trackLinkUrl: string | undefined;
+    onRemove?: () => void;
+    onClickRemoveInTrackMenu?: () => void;
+    naLegendLabel?: string;
+    description?: string;
+    info?: string;
+}
+
 export const GENETIC_TRACK_GROUP_INDEX = 1;
 export const CLINICAL_TRACK_GROUP_INDEX = 0;
 
@@ -195,7 +228,10 @@ export interface IOncoprintProps {
     genesetHeatmapTracks: IGenesetHeatmapTrackSpec[];
     heatmapTracks: IHeatmapTrackSpec[];
     heatmapTracksOrder?: { [trackGroupIndex: number]: string[] }; // track keys
-    heatmapTrackHeaders?: { [trackGroupIndex: number]: TrackGroupHeader };
+    categoricalTracks: ICategoricalTrackSpec[];
+    additionalTrackGroupHeaders?: {
+        [trackGroupIndex: number]: TrackGroupHeader;
+    };
     divId: string;
     width: number;
     initParams?: InitParams;
@@ -240,6 +276,8 @@ export interface IOncoprintProps {
     suppressRendering?: boolean;
     onSuppressRendering?: () => void;
     onReleaseRendering?: () => void;
+
+    keepSorted?: boolean;
 }
 
 @observer
@@ -296,6 +334,7 @@ export default class Oncoprint extends React.Component<IOncoprintProps, {}> {
     }
 
     private refreshOncoprint(props: IOncoprintProps) {
+        const now = performance.now();
         if (!this.oncoprint) {
             // instantiate new one
             this.oncoprint = new OncoprintJS(
@@ -324,6 +363,7 @@ export default class Oncoprint extends React.Component<IOncoprintProps, {}> {
             );
             this.lastTransitionProps = _.clone(props);
         }
+        console.log('oncoprint render time: ', performance.now() - now);
     }
 
     componentWillReceiveProps(nextProps: IOncoprintProps) {

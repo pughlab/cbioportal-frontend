@@ -50,12 +50,17 @@ import {
 import PdbChainDataStore from './PdbChainDataStore';
 import MutationMapperDataStore from './MutationMapperDataStore';
 import { IMutationMapperConfig } from './MutationMapperConfig';
-import { normalizeMutations } from './MutationMapperUtils';
+import {
+    buildNamespaceColumnConfig,
+    normalizeMutations,
+} from './MutationMapperUtils';
 import { getOncoKbApiUrl } from 'shared/api/urls';
+import { NamespaceColumnConfig } from 'shared/components/mutationTable/MutationTable';
 
 export interface IMutationMapperStoreConfig {
     filterMutationsBySelectedTranscript?: boolean;
     filterAppliersOverride?: { [filterType: string]: ApplyFilterFn };
+    genomeBuild?: string;
 }
 
 export default class MutationMapperStore extends DefaultMutationMapperStore<
@@ -84,12 +89,14 @@ export default class MutationMapperStore extends DefaultMutationMapperStore<
             {
                 isoformOverrideSource:
                     mutationMapperConfig.isoformOverrideSource,
+                ptmSources: mutationMapperConfig.ptmSources,
                 filterMutationsBySelectedTranscript:
                     mutationMapperStoreConfig.filterMutationsBySelectedTranscript,
                 enableCivic: mutationMapperConfig.show_civic,
                 enableOncoKb: mutationMapperConfig.show_oncokb,
                 filterAppliersOverride:
                     mutationMapperStoreConfig.filterAppliersOverride,
+                genomeBuild: mutationMapperStoreConfig.genomeBuild,
             },
             getMutations,
             getTranscriptId
@@ -188,6 +195,10 @@ export default class MutationMapperStore extends DefaultMutationMapperStore<
         },
         []
     );
+
+    @computed get namespaceColumnConfig(): NamespaceColumnConfig {
+        return buildNamespaceColumnConfig(this.mutationData.result);
+    }
 
     public countUniqueMutations(mutations: Mutation[]): number {
         return countUniqueMutations(mutations);

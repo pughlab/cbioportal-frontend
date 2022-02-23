@@ -4,11 +4,14 @@ import {
     CUSTOM_CASE_LIST_ID,
     CancerStudyQueryUrlParams,
 } from './QueryStore';
-import { VirtualStudy, VirtualStudyData } from 'shared/model/VirtualStudy';
 import Sinon from 'sinon';
 import sessionServiceClient from 'shared/api//sessionServiceInstance';
 import client from '../../api/cbioportalClientInstance';
-import * as _ from 'lodash';
+import _ from 'lodash';
+import {
+    VirtualStudy,
+    VirtualStudyData,
+} from 'shared/api/session-service/sessionServiceModels';
 
 describe('QueryStore', () => {
     describe('#setParamsFromLocalStorage', () => {
@@ -63,7 +66,7 @@ describe('QueryStore', () => {
         let deleteVirtualStudyStub: sinon.SinonStub;
         let addVirtualStudyStub: sinon.SinonStub;
 
-        before(() => {
+        beforeAll(() => {
             getUserVirtualStudiesStub = Sinon.stub(
                 sessionServiceClient,
                 'getUserVirtualStudies'
@@ -92,7 +95,7 @@ describe('QueryStore', () => {
             store_vs = new QueryStore();
         });
 
-        after(() => {
+        afterAll(() => {
             getUserVirtualStudiesStub.restore();
             deleteVirtualStudyStub.restore();
             addVirtualStudyStub.restore();

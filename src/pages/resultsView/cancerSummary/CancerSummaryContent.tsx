@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { Checkbox, ButtonGroup, Radio } from 'react-bootstrap';
 import { computed, observable, action, makeObservable } from 'mobx';
 import { observer } from 'mobx-react';
@@ -95,6 +95,7 @@ export interface ICancerSummaryChartData {
         x: string;
         y: number;
         alterationType: string;
+        alterationCount: number;
     }[][];
     alterationTypeDataCounts: {
         x: string;
@@ -400,6 +401,7 @@ export class CancerSummaryContent extends React.Component<
 
                             memo.push({
                                 alterationType: alterationKey,
+                                alterationCount: alterationCount,
                                 x: label,
                                 xKey: groupKey,
                                 y: this.getYValue(
@@ -416,6 +418,7 @@ export class CancerSummaryContent extends React.Component<
                         y: number;
                         xKey: string;
                         alterationType: string;
+                        alterationCount: number;
                     }[]
                 );
             }

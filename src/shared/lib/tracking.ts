@@ -1,9 +1,11 @@
 import $ from 'jquery';
-import AppConfig from 'appConfig';
+import { getServerConfig } from 'config/config';
 import { getBrowserWindow, isWebdriver } from 'cbioportal-frontend-commons';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { log } from './consoleLog';
 import { StudyViewPageStore } from '../../pages/studyView/StudyViewPageStore';
+// @ts-ignore
+import { UniversalAnalytics } from 'google.analytics';
 
 export type GAEvent = {
     category:
@@ -20,10 +22,8 @@ export type GAEvent = {
 };
 
 export function initializeTracking() {
-    if (!_.isEmpty(AppConfig.serverConfig.google_analytics_profile_id)) {
-        embedGoogleAnalytics(
-            AppConfig.serverConfig.google_analytics_profile_id!
-        );
+    if (!_.isEmpty(getServerConfig().google_analytics_profile_id)) {
+        embedGoogleAnalytics(getServerConfig().google_analytics_profile_id!);
     }
 
     $('body').on('click', '[data-event]', el => {

@@ -4,7 +4,6 @@ import {
     ClinicalAttribute,
     ClinicalData,
     MolecularProfile,
-    MutationSpectrum,
     MutationSpectrumFilter,
     Patient,
     Sample,
@@ -16,15 +15,11 @@ import _ from 'lodash';
 import client from '../api/cbioportalClientInstance';
 import internalClient from '../api/cbioportalInternalClientInstance';
 import ComplexKeySet from '../lib/complexKeyDataStructures/ComplexKeySet';
-import { makeUniqueColorGetter } from '../components/plots/PlotUtils';
-import { RESERVED_CLINICAL_VALUE_COLORS } from '../lib/Colors';
-import { interpolateReds } from 'd3-scale-chromatic';
+import { hexToRGBA } from '../lib/Colors';
 import {
     getClinicalAttributeColoring,
     OncoprintClinicalData,
 } from './ClinicalDataCacheUtils';
-import { ChartUserSetting } from 'pages/studyView/StudyViewPageStore';
-import hashString from 'shared/lib/hashString';
 
 export enum SpecialAttribute {
     MutationSpectrum = 'NO_CONTEXT_MUTATION_SIGNATURE',
@@ -50,7 +45,7 @@ export const MUTATION_SPECTRUM_FILLS = [
     '#FCE08E',
     '#F78F5E',
     '#D62B23',
-];
+].map(hexToRGBA);
 
 const locallyComputedSpecialAttributes = [
     SpecialAttribute.StudyOfOrigin,
@@ -182,7 +177,7 @@ function makeProfiledData(
 async function fetch(
     attribute: ExtendedClinicalAttribute,
     samples: Sample[],
-    patients: Patient[],
+    patients: Pick<Patient, 'uniquePatientKey' | 'patientId' | 'studyId'>[],
     studyToMutationMolecularProfile: { [studyId: string]: MolecularProfile },
     studyIdToStudy: { [studyId: string]: CancerStudy },
     coverageInformation: CoverageInformation,
@@ -298,7 +293,9 @@ export class UnfilteredClinicalDataCache extends MobxPromiseCache<
 > {
     constructor(
         samplesPromise: MobxPromise<Sample[]>,
-        patientsPromise: MobxPromise<Patient[]>,
+        patientsPromise: MobxPromise<
+            Pick<Patient, 'uniquePatientKey' | 'patientId' | 'studyId'>[]
+        >,
         studyToMutationMolecularProfilePromise: MobxPromise<{
             [studyId: string]: MolecularProfile;
         }>,
@@ -345,7 +342,9 @@ export default class ClinicalDataCache extends MobxPromiseCache<
 
     constructor(
         samplesPromise: MobxPromise<Sample[]>,
-        patientsPromise: MobxPromise<Patient[]>,
+        patientsPromise: MobxPromise<
+            Pick<Patient, 'uniquePatientKey' | 'patientId' | 'studyId'>[]
+        >,
         studyToMutationMolecularProfilePromise: MobxPromise<{
             [studyId: string]: MolecularProfile;
         }>,

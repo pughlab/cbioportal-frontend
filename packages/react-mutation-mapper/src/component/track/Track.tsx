@@ -18,14 +18,14 @@ import {
 import { DataFilter } from '../../model/DataFilter';
 import DataStore from '../../model/DataStore';
 import {
-    updatePositionHighlightFilters,
     updatePositionSelectionFilters,
+    updatePositionRangeHighlightFilters,
 } from '../../util/FilterUtils';
-import TrackCircle, { TrackItemSpec } from './TrackCircle';
-
+import TrackItem, { TrackItemSpec, TrackItemType } from './TrackItem';
 import styles from './trackStyles.module.scss';
 
 const DEFAULT_ID_CLASS_PREFIX = 'track-circle-';
+const DEFAULT_HEIGHT = 15; // height of rectangle element
 
 export type TrackProps = {
     dataStore: DataStore;
@@ -37,6 +37,7 @@ export type TrackProps = {
     xOffset?: number;
     defaultFilters?: DataFilter[];
     idClassPrefix?: string;
+    isSubTrack?: boolean;
 };
 
 @observer
@@ -45,7 +46,7 @@ export default class Track extends React.Component<TrackProps, {}> {
     @observable private shiftPressed = false;
     private tooltipActive = false;
 
-    private circles: { [index: string]: TrackCircle };
+    private shapes: { [index: string]: TrackItem };
 
     constructor(props: TrackProps) {
         super(props);
@@ -110,23 +111,30 @@ export default class Track extends React.Component<TrackProps, {}> {
     }
 
     @action.bound
-    onTrackCircleClick(circleComponent: TrackCircle) {
-        updatePositionSelectionFilters(
-            this.props.dataStore,
-            circleComponent.props.spec.codon,
-            this.shiftPressed,
-            this.props.defaultFilters
-        );
+    onTrackItemClick(shapeComponent: TrackItem) {
+        if (shapeComponent.props.spec.itemType === TrackItemType.CIRCLE) {
+            updatePositionSelectionFilters(
+                this.props.dataStore,
+                shapeComponent.props.spec.startCodon,
+                this.shiftPressed,
+                this.props.defaultFilters
+            );
+        }
     }
 
     @action.bound
-    onTrackCircleHover(circleComponent: TrackCircle) {
-        updatePositionHighlightFilters(
+    onTrackItemHover(shapeComponent: TrackItem) {
+        const endCodon: number = shapeComponent.props.spec.endCodon
+            ? Math.trunc(shapeComponent.props.spec.endCodon)
+            : Math.trunc(shapeComponent.props.spec.startCodon);
+
+        updatePositionRangeHighlightFilters(
             this.props.dataStore,
-            circleComponent.props.spec.codon,
+            Math.trunc(shapeComponent.props.spec.startCodon),
+            endCodon,
             this.props.defaultFilters
         );
-        circleComponent.isHovered = true;
+        shapeComponent.isHovered = true;
     }
 
     @action.bound
@@ -153,14 +161,13 @@ export default class Track extends React.Component<TrackProps, {}> {
         const componentIndex: number | null = this.getComponentIndex(className);
 
         if (componentIndex !== null) {
-            const circleComponent = this.circles[componentIndex];
-
-            if (circleComponent) {
+            const shapeComponent = this.shapes[componentIndex];
+            if (shapeComponent) {
                 this.setHitZone(
-                    circleComponent.hitRectangle,
-                    circleComponent.props.spec.tooltip,
-                    action(() => this.onTrackCircleHover(circleComponent)),
-                    action(() => this.onTrackCircleClick(circleComponent)),
+                    shapeComponent.hitRectangle,
+                    shapeComponent.props.spec.tooltip,
+                    action(() => this.onTrackItemHover(shapeComponent)),
+                    action(() => this.onTrackItemClick(shapeComponent)),
                     this.onHitzoneMouseOut,
                     'pointer',
                     'bottom'
@@ -194,36 +201,60 @@ export default class Track extends React.Component<TrackProps, {}> {
     }
 
     get svgHeight() {
-        return 10;
+        return 10; // height of baseline element
     }
 
     get items() {
-        this.circles = {};
+        this.shapes = {};
 
         return (this.props.trackItems || []).map((spec, index) => {
+            let dim1;
+            let dim2;
+            let hoverdim1;
+            let specFeats;
+            let y;
+            if (spec.endCodon !== undefined) {
+                dim1 =
+                    ((spec.endCodon! - spec.startCodon) /
+                        this.props.proteinLength) *
+                    this.props.width;
+                dim2 = spec.height || DEFAULT_HEIGHT;
+                hoverdim1 = dim1;
+                y = (this.svgHeight - dim2) / 2; // y is the vertical start position of rectangle, half of baseline element height = half of element height + y
+                specFeats = {
+                    ...spec,
+                    endCodon: spec.endCodon!,
+                    itemType: TrackItemType.RECTANGLE,
+                };
+            } else {
+                dim1 =
+                    this.props.dataStore.isPositionSelected(spec.startCodon) ||
+                    this.props.dataStore.isPositionHighlighted(spec.startCodon)
+                        ? 5
+                        : 2.8;
+                hoverdim1 = 5;
+                y = this.svgHeight / 2;
+                dim2 = dim1;
+                specFeats = { ...spec, itemType: TrackItemType.CIRCLE };
+            }
             return (
-                <TrackCircle
-                    ref={(circle: TrackCircle) => {
-                        if (circle !== null) {
-                            this.circles[index] = circle;
+                <TrackItem
+                    ref={(item: TrackItem) => {
+                        if (item !== null) {
+                            this.shapes[index] = item;
                         }
                     }}
-                    key={spec.codon}
+                    key={spec.startCodon}
                     hitZoneClassName={`${this.props.idClassPrefix}${index}`}
                     hitZoneXOffset={this.props.xOffset}
                     x={
-                        (this.props.width / this.props.proteinLength) *
-                        spec.codon
+                        (spec.startCodon / this.props.proteinLength) *
+                        this.props.width
                     }
-                    y={this.svgHeight / 2}
-                    radius={
-                        this.props.dataStore.isPositionSelected(spec.codon) ||
-                        this.props.dataStore.isPositionHighlighted(spec.codon)
-                            ? 5
-                            : 2.8
-                    }
-                    hoverRadius={5}
-                    spec={spec}
+                    y={y}
+                    dim1={dim1}
+                    dim2={dim2}
+                    spec={specFeats}
                 />
             );
         });
@@ -231,7 +262,7 @@ export default class Track extends React.Component<TrackProps, {}> {
 
     @action
     private unhoverAllComponents() {
-        unhoverAllComponents(this.circles);
+        unhoverAllComponents(this.shapes);
         this.props.dataStore.clearHighlightFilters();
     }
 
@@ -279,7 +310,13 @@ export default class Track extends React.Component<TrackProps, {}> {
                     display: 'flex',
                 }}
             >
-                <span className={classnames(styles.trackTitle, 'small')}>
+                <span
+                    className={classnames(
+                        styles.trackTitle,
+                        'small',
+                        `${this.props.isSubTrack ? 'subtrack-' : ''}trackTitle`
+                    )}
+                >
                     {this.props.trackTitle}
                 </span>
                 <span>

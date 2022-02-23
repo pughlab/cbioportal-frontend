@@ -57,6 +57,10 @@ $selectHeightInner: $selectHeight - 2px;
     }
 }
 
+.no-checkbox {
+    padding-left: 0px !important;
+}
+
 [data-mfb-label]:after {
     background: rgba(0, 0, 0, 1) !important;
     color: white !important;
@@ -118,4 +122,16 @@ iframe.mdacc-heatmap-iframe {
             margin-bottom: 0px;
         }
     }
+}
+
+.violinPlotTableHeader {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fixedHeaderTableRightJustified {
+    flex-direction: row-reverse;
+    display: flex;
 }

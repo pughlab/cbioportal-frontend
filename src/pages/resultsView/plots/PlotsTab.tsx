@@ -11,6 +11,7 @@ import { Observer, observer } from 'mobx-react';
 import './styles.scss';
 import {
     AlterationTypeConstants,
+    DataTypeConstants,
     ResultsViewPageStore,
 } from '../ResultsViewPageStore';
 import { Button, FormControl } from 'react-bootstrap';
@@ -66,6 +67,7 @@ import {
     getCategoryOptions,
     maybeSetLogScale,
     logScalePossibleForProfile,
+    isGenericAssaySelected,
 } from './PlotsTabUtils';
 import {
     ClinicalAttribute,
@@ -74,7 +76,6 @@ import {
     ClinicalData,
     CancerStudy,
 } from 'cbioportal-ts-api-client';
-import Timer = NodeJS.Timer;
 import ScatterPlot from 'shared/components/plots/ScatterPlot';
 import WaterfallPlot from 'shared/components/plots/WaterfallPlot';
 import TablePlot from 'shared/components/plots/TablePlot';
@@ -101,7 +102,7 @@ import {
 import { getTablePlotDownloadData } from '../../../shared/components/plots/TablePlotUtils';
 import MultipleCategoryBarPlot from '../../../shared/components/plots/MultipleCategoryBarPlot';
 import { RESERVED_CLINICAL_VALUE_COLORS } from 'shared/lib/Colors';
-import onMobxPromise from '../../../shared/lib/onMobxPromise';
+import { onMobxPromise } from 'cbioportal-frontend-commons';
 import { showWaterfallPlot } from 'pages/resultsView/plots/PlotsTabUtils';
 import Pluralize from 'pluralize';
 import AlterationFilterWarning from '../../../shared/components/banners/AlterationFilterWarning';
@@ -122,6 +123,12 @@ import {
 } from 'shared/lib/GenericAssayUtils/GenericAssayCommonUtils';
 import { getBoxWidth } from 'shared/lib/boxPlotUtils';
 import ScrollWrapper from '../cancerSummary/ScrollWrapper';
+import {
+    DEFAULT_GENERIC_ASSAY_OPTIONS_SHOWING,
+    MenuList,
+    MenuListHeader,
+    doesOptionMatchSearchText,
+} from 'pages/studyView/addChartButton/genericAssaySelection/GenericAssaySelection';
 
 enum EventKey {
     horz_logScale,
@@ -183,9 +190,9 @@ export type AxisMenuSelection = {
     selectedDataSourceOption?: PlotsTabOption;
     selectedGenesetOption?: PlotsTabOption;
     selectedGenericAssayOption?: PlotsTabOption;
-    isGenericAssayType?: boolean;
+    genericAssayDataType?: string; // LIMIT-VALUE, CATEGORICAL, BINARY
     selectedCategories: any[];
-    dataType?: string;
+    dataType?: string; // Generic Assay saves genericAssayType as dataType
     dataSourceId?: string;
     mutationCountBy: MutationCountBy;
     structuralVariantCountBy: StructuralVariantCountBy;
@@ -230,7 +237,7 @@ export type PlotsTabOption = {
     value: string;
     label: string;
     plotAxisLabel?: string;
-    isGenericAssayType?: boolean;
+    genericAssayDataType?: string;
 };
 
 export type PlotsTabGeneOption = {
@@ -313,6 +320,8 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
         string,
         LegendDataWithId
     >({}, { deep: false });
+    @observable _horzGenericAssaySearchText: string = '';
+    @observable _vertGenericAssaySearchText: string = '';
 
     @action.bound
     private onClickLegendItem(ld: LegendDataWithId<any>) {
@@ -688,8 +697,8 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
         );
     }
 
-    private searchCaseTimeout: Timer;
-    private searchMutationTimeout: Timer;
+    private searchCaseTimeout: any;
+    private searchMutationTimeout: any;
 
     constructor(props: IPlotsTabProps) {
         super(props);
@@ -721,7 +730,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                 if (
                     self.showGeneSelectBox(
                         this.dataType,
-                        this.isGenericAssayType
+                        isGenericAssaySelected(this)
                     ) &&
                     this.selectedGeneOption
                 ) {
@@ -757,7 +766,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                     self.horzSelection.dataType &&
                     !self.showGeneSelectBox(
                         self.horzSelection.dataType,
-                        self.horzSelection.isGenericAssayType
+                        isGenericAssaySelected(self.horzSelection)
                     )
                 ) {
                     // if vertical gene option is "same as horizontal", and horizontal is clinical, then use the actual
@@ -948,7 +957,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                 if (
                     self.showGenericAssaySelectBox(
                         this.dataType,
-                        this.isGenericAssayType
+                        isGenericAssaySelected(this)
                     ) &&
                     this.selectedGenericAssayOption
                 ) {
@@ -993,10 +1002,10 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
             set selectedGenericAssayOption(o: any) {
                 this._selectedGenericAssayOption = o;
             },
-            get isGenericAssayType() {
+            get genericAssayDataType() {
                 if (!self.dataTypeOptions.isComplete) {
                     // if there are no options to select a default from, then return the stored value for this variable
-                    return this._isGenericAssayType;
+                    return this._genericAssayDataType;
                 }
                 // otherwise, pick the default based on selected dataType
                 const dataTypeOptions = self.dataTypeOptions.result!;
@@ -1005,18 +1014,18 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                         dataTypeOptions,
                         option => option.value === self.vertSelection.dataType
                     );
-                    return vertOption && vertOption.isGenericAssayType;
+                    return vertOption?.genericAssayDataType;
                 } else if (!vertical && self.horzSelection.dataType) {
                     const horzOption = _.find(
                         dataTypeOptions,
                         option => option.value === self.horzSelection.dataType
                     );
-                    return horzOption && horzOption.isGenericAssayType;
+                    return horzOption?.genericAssayDataType;
                 }
-                return this._isGenericAssayType;
+                return this._genericAssayDataType;
             },
-            set isGenericAssayType(i: any) {
-                this._isGenericAssayType = i;
+            set genericAssayDataType(type: any) {
+                this._genericAssayDataType = type;
             },
 
             get _selectedGeneOption() {
@@ -1237,7 +1246,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                     return currentParams;
                 });
             },
-            _isGenericAssayType: undefined,
+            _genericAssayDataType: undefined,
             selectedCategories: [],
         });
     }
@@ -1669,8 +1678,9 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
             // listen to updates of `dataTypeOptions` and on the selected data type for the vertical axis
             if (
                 this.dataTypeOptions.result &&
-                this.vertSelection.dataType &&
-                this.vertSelection.isGenericAssayType
+                isGenericAssaySelected(this.vertSelection) &&
+                this.vertSelection.genericAssayDataType ===
+                    DataTypeConstants.LIMITVALUE
             ) {
                 noneDatatypeOption = [
                     {
@@ -1693,8 +1703,9 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
             // listen to updates of `dataTypeOptions` and on the selected data type for the horzontal axis
             if (
                 this.dataTypeOptions.result &&
-                this.horzSelection.dataType &&
-                this.horzSelection.isGenericAssayType
+                isGenericAssaySelected(this.horzSelection) &&
+                this.horzSelection.genericAssayDataType ===
+                    DataTypeConstants.LIMITVALUE
             ) {
                 noneDatatypeOption = [
                     {
@@ -1734,7 +1745,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                 this.horzSelection.dataType &&
                 this.showGeneSelectBox(
                     this.horzSelection.dataType,
-                    this.horzSelection.isGenericAssayType
+                    isGenericAssaySelected(this.horzSelection)
                 ) &&
                 this.horzSelection.selectedGeneOption &&
                 this.horzSelection.selectedGeneOption.value !==
@@ -1955,7 +1966,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                 this.vertSelection.dataType &&
                 this.showGenericAssaySelectBox(
                     this.vertSelection.dataType,
-                    this.vertSelection.isGenericAssayType
+                    isGenericAssaySelected(this.vertSelection)
                 )
             ) {
                 // different generic assay profile can hold different entities, use entites in selected profile
@@ -2000,7 +2011,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                     this.horzSelection.dataSourceId &&
                     this.showGenericAssaySelectBox(
                         this.horzSelection.dataType,
-                        this.horzSelection.isGenericAssayType
+                        isGenericAssaySelected(this.horzSelection)
                     ) &&
                     this.horzSelection.selectedGenericAssayOption &&
                     this.horzSelection.selectedGenericAssayOption.value !==
@@ -2047,13 +2058,13 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
 
     private showGeneSelectBox(
         dataType: string,
-        isGenericAssayType: boolean | undefined
+        isGenericAssaySelected: boolean
     ): boolean {
         return (
             dataType !== NONE_SELECTED_OPTION_STRING_VALUE &&
             dataType !== GENESET_DATA_TYPE &&
             dataType !== CLIN_ATTR_DATA_TYPE &&
-            !isGenericAssayType
+            !isGenericAssaySelected
         );
     }
 
@@ -2066,11 +2077,11 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
 
     private showGenericAssaySelectBox(
         dataType: string,
-        isGenericAssayType: boolean | undefined
+        isGenericAssaySelected: boolean
     ): boolean {
         return (
             dataType !== NONE_SELECTED_OPTION_STRING_VALUE &&
-            !!isGenericAssayType
+            isGenericAssaySelected
         );
     }
 
@@ -2197,7 +2208,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                     label: deriveDisplayTextFromGenericAssayType(
                         profile.genericAssayType
                     ),
-                    isGenericAssayType: true,
+                    genericAssayDataType: profile.datatype,
                 }))
                 .value();
 
@@ -2284,8 +2295,9 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
         const oldVerticalGene = this.vertSelection.selectedGeneOption;
         const oldHorizontalGene = this.horzSelection.selectedGeneOption;
         this.vertSelection.dataType = option.value;
-        if (option.isGenericAssayType) {
-            this.vertSelection.isGenericAssayType = true;
+        if (option.genericAssayDataType) {
+            this.vertSelection.genericAssayDataType =
+                option.genericAssayDataType;
         }
 
         this.viewLimitValues = true;
@@ -2301,7 +2313,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
             this.vertSelection.dataType &&
             !this.showGeneSelectBox(
                 this.vertSelection.dataType,
-                this.vertSelection.isGenericAssayType
+                isGenericAssaySelected(this.vertSelection)
             ) &&
             oldHorizontalGene &&
             oldHorizontalGene.value == SAME_SELECTED_OPTION_NUMERICAL_VALUE
@@ -2320,8 +2332,9 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
         const oldVerticalGene = this.vertSelection.selectedGeneOption;
 
         this.horzSelection.dataType = option.value;
-        if (option.isGenericAssayType) {
-            this.horzSelection.isGenericAssayType = true;
+        if (option.genericAssayDataType) {
+            this.horzSelection.genericAssayDataType =
+                option.genericAssayDataType;
         }
 
         this.viewLimitValues = true;
@@ -2337,7 +2350,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
             this.horzSelection.dataType &&
             !this.showGeneSelectBox(
                 this.horzSelection.dataType,
-                this.horzSelection.isGenericAssayType
+                isGenericAssaySelected(this.horzSelection)
             ) &&
             oldVerticalGene &&
             oldVerticalGene.value == SAME_SELECTED_OPTION_NUMERICAL_VALUE
@@ -2510,7 +2523,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
             selection.dataType !== NONE_SELECTED_OPTION_STRING_VALUE &&
             selection.dataType !== CLIN_ATTR_DATA_TYPE &&
             selection.dataType !== GENESET_DATA_TYPE &&
-            !selection.isGenericAssayType
+            !isGenericAssaySelected(selection)
         );
     }
 
@@ -2567,7 +2580,9 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
         if (
             this.horzAxisDataPromise.result &&
             this.horzSelection.dataType &&
-            this.horzSelection.isGenericAssayType
+            isGenericAssaySelected(this.horzSelection) &&
+            this.horzSelection.genericAssayDataType ===
+                DataTypeConstants.LIMITVALUE
         ) {
             return getLimitValues(this.horzAxisDataPromise.result.data);
         }
@@ -2582,7 +2597,9 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
         if (
             this.vertAxisDataPromise.result &&
             this.vertSelection.dataType &&
-            this.vertSelection.isGenericAssayType
+            isGenericAssaySelected(this.vertSelection) &&
+            this.vertSelection.genericAssayDataType ===
+                DataTypeConstants.LIMITVALUE
         ) {
             return getLimitValues(this.vertAxisDataPromise.result.data);
         }
@@ -3192,7 +3209,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                 !this.props.store.molecularProfileIdSuffixToMolecularProfiles
                     .isComplete) ||
             (axisSelection.dataType &&
-                axisSelection.isGenericAssayType &&
+                isGenericAssaySelected(axisSelection) &&
                 !this.horzGenericAssayOptions.isComplete)
         ) {
             return <LoadingIndicator isLoading={true} />;
@@ -3245,7 +3262,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                 break;
             default:
                 dataSourceLabel = `${
-                    axisSelection.isGenericAssayType
+                    isGenericAssaySelected(axisSelection)
                         ? deriveDisplayTextFromGenericAssayType(
                               axisSelection.dataType!
                           )
@@ -3295,8 +3312,9 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
             : this.horzSelection.genericAssayEntityId;
         if (
             axisSelection.dataType &&
-            axisSelection.isGenericAssayType &&
-            selectedGenericAssayEntityId
+            isGenericAssaySelected(axisSelection) &&
+            selectedGenericAssayEntityId &&
+            this.genericEntitiesGroupByEntityId.isComplete
         ) {
             const entity = this.genericEntitiesGroupByEntityId.result![
                 selectedGenericAssayEntityId
@@ -3328,18 +3346,54 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                 axisSelection.dataType
             ];
         }
+        let genericAssayOptionsCount: number = 0;
+        let filteredGenericAssayOptionsCount: number = 0;
         if (vertical && this.vertGenericAssayOptions.result) {
             genericAssayOptions =
                 this.makeGenericAssayGroupOptions(
                     this.vertGenericAssayOptions.result,
-                    selectedEntities
+                    selectedEntities,
+                    this._vertGenericAssaySearchText
                 ) || [];
+            // generate statistics for options
+            genericAssayOptionsCount = this.vertGenericAssayOptions.result
+                .length;
+            const selectedOptions = this.vertGenericAssayOptions.result.filter(
+                option => selectedEntities.includes(option.value)
+            );
+            const otherEntities = _.difference(
+                this.vertGenericAssayOptions.result,
+                selectedOptions
+            );
+            filteredGenericAssayOptionsCount = otherEntities.filter(option =>
+                doesOptionMatchSearchText(
+                    this._vertGenericAssaySearchText,
+                    option
+                )
+            ).length;
         } else if (!vertical && this.horzGenericAssayOptions.result) {
             genericAssayOptions =
                 this.makeGenericAssayGroupOptions(
                     this.horzGenericAssayOptions.result,
-                    selectedEntities
+                    selectedEntities,
+                    this._horzGenericAssaySearchText
                 ) || [];
+            // generate statistics for options
+            genericAssayOptionsCount = this.horzGenericAssayOptions.result
+                .length;
+            const selectedOptions = this.horzGenericAssayOptions.result.filter(
+                option => selectedEntities.includes(option.value)
+            );
+            const otherEntities = _.difference(
+                this.horzGenericAssayOptions.result,
+                selectedOptions
+            );
+            filteredGenericAssayOptionsCount = otherEntities.filter(option =>
+                doesOptionMatchSearchText(
+                    this._horzGenericAssaySearchText,
+                    option
+                )
+            ).length;
         }
 
         const axisCategoriesPromise = vertical
@@ -3497,7 +3551,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                     {axisSelection.dataType &&
                         this.showGeneSelectBox(
                             axisSelection.dataType,
-                            axisSelection.isGenericAssayType
+                            isGenericAssaySelected(axisSelection)
                         ) && (
                             <div
                                 className="form-group"
@@ -3593,7 +3647,7 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                     {axisSelection.dataType &&
                         this.showGenericAssaySelectBox(
                             axisSelection.dataType,
-                            axisSelection.isGenericAssayType
+                            isGenericAssaySelected(axisSelection)
                         ) && (
                             <div className="form-group" style={{ opacity: 1 }}>
                                 <label>
@@ -3648,8 +3702,30 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                                                 undefined ||
                                             axisSelection.dataType ===
                                                 CLIN_ATTR_DATA_TYPE ||
-                                            !axisSelection.isGenericAssayType
+                                            !isGenericAssaySelected(
+                                                axisSelection
+                                            )
                                         }
+                                        onInputChange={
+                                            vertical
+                                                ? this
+                                                      .onVerticalAxisGenericAssayInputChange
+                                                : this
+                                                      .onHorizontalAxisGenericAssayInputChange
+                                        }
+                                        components={{
+                                            MenuList: MenuList,
+                                            MenuListHeader: (
+                                                <MenuListHeader
+                                                    current={
+                                                        filteredGenericAssayOptionsCount
+                                                    }
+                                                    total={
+                                                        genericAssayOptionsCount
+                                                    }
+                                                />
+                                            ),
+                                        }}
                                     />
                                     {genericAssayDescription && (
                                         <div data-test="generic-assay-info-icon">
@@ -3764,15 +3840,28 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
             value: string;
             label: string;
         }[],
-        selectedEntities: string[]
+        selectedEntities: string[],
+        serchText: string
     ) {
         if (alloptions) {
             const entities = alloptions.filter(option =>
                 selectedEntities.includes(option.value)
             );
             const otherEntities = _.difference(alloptions, entities);
+            let filteredOtherOptions = otherEntities.filter(option =>
+                doesOptionMatchSearchText(serchText, option)
+            );
+            if (
+                filteredOtherOptions.length >
+                DEFAULT_GENERIC_ASSAY_OPTIONS_SHOWING
+            ) {
+                filteredOtherOptions = filteredOtherOptions.slice(
+                    0,
+                    DEFAULT_GENERIC_ASSAY_OPTIONS_SHOWING
+                );
+            }
             if (entities.length === 0) {
-                return alloptions;
+                return filteredOtherOptions;
             } else {
                 return [
                     {
@@ -3781,12 +3870,36 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
                     },
                     {
                         label: 'Other entities',
-                        options: otherEntities,
+                        options: filteredOtherOptions,
                     },
                 ];
             }
         } else {
             return undefined;
+        }
+    }
+
+    @action.bound
+    private onVerticalAxisGenericAssayInputChange(
+        input: string,
+        inputInfo: any
+    ) {
+        if (inputInfo.action === 'input-change') {
+            this._vertGenericAssaySearchText = input;
+        } else if (inputInfo.action !== 'set-value') {
+            this._vertGenericAssaySearchText = '';
+        }
+    }
+
+    @action.bound
+    private onHorizontalAxisGenericAssayInputChange(
+        input: string,
+        inputInfo: any
+    ) {
+        if (inputInfo.action === 'input-change') {
+            this._horzGenericAssaySearchText = input;
+        } else if (inputInfo.action !== 'set-value') {
+            this._horzGenericAssaySearchText = '';
         }
     }
 
@@ -4517,11 +4630,11 @@ export default class PlotsTab extends React.Component<IPlotsTabProps, {}> {
     @computed get showNoGenericAssaySelectedWarning() {
         return (
             (this.vertSelection.dataType &&
-                this.vertSelection.isGenericAssayType &&
+                isGenericAssaySelected(this.vertSelection) &&
                 this.vertGenericAssayOptions.isComplete &&
                 this.vertGenericAssayOptions.result!.length === 0) ||
             (this.horzSelection.dataType &&
-                this.horzSelection.isGenericAssayType &&
+                isGenericAssaySelected(this.horzSelection) &&
                 this.horzGenericAssayOptions.isComplete &&
                 this.horzGenericAssayOptions.result!.length === 0)
         );

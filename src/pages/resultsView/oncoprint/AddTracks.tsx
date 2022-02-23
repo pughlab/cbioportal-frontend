@@ -3,7 +3,7 @@ import { observer } from 'mobx-react';
 import { MSKTab, MSKTabs } from '../../../shared/components/MSKTabs/MSKTabs';
 import { action, computed, makeObservable, observable } from 'mobx';
 import { ResultsViewPageStore } from '../ResultsViewPageStore';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import OncoprintDropdownCount from './OncoprintDropdownCount';
 import CustomDropdown from 'shared/components/oncoprint/controls/CustomDropdown';
 import { makeGenericAssayOption } from 'shared/lib/GenericAssayUtils/GenericAssayCommonUtils';
@@ -24,7 +24,7 @@ import {
     clinicalAttributeIsPROFILEDIN,
 } from 'shared/cache/ClinicalDataCache';
 import { ExtendedClinicalAttribute } from '../ResultsViewPageStoreUtils';
-import { ClinicalAttribute } from 'cbioportal-ts-api-client';
+import { ClinicalAttribute, MolecularProfile } from 'cbioportal-ts-api-client';
 export interface IAddTrackProps {
     store: ResultsViewPageStore;
     heatmapMenu: JSX.Element | null;

@@ -15,7 +15,6 @@ import {
     ProteinImpactTypeBadgeSelector,
     TrackDataStatus,
     TrackName,
-    TrackSelector,
     TrackVisibility,
 } from 'react-mutation-mapper';
 
@@ -45,11 +44,20 @@ import styles from './mutationMapper.module.scss';
 import { ProteinImpactType } from 'cbioportal-frontend-commons';
 import { AnnotatedMutation } from 'pages/resultsView/ResultsViewPageStore';
 import DriverAnnotationProteinImpactTypeBadgeSelector from 'pages/resultsView/mutation/DriverAnnotationProteinImpactTypeBadgeSelector';
+import { PtmSource } from 'cbioportal-utils';
 
 export interface IMutationMapperProps {
     store: MutationMapperStore;
     isPutativeDriver?: (mutation: Partial<AnnotatedMutation>) => boolean;
     trackVisibility?: TrackVisibility;
+    columnVisibility?: { [columnId: string]: boolean };
+    storeColumnVisibility?: (
+        columnVisibility:
+            | {
+                  [columnId: string]: boolean;
+              }
+            | undefined
+    ) => void;
     showPlotYMaxSlider?: boolean;
     showPlotLegendToggle?: boolean;
     showPlotDownloadControls?: boolean;
@@ -67,6 +75,10 @@ export interface IMutationMapperProps {
     generateGenomeNexusHgvsgUrl: (hgvsg: string) => string;
     onTranscriptChange?: (transcript: string) => void;
     onClickSettingMenu?: (visible: boolean) => void;
+    onOncoKbIconToggle?: (mergeIcons: boolean) => void;
+    compactStyle?: boolean;
+    mergeOncoKbIcons?: boolean; // TODO add server config param for this as well?
+
     // server config properties
     genomeNexusUrl?: string;
     oncoKbPublicApiUrl?: string;
@@ -79,7 +91,7 @@ export interface IMutationMapperProps {
     enableHotspot?: boolean;
     enableMyCancerGenome?: boolean;
     enableCivic?: boolean;
-    compactStyle?: boolean;
+    ptmSources?: string[];
 }
 
 export default class MutationMapper<
@@ -281,22 +293,61 @@ export default class MutationMapper<
             alignmentDataStatus = 'empty';
         }
 
-        let ptmDataStatus: 'pending' | 'error' | 'complete' | 'empty' = this
+        const ptmDataStatus: 'pending' | 'error' | 'complete' | 'empty' = this
             .props.store.ptmData.status;
 
-        if (
-            ptmDataStatus === 'complete' &&
-            (!this.props.store.ptmData.result ||
-                this.props.store.ptmData.result.length === 0)
-        ) {
-            ptmDataStatus = 'empty';
+        let dbPtmDataStatus:
+            | 'pending'
+            | 'error'
+            | 'complete'
+            | 'empty' = ptmDataStatus;
+        let uniprotPtmDataStatus:
+            | 'pending'
+            | 'error'
+            | 'complete'
+            | 'empty' = ptmDataStatus;
+
+        if (ptmDataStatus === 'complete') {
+            if (!this.props.store.ptmData.result) {
+                dbPtmDataStatus = 'empty';
+                uniprotPtmDataStatus = 'empty';
+            } else {
+                if (
+                    this.props.store.ptmData.result.filter(
+                        d => d.source === PtmSource.dbPTM
+                    ).length === 0
+                ) {
+                    dbPtmDataStatus = 'empty';
+                }
+                if (
+                    this.props.store.ptmData.result.filter(
+                        d => d.source === PtmSource.Uniprot
+                    ).length === 0
+                ) {
+                    uniprotPtmDataStatus = 'empty';
+                }
+            }
+        }
+
+        let uniprotTopologyDataStatus:
+            | 'pending'
+            | 'error'
+            | 'complete'
+            | 'empty' = this.props.store.uniprotTopologyData.status;
+        if (uniprotTopologyDataStatus === 'complete') {
+            if (this.props.store.uniprotTopologyData.result?.length === 0) {
+                uniprotTopologyDataStatus = 'empty';
+            }
         }
 
         return {
             [TrackName.OncoKB]: oncoKbDataStatus,
             [TrackName.CancerHotspots]: hotspotDataStatus,
-            [TrackName.PTM]: ptmDataStatus,
+            [TrackName.dbPTM]: dbPtmDataStatus,
+            [TrackName.UniprotPTM]: uniprotPtmDataStatus,
             [TrackName.PDB]: alignmentDataStatus,
+            [TrackName.Exon]: 'complete',
+            [TrackName.UniprotTopology]: uniprotTopologyDataStatus,
         };
     }
 
@@ -333,6 +384,12 @@ export default class MutationMapper<
         return findProteinImpactTypeFilter(this.store.dataStore.dataFilters);
     }
 
+    @computed get annotatedProteinImpactTypeFilter() {
+        return this.store.dataStore.dataFilters.find(
+            filter => filter.type === ANNOTATED_PROTEIN_IMPACT_FILTER_TYPE
+        );
+    }
+
     /**
      * Overriding the parent method to have a customized filter panel.
      */
@@ -350,6 +407,9 @@ export default class MutationMapper<
                             counts={this.mutationCountsByProteinImpactType}
                             onSelect={this.onProteinImpactTypeSelect}
                             onClickSettingMenu={this.props.onClickSettingMenu}
+                            annotatedProteinImpactTypeFilter={
+                                this.annotatedProteinImpactTypeFilter
+                            }
                         />
                     </div>
                 ) : (
@@ -485,21 +545,31 @@ export default class MutationMapper<
 
     @computed
     protected get tracks(): TrackName[] {
-        const defaultTracks: TrackName[] = TrackSelector.defaultProps.tracks!;
+        const tracks: TrackName[] = [];
 
-        const conditionalTracks = [
-            { name: TrackName.OncoKB, enabled: this.props.enableOncoKb },
-            {
-                name: TrackName.CancerHotspots,
-                enabled: this.props.enableHotspot,
-            },
-        ];
+        if (this.props.enableHotspot) {
+            tracks.push(TrackName.CancerHotspots);
+        }
 
-        // default tracks minus the disabled ones
-        return _.without(
-            defaultTracks,
-            ...conditionalTracks.filter(t => !t.enabled).map(t => t.name)
-        );
+        if (this.props.enableOncoKb) {
+            tracks.push(TrackName.OncoKB);
+        }
+
+        if (this.props.ptmSources) {
+            if (this.props.ptmSources.includes(PtmSource.dbPTM)) {
+                tracks.push(TrackName.dbPTM);
+            }
+            if (this.props.ptmSources.includes(PtmSource.Uniprot)) {
+                tracks.push(TrackName.UniprotPTM);
+            }
+        } else {
+            tracks.push(TrackName.dbPTM);
+        }
+        tracks.push(TrackName.Exon);
+        tracks.push(TrackName.UniprotTopology);
+        tracks.push(TrackName.PDB);
+
+        return tracks;
     }
 
     protected get proteinChainPanel(): JSX.Element | null {

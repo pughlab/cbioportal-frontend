@@ -83,6 +83,7 @@ export type MutationMapperProps = {
     filterMutationsBySelectedTranscript?: boolean;
     transcriptSummaryUrlTemplate?: string;
     isoformOverrideSource?: string;
+    ptmSources?: string[];
     annotationFields?: string[];
     mainLoadingIndicator?: JSX.Element;
     geneSummaryLoadingIndicator?: JSX.Element;
@@ -100,6 +101,8 @@ export type MutationMapperProps = {
     filterApplier?: FilterApplier;
     onTranscriptChange?: (transcript: string) => void;
     compactStyle?: boolean;
+    collapsePtmTrack?: boolean;
+    collapseUniprotTopologyTrack?: boolean;
 };
 
 export function initDefaultMutationMapperStore(props: MutationMapperProps) {
@@ -111,6 +114,7 @@ export function initDefaultMutationMapperStore(props: MutationMapperProps) {
         {
             annotationFields: props.annotationFields,
             isoformOverrideSource: props.isoformOverrideSource,
+            ptmSources: props.ptmSources,
             filterMutationsBySelectedTranscript:
                 props.filterMutationsBySelectedTranscript,
             genomeNexusUrl: props.genomeNexusUrl,
@@ -354,6 +358,10 @@ export default class MutationMapper<
                 bottomYAxisDefaultMin={this.plotBottomYAxisDefaultMin}
                 lollipopTooltipCountInfo={
                     this.props.plotLollipopTooltipCountInfo
+                }
+                collapsePtmTrack={this.props.collapsePtmTrack}
+                collapseUniprotTopologyTrack={
+                    this.props.collapseUniprotTopologyTrack
                 }
             />
         );

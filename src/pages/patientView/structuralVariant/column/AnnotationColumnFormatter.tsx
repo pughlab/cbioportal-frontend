@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import {
     civicSortValue,
     DEFAULT_ANNOTATION_DATA,
@@ -7,7 +7,6 @@ import {
     IAnnotation,
     USE_DEFAULT_PUBLIC_INSTANCE_FOR_ONCOKB,
     oncoKbAnnotationSortValue,
-    calculateOncoKbAvailableDataType,
 } from 'react-mutation-mapper';
 import { CancerStudy, StructuralVariant } from 'cbioportal-ts-api-client';
 import { IAnnotationColumnProps } from 'shared/components/mutationTable/column/AnnotationColumnFormatter';
@@ -17,7 +16,9 @@ import {
     IOncoKbData,
     generateQueryStructuralVariantId,
     OncoKbCardDataType,
+    calculateOncoKbAvailableDataType,
 } from 'cbioportal-utils';
+import AnnotationHeader from 'shared/components/mutationTable/column/annotation/AnnotationHeader';
 
 export default class AnnotationColumnFormatter {
     public static getData(
@@ -202,6 +203,22 @@ export default class AnnotationColumnFormatter {
             civicSortValue(annotationData.civicEntry),
             annotationData.isOncoKbCancerGene ? 1 : 0,
         ]);
+    }
+
+    public static headerRender(
+        name: string,
+        width: number,
+        mergeOncoKbIcons?: boolean,
+        onOncoKbIconToggle?: (mergeIcons: boolean) => void
+    ) {
+        return (
+            <AnnotationHeader
+                name={name}
+                width={width}
+                mergeOncoKbIcons={mergeOncoKbIcons}
+                onOncoKbIconToggle={onOncoKbIconToggle}
+            />
+        );
     }
 
     public static renderFunction(

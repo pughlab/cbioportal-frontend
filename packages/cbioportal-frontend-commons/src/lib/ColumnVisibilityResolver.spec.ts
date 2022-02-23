@@ -1,5 +1,5 @@
 import { assert } from 'chai';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import {
     ISimpleColumnVisibilityDef,
     resolveColumnVisibility,
@@ -55,7 +55,7 @@ describe('ColumnVisibilityResolver', () => {
     });
 
     describe('resolveColumnVisibility', () => {
-        it('relies only on custom column visibility contents when provided', () => {
+        it('properly overrides even custom column visibility when provided', () => {
             const customColumnVisibility = {
                 '1st': false,
                 '2nd': true,
@@ -84,8 +84,8 @@ describe('ColumnVisibilityResolver', () => {
 
             assert.deepEqual(
                 getVisibleColumnIds(colVis),
-                ['2nd', '5th'],
-                'only 2nd and 5th columns should be visible'
+                ['1st', '2nd', '3rd', '4th', '5th'],
+                'all columns should be visible'
             );
         });
 

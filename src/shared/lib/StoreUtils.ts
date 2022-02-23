@@ -1,4 +1,4 @@
-import * as _ from 'lodash';
+import _ from 'lodash';
 import $ from 'jquery';
 import localForage from 'localforage';
 import {
@@ -78,7 +78,7 @@ import {
     CustomDriverNumericGeneMolecularData,
 } from '../../pages/resultsView/ResultsViewPageStore';
 import { normalizeMutations } from '../components/mutationMapper/MutationMapperUtils';
-import AppConfig from 'appConfig';
+import { getServerConfig } from 'config/config';
 import { getFrontendAssetUrl } from 'shared/api/urls';
 import {
     AnnotateCopyNumberAlterationQuery,
@@ -210,6 +210,12 @@ export async function fetchGenes(
     }
 }
 
+export function getAllGenes(client: CBioPortalAPI = defaultClient) {
+    return client.getAllGenesUsingGET({
+        projection: 'SUMMARY',
+    });
+}
+
 export async function fetchReferenceGenomeGenes(
     genomeName: string,
     hugoGeneSymbols?: string[],
@@ -233,10 +239,14 @@ export async function fetchAllReferenceGenomeGenes(
     genomeName: string,
     client: CBioPortalAPI = defaultClient
 ) {
-    const doCaching = window.location.hostname.includes('.cbioportal.org');
+    const doCaching = /\.cbioportal\.org|netlify\.app/.test(
+        window.location.hostname
+    );
 
     // allows us to clear cache when data changes
-    const referenceGenomeKey = `referenceGenome-${AppConfig.serverConfig.referenceGenomeVersion}`;
+    const referenceGenomeKey = `referenceGenome-${
+        getServerConfig().referenceGenomeVersion
+    }`;
 
     const hg19cached = doCaching
         ? await localForage.getItem(referenceGenomeKey)
@@ -849,8 +859,7 @@ export async function fetchStructuralVariantOncoKbData(
         const alterationsToQuery = _.filter(
             structuralVariantData.result,
             d =>
-                d.site1EntrezGeneId &&
-                d.site2EntrezGeneId &&
+                (d.site1EntrezGeneId || d.site2EntrezGeneId) &&
                 (!!annotatedGenes[d.site1EntrezGeneId] ||
                     !!annotatedGenes[d.site2EntrezGeneId])
         );
@@ -1070,16 +1079,14 @@ export function isMutationProfile(profile: MolecularProfile): boolean {
 export function findMutationMolecularProfile(
     molecularProfilesInStudy: MobxPromise<MolecularProfile[]>,
     studyId: string,
-    suffix: string = MOLECULAR_PROFILE_MUTATIONS_SUFFIX
+    type: string
 ) {
     if (!molecularProfilesInStudy.result) {
         return undefined;
     }
 
-    const profile = molecularProfilesInStudy.result.find(
-        (p: MolecularProfile) => {
-            return p.molecularProfileId === `${studyId}${suffix}`;
-        }
+    const profile = molecularProfilesInStudy.result!.find(
+        (profile: MolecularProfile) => profile.molecularAlterationType === type
     );
 
     return profile;
@@ -1087,13 +1094,12 @@ export function findMutationMolecularProfile(
 
 export function findUncalledMutationMolecularProfileId(
     molecularProfilesInStudy: MobxPromise<MolecularProfile[]>,
-    studyId: string,
-    suffix: string = MOLECULAR_PROFILE_UNCALLED_MUTATIONS_SUFFIX
+    studyId: string
 ) {
     const profile = findMutationMolecularProfile(
         molecularProfilesInStudy,
         studyId,
-        suffix
+        AlterationTypeConstants.MUTATION_UNCALLED
     );
     if (profile) {
         return profile.molecularProfileId;
@@ -1103,33 +1109,16 @@ export function findUncalledMutationMolecularProfileId(
 }
 
 export function findMrnaRankMolecularProfileId(
-    molecularProfilesInStudy: MobxPromise<MolecularProfile[]>
+    molecularProfilesInStudy: string[]
 ) {
-    if (!molecularProfilesInStudy.result) {
-        return null;
-    }
-
-    const regex1 = /^.+rna_seq.*_zscores$/; // We prefer profiles that look like this
-    const regex2 = /^.*_zscores$/; // If none of the above are available, we'll look for ones like this
-    const preferredProfile:
-        | MolecularProfile
-        | undefined = molecularProfilesInStudy.result.find(
-        (gp: MolecularProfile) =>
-            regex1.test(gp.molecularProfileId.toLowerCase())
+    const regex1 = /^.+rna_seq.*_zscores$/i; // We prefer profiles that look like this
+    const preferredProfileId:
+        | string
+        | undefined = molecularProfilesInStudy.find(profileId =>
+        regex1.test(profileId)
     );
 
-    if (preferredProfile) {
-        return preferredProfile.molecularProfileId;
-    } else {
-        const fallbackProfile:
-            | MolecularProfile
-            | undefined = molecularProfilesInStudy.result.find(
-            (gp: MolecularProfile) =>
-                regex2.test(gp.molecularProfileId.toLowerCase())
-        );
-
-        return fallbackProfile ? fallbackProfile.molecularProfileId : null;
-    }
+    return preferredProfileId || null;
 }
 
 export function generateUniqueSampleKeyToTumorTypeMap(
@@ -1298,6 +1287,17 @@ export function generateMutationIdByGeneAndProteinChangeAndEvent(
     ].join('_');
 }
 
+export function generateMutationIdByGeneAndProteinChangeSampleIdAndEvent(
+    m: Mutation
+): string {
+    return [
+        m.gene.hugoGeneSymbol,
+        m.proteinChange,
+        m.sampleId,
+        ...mutationEventFields(m),
+    ].join('_');
+}
+
 /** scan a collection of Mutations to see if any contain values for ASCN fields/properties
  *
  * all mutations (whether passed as a simple array or as an array of array)
@@ -1429,9 +1429,9 @@ export async function getHierarchyData(
     });
 }
 
-export function getGenomeNexusUrl(studies: CancerStudy[]) {
-    // default reference genome is GRCh37
-    // if the study is based on GRCh38, return GRCh38 genome nexus url
+export function getGenomeBuildFromStudies(studies: CancerStudy[]) {
+    // default reference genome is hg19(GRCh37)
+    // if the all studies are based on hg38, return hg38(GRCh38)
     if (studies) {
         if (
             _.every(
@@ -1445,10 +1445,20 @@ export function getGenomeNexusUrl(studies: CancerStudy[]) {
                     )
             )
         ) {
-            return AppConfig.serverConfig.genomenexus_url_grch38!;
+            return REFERENCE_GENOME.grch38.UCSC;
         }
     }
-    return AppConfig.serverConfig.genomenexus_url!;
+    return REFERENCE_GENOME.grch37.UCSC;
+}
+
+export function getGenomeNexusUrl(studies: CancerStudy[]) {
+    // default reference genome is GRCh37
+    // if the study is based on GRCh38, return GRCh38 genome nexus url
+    const genomeBuild = getGenomeBuildFromStudies(studies);
+    if (genomeBuild === REFERENCE_GENOME.grch38.UCSC) {
+        return getServerConfig().genomenexus_url_grch38!;
+    }
+    return getServerConfig().genomenexus_url!;
 }
 
 export function getSurvivalClinicalAttributesPrefix(
@@ -1628,7 +1638,7 @@ export async function fetchOncoKbDataForOncoprint(
     >,
     mutations: MobxPromise<Mutation[]>
 ) {
-    if (AppConfig.serverConfig.show_oncokb) {
+    if (getServerConfig().show_oncokb) {
         let result;
         try {
             result = await fetchOncoKbData(
@@ -1650,7 +1660,7 @@ export async function fetchCnaOncoKbDataForOncoprint(
     oncoKbAnnotatedGenes: MobxPromise<{ [entrezGeneId: number]: boolean }>,
     cnaMolecularData: MobxPromise<NumericGeneMolecularData[]>
 ) {
-    if (AppConfig.serverConfig.show_oncokb) {
+    if (getServerConfig().show_oncokb) {
         let result;
         try {
             result = await fetchCnaOncoKbDataWithNumericGeneMolecularData(

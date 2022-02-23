@@ -1,3 +1,2 @@
-export BRANCH_ENV="http://localhost:8080"
+#export CBIOPORTAL_URL="http://www.cbioportal.org"
 export GENOME_NEXUS_URL="https://www.genomenexus.org"
-#export BACKEND=cbioportal:release-genie-performance

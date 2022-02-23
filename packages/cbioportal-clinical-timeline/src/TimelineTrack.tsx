@@ -1,17 +1,19 @@
 import {
     EventPosition,
+    POINT_COLOR,
+    POINT_RADIUS,
     TimelineEvent,
     TimelineTrackSpecification,
     TimelineTrackType,
 } from './types';
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import _ from 'lodash';
 import {
     formatDate,
+    getAttributeValue,
+    getTrackEventColorGetter,
     REMOVE_FOR_DOWNLOAD_CLASSNAME,
-    TIMELINE_LINE_CHART_TRACK_HEIGHT,
     TIMELINE_TRACK_HEIGHT,
-    getTrackHeight,
 } from './lib/helpers';
 import { TimelineStore } from './TimelineStore';
 import { renderStack } from './svg/renderStack';
@@ -21,6 +23,14 @@ import {
     getTicksForLineChartAxis,
     getTrackValueRange,
 } from './lib/lineChartAxisUtils';
+import { getColor } from 'cbioportal-frontend-commons';
+import { getTrackLabel } from './TrackHeader';
+import {
+    COLOR_ATTRIBUTE_KEY,
+    renderShape,
+    SHAPE_ATTRIBUTE_KEY,
+} from './renderHelpers';
+import ReactMarkdown from 'react-markdown';
 
 export interface ITimelineTrackProps {
     trackData: TimelineTrackSpecification;
@@ -130,51 +140,59 @@ function getPointY(
     return y;
 }
 
-const POINT_RADIUS = 4;
-const POINT_COLOR = 'rgb(31, 119, 180)';
-
-export function renderPoint(events: TimelineEvent[], y: number) {
-    if (events.length === 1 && events[0].render) {
-        // If only one event, and theres an event-specific render function, show that.
-        return events[0].render(events[0]);
-    } else {
-        // events.length > 1, multiple simultaneous events.
-
-        // When nested tracks are collapsed, we might see multiple events that are
-        //  from different tracks. So let's check if all these events actually come
-        //  from the same track
-        const allFromSameTrack =
-            _.uniq(events.map(e => e.containingTrack.uid)).length === 1;
-
-        if (allFromSameTrack && events[0].containingTrack.renderEvents) {
-            // If they are all from the same track and there is a track-specific multiple-event renderer,
-            //  use that.
-            return events[0].containingTrack.renderEvents(events);
-        } else {
-            // Otherwise, show a generic stack. (We'll show the point-specific
-            //  renders in the tooltip.)
-            return (
-                <g>
-                    {events.length > 1 ? (
-                        <>
-                            {renderSuperscript(events.length)}
-                            {renderStack(events.map(e => POINT_COLOR))}
-                        </>
-                    ) : (
-                        <circle
-                            cx="0"
-                            cy={y}
-                            r={POINT_RADIUS}
-                            fill={POINT_COLOR}
-                        />
-                    )}
-                </g>
-            );
-        }
-    }
+export function randomColorGetter(e: TimelineEvent) {
+    return getColor(getTrackLabel(e.containingTrack));
 }
 
-function renderRange(pixelWidth: number) {
+function getSpecifiedColorIfExists(e: TimelineEvent) {
+    return getAttributeValue(COLOR_ATTRIBUTE_KEY, e);
+}
+
+const defaultColorGetter = function(e: TimelineEvent) {
+    return getSpecifiedColorIfExists(e) || POINT_COLOR;
+};
+
+export function renderPoint(
+    events: TimelineEvent[],
+    y: number,
+    eventColorGetter: (e: TimelineEvent) => string = defaultColorGetter
+) {
+    // When nested tracks are collapsed, we might see multiple events that are
+    //  from different tracks. So let's check if all these events actually come
+    //  from the same track
+    const allFromSameTrack =
+        _.uniq(events.map(e => e.containingTrack.uid)).length === 1;
+
+    let contents: any | null = null;
+    if (allFromSameTrack && events[0].containingTrack.renderEvents) {
+        // If they are all from the same track and there is a track-specific renderer,
+        // try that.
+        contents = events[0].containingTrack.renderEvents(events, y);
+    }
+    // Otherwise, or if that returns null, use default renderers. For multiple events, we'll show the individual
+    // renders in the tooltip.
+
+    if (contents === null) {
+        if (events.length > 1) {
+            contents = (
+                <>
+                    {renderSuperscript(events.length)}
+                    {renderStack(events.map(eventColorGetter))}
+                </>
+            );
+        } else {
+            contents = renderShape(events[0], y, eventColorGetter);
+        }
+    }
+
+    return <g>{contents}</g>;
+}
+
+function renderRange(
+    pixelWidth: number,
+    events: TimelineEvent[],
+    eventColorGetter: (e: TimelineEvent) => string = defaultColorGetter
+) {
     const height = 5;
     return (
         <rect
@@ -183,7 +201,7 @@ function renderRange(pixelWidth: number) {
             y={(TIMELINE_TRACK_HEIGHT - height) / 2}
             rx="2"
             ry="2"
-            fill="rgb(31, 119, 180)"
+            fill={eventColorGetter(events[0])}
         />
     );
 }
@@ -235,14 +253,22 @@ export const TimelineTrack: React.FunctionComponent<ITimelineTrackProps> = obser
                         trackValueRange
                     );
                     if (y !== null) {
-                        content = renderPoint(itemGroup, y);
+                        content = renderPoint(
+                            itemGroup,
+                            y,
+                            getTrackEventColorGetter(trackData)
+                        );
                         linePoints.push({
                             x: position ? position.pixelLeft : 0,
                             y,
                         });
                     }
                 } else if (position && position.pixelWidth) {
-                    content = renderRange(position.pixelWidth);
+                    content = renderRange(
+                        position.pixelWidth,
+                        itemGroup,
+                        getTrackEventColorGetter(trackData)
+                    );
                 }
 
                 return (
@@ -295,7 +321,7 @@ const TimelineItemWithTooltip: React.FunctionComponent<{
     track: TimelineTrackSpecification;
     events: TimelineEvent[];
     content: any;
-}> = function({ x, store, track, events, content }) {
+}> = observer(function({ x, store, track, events, content }) {
     const [tooltipUid, setTooltipUid] = useState<string | null>(null);
 
     const transforms = [];
@@ -311,9 +337,15 @@ const TimelineItemWithTooltip: React.FunctionComponent<{
         return tooltipUid;
     }
 
+    const hoverStyle = store.doesTooltipExist(tooltipUid || '')
+        ? {
+              opacity: 0.5,
+          }
+        : {};
+
     return (
         <g
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', ...hoverStyle }}
             transform={transforms.join(' ')}
             onMouseMove={e => {
                 let uid = syncTooltipUid();
@@ -325,20 +357,29 @@ const TimelineItemWithTooltip: React.FunctionComponent<{
                     });
 
                     setTooltipUid(uid);
+
+                    store.setHoveredTooltipUid(uid);
+                    store.setMousePosition({
+                        x: e.pageX,
+                        y: e.pageY,
+                    });
                 }
-                store.setHoveredTooltipUid(uid);
-                store.setMousePosition({
-                    x: e.pageX,
-                    y: e.pageY,
-                });
             }}
             onMouseLeave={e => {
-                const uid = syncTooltipUid();
-
-                if (uid && !store.isTooltipPinned(uid)) {
-                    store.removeTooltip(uid);
-                    setTooltipUid(null);
-                }
+                // we use a timeout here to allow user to
+                // mouse into the tooltip (in order to copy or click a link)
+                // the tooltip onEnter handler causes the tooltip to
+                // become "pinned" meaning it is stuck open
+                // that way when this timeout finally executes
+                // the if statement will be false and the tooltip
+                // will not be removed
+                setTimeout(() => {
+                    const uid = syncTooltipUid();
+                    if (uid && !store.isTooltipPinned(uid)) {
+                        store.removeTooltip(uid);
+                        setTooltipUid(null);
+                    }
+                }, 100);
             }}
             onClick={() => {
                 const uid = syncTooltipUid();
@@ -351,23 +392,40 @@ const TimelineItemWithTooltip: React.FunctionComponent<{
             {content}
         </g>
     );
-};
+});
 
 export const EventTooltipContent: React.FunctionComponent<{
     event: TimelineEvent;
 }> = function({ event }) {
+    const attributes = event.event.attributes.filter(attr => {
+        return (
+            attr.key !== COLOR_ATTRIBUTE_KEY && attr.key !== SHAPE_ATTRIBUTE_KEY
+        );
+    });
     return (
         <div>
             <table>
                 <tbody>
-                    {_.map(event.event.attributes, (att: any) => {
-                        return (
-                            <tr>
-                                <th>{att.key.replace(/_/g, ' ')}</th>
-                                <td>{att.value}</td>
-                            </tr>
-                        );
-                    })}
+                    {_.map(
+                        attributes.sort((a: any, b: any) =>
+                            a.key > b.key ? 1 : -1
+                        ),
+                        (att: any) => {
+                            return (
+                                <tr>
+                                    <th>{att.key.replace(/_/g, ' ')}</th>
+                                    <td>
+                                        <ReactMarkdown
+                                            allowedElements={['p', 'a']}
+                                            linkTarget={'_blank'}
+                                        >
+                                            {att.value}
+                                        </ReactMarkdown>
+                                    </td>
+                                </tr>
+                            );
+                        }
+                    )}
                     <tr>
                         <th>{`${
                             event.event.endNumberOfDaysSinceDiagnosis

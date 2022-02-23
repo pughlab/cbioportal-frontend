@@ -5,21 +5,15 @@ import { ResultsViewPageStore } from '../ResultsViewPageStore';
 import { CancerStudy } from 'cbioportal-ts-api-client';
 import classNames from 'classnames';
 import './styles.scss';
-import {
-    DefaultTooltip,
-    getBrowserWindow,
-    setArrowLeft,
-} from 'cbioportal-frontend-commons';
-import Loader, {
-    default as LoadingIndicator,
-} from '../../../shared/components/loadingIndicator/LoadingIndicator';
-import { action, computed, makeObservable, observable } from 'mobx';
+import { DefaultTooltip } from 'cbioportal-frontend-commons';
+import LoadingIndicator from 'shared/components/loadingIndicator/LoadingIndicator';
+import { action, computed, makeObservable } from 'mobx';
 import QueryAndDownloadTabs from '../../../shared/components/query/QueryAndDownloadTabs';
 import autobind from 'autobind-decorator';
 import ExtendedRouterStore from '../../../shared/lib/ExtendedRouterStore';
 import { ShareUI } from './ShareUI';
 import { ServerConfigHelpers } from '../../../config/config';
-import AppConfig from 'appConfig';
+import { getServerConfig } from 'config/config';
 import { StudyLink } from '../../../shared/components/StudyLink/StudyLink';
 import {
     getAlterationSummary,
@@ -30,10 +24,10 @@ import {
 import { MakeMobxView } from '../../../shared/components/MobxView';
 import { getGAInstance } from '../../../shared/lib/tracking';
 import { buildCBioPortalPageUrl } from '../../../shared/api/urls';
-import ResultsPageSettings from '../settings/ResultsPageSettings';
 import { createQueryStore } from 'shared/lib/createQueryStore';
 import _ from 'lodash';
 import { mixedReferenceGenomeWarning } from 'shared/lib/referenceGenomeUtils';
+import SettingsMenuButton from 'shared/components/driverAnnotations/SettingsMenuButton';
 
 interface QuerySummaryProps {
     routingStore: ExtendedRouterStore;
@@ -77,10 +71,10 @@ export default class QuerySummary extends React.Component<
                     submitToStudyViewPage(
                         this.props.store.queriedStudies.result,
                         this.props.store.filteredSamples.result!,
-                        this.props.store.queriedVirtualStudies.result.length >
-                            0,
                         this.props.store.filteredSamples.result!.length <
                             this.props.store.samples.result!.length,
+                        this.props.store.queriedVirtualStudies.result.length >
+                            0,
                         this.props.store.sampleLists.result
                     );
                 }}
@@ -277,7 +271,9 @@ export default class QuerySummary extends React.Component<
     }
 
     @computed get isQueryOrGeneInvalid() {
-        return this.props.store.genesInvalid || this.props.store.isQueryInvalid;
+        return (
+            this.props.store.genesInvalid || this.props.store.queryExceedsLimit
+        );
     }
 
     render() {
@@ -307,33 +303,10 @@ export default class QuerySummary extends React.Component<
                                             ? 'Cancel Modify Query'
                                             : 'Modify Query'}
                                     </button>
-                                    <DefaultTooltip
-                                        trigger={['click']}
-                                        placement="bottomRight"
-                                        overlay={
-                                            <ResultsPageSettings
-                                                store={this.props.store}
-                                            />
-                                        }
-                                        visible={
-                                            this.props.store
-                                                .resultsPageSettingsVisible
-                                        }
-                                        onVisibleChange={visible => {
-                                            this.props.store.resultsPageSettingsVisible = !!visible;
-                                        }}
-                                        onPopupAlign={tooltipEl =>
-                                            setArrowLeft(tooltipEl, '22px')
-                                        }
-                                    >
-                                        <button
-                                            data-test="GlobalSettingsButton"
-                                            style={{ marginLeft: 5 }}
-                                            className="btn btn-primary"
-                                        >
-                                            <i className="fa fa-sliders fa-lg" />
-                                        </button>
-                                    </DefaultTooltip>
+                                    <SettingsMenuButton
+                                        store={this.props.store}
+                                        resultsView={true}
+                                    />
                                 </div>
                             )}
 
@@ -357,7 +330,7 @@ export default class QuerySummary extends React.Component<
                             <ShareUI
                                 sessionEnabled={ServerConfigHelpers.sessionServiceIsEnabled()}
                                 bitlyAccessToken={
-                                    AppConfig.serverConfig.bitly_access_token
+                                    getServerConfig().bitly_access_token
                                 }
                                 urlWrapper={this.props.store.urlWrapper}
                             />

@@ -26,6 +26,7 @@ import {
     AlterationTypeConstants,
     AnnotatedNumericGeneMolecularData,
     AnnotatedMutation,
+    DataTypeConstants,
 } from '../ResultsViewPageStore';
 import { MutationCountBy, AxisMenuSelection } from './PlotsTab';
 import {
@@ -37,9 +38,9 @@ import {
     IAxisData,
     axisHasNegativeNumbers,
 } from 'pages/resultsView/plots/PlotsTabUtils';
-import AppConfig from 'appConfig';
+import { getServerConfig } from 'config/config';
 import ServerConfigDefaults from 'config/serverConfigDefaults';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { GenericAssayTypeConstants } from 'shared/lib/GenericAssayUtils/GenericAssayCommonUtils';
 
 describe('PlotsTabUtils', () => {
@@ -376,7 +377,7 @@ describe('PlotsTabUtils', () => {
         let horzAxisData: any;
         let vertAxisData: any;
 
-        before(() => {
+        beforeAll(() => {
             horzAxisData = {
                 data: [
                     { uniqueSampleKey: 'sample1', value: [0] },
@@ -494,7 +495,7 @@ describe('PlotsTabUtils', () => {
         let samples: Pick<Sample, 'uniqueSampleKey'>[];
         let molecularProfileId: string;
 
-        before(() => {
+        beforeAll(() => {
             molecularProfileId = 'mutations';
             mutations = [
                 {
@@ -747,7 +748,7 @@ describe('PlotsTabUtils', () => {
             const axisMenuSelection = ({
                 dataType: GenericAssayTypeConstants.TREATMENT_RESPONSE,
                 logScale: true,
-                isGenericAssayType: true,
+                genericAssayDataType: DataTypeConstants.LIMITVALUE,
             } as any) as AxisMenuSelection;
             const funcs = makeAxisLogScaleFunction(axisMenuSelection);
             assert.equal(funcs!.fLogScale(10), 1);
@@ -760,7 +761,7 @@ describe('PlotsTabUtils', () => {
             const axisMenuSelection = ({
                 dataType: GenericAssayTypeConstants.TREATMENT_RESPONSE,
                 logScale: true,
-                isGenericAssayType: true,
+                genericAssayDataType: DataTypeConstants.LIMITVALUE,
             } as any) as AxisMenuSelection;
             const funcs = makeAxisLogScaleFunction(axisMenuSelection);
             assert.equal(funcs!.fLogScale(0, 10), 1);
@@ -901,8 +902,8 @@ describe('PlotsTabUtils', () => {
     });
 
     describe('deriveDisplayTextFromGenericAssayType', () => {
-        before(() => {
-            AppConfig.serverConfig.generic_assay_display_text = ServerConfigDefaults.generic_assay_display_text!;
+        beforeAll(() => {
+            getServerConfig().generic_assay_display_text = ServerConfigDefaults.generic_assay_display_text!;
         });
         it('derive from the existing display text', () => {
             const displayText = 'Treatment Response';

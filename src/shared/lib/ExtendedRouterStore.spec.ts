@@ -1,7 +1,7 @@
 import ExtendedRouterStore, { PortalSession } from './ExtendedRouterStore';
 import { assert } from 'chai';
 import * as React from 'react';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import * as $ from 'jquery';
 import * as sinon from 'sinon';
 import * as mobx from 'mobx';
@@ -10,7 +10,7 @@ import { createBrowserHistory, MemoryHistory } from 'history';
 import { SinonStub } from 'sinon';
 import { sleep } from './TimeUtils';
 import { computed } from 'mobx';
-import AppConfig from 'appConfig';
+import { getServerConfig } from 'config/config';
 import { setServerConfig } from '../../config/config';
 
 describe('ExtendedRouterStore', () => {

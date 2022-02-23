@@ -2,9 +2,9 @@ import {
     CancerStudy,
     TypeOfCancer as CancerType,
 } from 'cbioportal-ts-api-client';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { CategorizedConfigItems } from 'config/IAppConfig';
-import { VirtualStudy } from 'shared/model/VirtualStudy';
+import { VirtualStudy } from 'shared/api/session-service/sessionServiceModels';
 
 export const CANCER_TYPE_ROOT = 'tissue';
 export const VIRTUAL_STUDY_NAME = 'My Virtual Studies';
@@ -33,7 +33,6 @@ export default class CancerStudyTreeData {
     }
 
     rootCancerType: CancerTypeWithVisibility = {
-        clinicalTrialKeywords: '',
         dedicatedColor: '',
         name: 'All',
         parent: '',
@@ -42,7 +41,6 @@ export default class CancerStudyTreeData {
     };
 
     virtualStudyCategory: CancerTypeWithVisibility = {
-        clinicalTrialKeywords: '',
         dedicatedColor: '',
         name: VIRTUAL_STUDY_NAME,
         parent: CANCER_TYPE_ROOT,
@@ -52,7 +50,6 @@ export default class CancerStudyTreeData {
     };
 
     physicalStudyCategory: CancerTypeWithVisibility = {
-        clinicalTrialKeywords: '',
         dedicatedColor: '',
         name: PHYSICAL_STUDY_NAME,
         parent: CANCER_TYPE_ROOT,
@@ -110,7 +107,6 @@ export default class CancerStudyTreeData {
         // add priority categories
         for (let name in priorityStudies) {
             this.priorityCategories.push({
-                clinicalTrialKeywords: '',
                 dedicatedColor: '',
                 name,
                 parent: CANCER_TYPE_ROOT,

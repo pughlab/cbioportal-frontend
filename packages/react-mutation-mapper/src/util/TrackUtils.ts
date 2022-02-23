@@ -4,7 +4,10 @@ export function initDefaultTrackVisibility(): TrackVisibility {
     return {
         [TrackName.OncoKB]: 'hidden',
         [TrackName.CancerHotspots]: 'hidden',
-        [TrackName.PTM]: 'hidden',
+        [TrackName.dbPTM]: 'hidden',
+        [TrackName.UniprotPTM]: 'hidden',
         [TrackName.PDB]: 'hidden',
+        [TrackName.Exon]: 'hidden',
+        [TrackName.UniprotTopology]: 'hidden',
     };
 }

@@ -4,9 +4,9 @@ import {
     QueryStore,
 } from './QueryStore';
 import { MolecularProfile, SampleList } from 'cbioportal-ts-api-client';
-import * as _ from 'lodash';
-import { VirtualStudy } from 'shared/model/VirtualStudy';
+import _ from 'lodash';
 import { getSuffixOfMolecularProfile } from 'shared/lib/molecularProfileUtils';
+import { VirtualStudy } from 'shared/api/session-service/sessionServiceModels';
 
 export enum MutationProfilesEnum {
     mutations = 'mutations',

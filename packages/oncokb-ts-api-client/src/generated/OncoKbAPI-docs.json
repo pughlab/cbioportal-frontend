@@ -432,7 +432,8 @@
               "missense_variant",
               "splice_region_variant",
               "stop_gained",
-              "synonymous_variant"
+              "synonymous_variant",
+              "intron_variant"
             ]
           },
           {
@@ -1149,6 +1150,12 @@
         },
         "foundationHeme": {
           "type": "boolean"
+        },
+        "geneAliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "grch37Isoform": {
           "type": "string"

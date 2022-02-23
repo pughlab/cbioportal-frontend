@@ -1,4 +1,4 @@
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { Mutation } from 'cbioportal-ts-api-client';
 
 /**
@@ -62,6 +62,7 @@ export function emptyMutation(): Mutation {
         driverTiersFilter: '',
         driverTiersFilterAnnotation: '',
         chr: '',
+        namespaceColumns: {},
         /*wildType:false,
         sequenced:true*/
     };

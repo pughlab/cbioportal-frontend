@@ -92,6 +92,8 @@ export type CancerGene = {
 
         'foundationHeme': boolean
 
+        'geneAliases': Array < string >
+
         'grch37Isoform': string
 
         'grch37RefSeq': string
@@ -1016,7 +1018,7 @@ export default class OncoKbAPI {
         'entrezGeneId' ? : number,
         'alteration' ? : string,
         'referenceGenome' ? : string,
-        'consequence' ? : "feature_truncation" | "frameshift_variant" | "inframe_deletion" | "inframe_insertion" | "start_lost" | "missense_variant" | "splice_region_variant" | "stop_gained" | "synonymous_variant",
+        'consequence' ? : "feature_truncation" | "frameshift_variant" | "inframe_deletion" | "inframe_insertion" | "start_lost" | "missense_variant" | "splice_region_variant" | "stop_gained" | "synonymous_variant" | "intron_variant",
         'proteinStart' ? : number,
         'proteinEnd' ? : number,
         'tumorType' ? : string,
@@ -1090,7 +1092,7 @@ export default class OncoKbAPI {
         'entrezGeneId' ? : number,
         'alteration' ? : string,
         'referenceGenome' ? : string,
-        'consequence' ? : "feature_truncation" | "frameshift_variant" | "inframe_deletion" | "inframe_insertion" | "start_lost" | "missense_variant" | "splice_region_variant" | "stop_gained" | "synonymous_variant",
+        'consequence' ? : "feature_truncation" | "frameshift_variant" | "inframe_deletion" | "inframe_insertion" | "start_lost" | "missense_variant" | "splice_region_variant" | "stop_gained" | "synonymous_variant" | "intron_variant",
         'proteinStart' ? : number,
         'proteinEnd' ? : number,
         'tumorType' ? : string,
@@ -1177,7 +1179,7 @@ export default class OncoKbAPI {
         'entrezGeneId' ? : number,
         'alteration' ? : string,
         'referenceGenome' ? : string,
-        'consequence' ? : "feature_truncation" | "frameshift_variant" | "inframe_deletion" | "inframe_insertion" | "start_lost" | "missense_variant" | "splice_region_variant" | "stop_gained" | "synonymous_variant",
+        'consequence' ? : "feature_truncation" | "frameshift_variant" | "inframe_deletion" | "inframe_insertion" | "start_lost" | "missense_variant" | "splice_region_variant" | "stop_gained" | "synonymous_variant" | "intron_variant",
         'proteinStart' ? : number,
         'proteinEnd' ? : number,
         'tumorType' ? : string,

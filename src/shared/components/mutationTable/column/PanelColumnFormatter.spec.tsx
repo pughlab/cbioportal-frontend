@@ -1,9 +1,8 @@
 import PanelColumnFormatter, { GenePanelLinks } from './PanelColumnFormatter';
-import Enzyme, { shallow } from 'enzyme';
+import { shallow } from 'enzyme';
 import { assert } from 'chai';
 import SampleManager from 'pages/patientView/SampleManager';
 import React from 'react';
-import Adapter from 'enzyme-adapter-react-16';
 
 const mockData = [
     {
@@ -28,7 +27,10 @@ const mockSamples = [{ id: 'sampleId', clinicalData: [] }];
 
 const mockSampleToGenePanelId = { sampleId: 'genePanelId' };
 const mockGenePanelIdToGene = { genePanelId: [1] };
-const mockSampleManager = new SampleManager(mockSamples);
+const mockSampleManager = new SampleManager(
+    mockSamples,
+    mockSamples.map(sample => sample.id)
+);
 
 const mock = {
     data: mockData,
@@ -36,8 +38,6 @@ const mock = {
     sampleManager: mockSampleManager,
     genePanelIdToGene: mockGenePanelIdToGene,
 };
-
-Enzyme.configure({ adapter: new Adapter() });
 
 describe('PanelColumnFormatter', () => {
     it('renders spinner icon if sampleToGenePanelId object is empty', () => {

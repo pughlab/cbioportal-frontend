@@ -35,7 +35,12 @@ export interface IChartHeaderProps {
     deleteChart: () => void;
     selectedRowsKeys?: string[];
     toggleLogScale?: () => void;
+    toggleLogScaleX?: () => void;
+    toggleLogScaleY?: () => void;
+    toggleBoxPlot?: () => void;
+    toggleViolinPlot?: () => void;
     toggleNAValue?: () => void;
+    swapAxes?: () => void;
     hideLabel?: boolean;
     chartControls?: ChartControls;
     changeChartType: (chartType: ChartType) => void;
@@ -59,8 +64,17 @@ export interface ChartControls {
     showComparisonPageIcon?: boolean;
     showLogScaleToggle?: boolean;
     logScaleChecked?: boolean;
+    showLogScaleXToggle?: boolean;
+    logScaleXChecked?: boolean;
+    showLogScaleYToggle?: boolean;
+    logScaleYChecked?: boolean;
+    showBoxPlotToggle?: boolean;
+    boxPlotChecked?: boolean;
+    showViolinPlotToggle?: boolean;
+    violinPlotChecked?: boolean;
     isShowNAChecked?: boolean;
     showNAToggle?: boolean;
+    showSwapAxes?: boolean;
 }
 
 @observer
@@ -196,7 +210,10 @@ export class ChartHeader extends React.Component<IChartHeaderProps, {}> {
                 );
             case ChartTypeEnum.MUTATED_GENES_TABLE:
             case ChartTypeEnum.CNA_GENES_TABLE:
+            case ChartTypeEnum.STRUCTURAL_VARIANT_GENES_TABLE:
+            case ChartTypeEnum.SAMPLE_TREATMENT_GROUPS_TABLE:
             case ChartTypeEnum.SAMPLE_TREATMENTS_TABLE:
+            case ChartTypeEnum.PATIENT_TREATMENT_GROUPS_TABLE:
             case ChartTypeEnum.PATIENT_TREATMENTS_TABLE:
                 return (
                     <a
@@ -266,6 +283,142 @@ export class ChartHeader extends React.Component<IChartHeaderProps, {}> {
                             }
                             label={
                                 <span style={{ marginTop: -3 }}>Log Scale</span>
+                            }
+                            style={{ marginTop: 1, marginBottom: -3 }}
+                        />
+                    </a>
+                </li>
+            );
+        }
+        if (
+            this.props.chartControls &&
+            this.props.chartControls.showSwapAxes &&
+            this.props.swapAxes
+        ) {
+            items.push(
+                <li>
+                    <a
+                        className="dropdown-item"
+                        data-test={'swapAxes'}
+                        onClick={this.props.swapAxes}
+                    >
+                        <i className={'fa fa-arrow-up'} />
+                        {` Swap Axes `}
+                        <i className={'fa fa-arrow-down'} />
+                    </a>
+                </li>
+            );
+        }
+        if (
+            this.props.chartControls &&
+            this.props.chartControls.showLogScaleXToggle &&
+            this.props.toggleLogScaleX
+        ) {
+            items.push(
+                <li>
+                    <a
+                        className="dropdown-item logScaleCheckbox"
+                        onClick={this.props.toggleLogScaleX}
+                    >
+                        <FlexAlignedCheckbox
+                            checked={
+                                !!(
+                                    this.props.chartControls &&
+                                    this.props.chartControls.logScaleXChecked
+                                )
+                            }
+                            label={
+                                <span style={{ marginTop: -3 }}>
+                                    Log Scale X
+                                </span>
+                            }
+                            style={{ marginTop: 1, marginBottom: -3 }}
+                        />
+                    </a>
+                </li>
+            );
+        }
+        if (
+            this.props.chartControls &&
+            this.props.chartControls.showLogScaleYToggle &&
+            this.props.toggleLogScaleY
+        ) {
+            items.push(
+                <li>
+                    <a
+                        className="dropdown-item logScaleCheckbox"
+                        onClick={this.props.toggleLogScaleY}
+                    >
+                        <FlexAlignedCheckbox
+                            checked={
+                                !!(
+                                    this.props.chartControls &&
+                                    this.props.chartControls.logScaleYChecked
+                                )
+                            }
+                            label={
+                                <span style={{ marginTop: -3 }}>
+                                    Log Scale Y
+                                </span>
+                            }
+                            style={{ marginTop: 1, marginBottom: -3 }}
+                        />
+                    </a>
+                </li>
+            );
+        }
+        if (
+            this.props.chartControls &&
+            this.props.chartControls.showViolinPlotToggle &&
+            this.props.toggleViolinPlot
+        ) {
+            items.push(
+                <li>
+                    <a
+                        className="dropdown-item violinCheckbox"
+                        onClick={this.props.toggleViolinPlot}
+                    >
+                        <FlexAlignedCheckbox
+                            checked={
+                                !!(
+                                    this.props.chartControls &&
+                                    this.props.chartControls.violinPlotChecked
+                                )
+                            }
+                            label={
+                                <span style={{ marginTop: -3 }}>
+                                    Show Violin Plot
+                                </span>
+                            }
+                            style={{ marginTop: 1, marginBottom: -3 }}
+                        />
+                    </a>
+                </li>
+            );
+        }
+
+        if (
+            this.props.chartControls &&
+            this.props.chartControls.showBoxPlotToggle &&
+            this.props.toggleBoxPlot
+        ) {
+            items.push(
+                <li>
+                    <a
+                        className="dropdown-item violinCheckbox"
+                        onClick={this.props.toggleBoxPlot}
+                    >
+                        <FlexAlignedCheckbox
+                            checked={
+                                !!(
+                                    this.props.chartControls &&
+                                    this.props.chartControls.boxPlotChecked
+                                )
+                            }
+                            label={
+                                <span style={{ marginTop: -3 }}>
+                                    Show Box Plot
+                                </span>
                             }
                             style={{ marginTop: 1, marginBottom: -3 }}
                         />
@@ -605,6 +758,7 @@ export class ChartHeader extends React.Component<IChartHeaderProps, {}> {
                                         'btn btn-xs btn-default',
                                         styles.item
                                     )}
+                                    data-test={'deleteChart'}
                                     onClick={this.props.deleteChart}
                                 >
                                     <i

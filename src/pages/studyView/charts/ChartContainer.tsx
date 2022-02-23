@@ -1,7 +1,7 @@
 import * as React from 'react';
 import styles from './styles.module.scss';
 import { observer } from 'mobx-react';
-import { action, computed, observable, makeObservable } from 'mobx';
+import { action, computed, makeObservable, observable } from 'mobx';
 import _ from 'lodash';
 import {
     ChartControls,
@@ -11,7 +11,7 @@ import {
     StudyViewPageStore,
     SurvivalType,
 } from 'pages/studyView/StudyViewPageStore';
-import { StudyViewFilter } from 'cbioportal-ts-api-client';
+import { GenePanel, StudyViewFilter } from 'cbioportal-ts-api-client';
 import PieChart from 'pages/studyView/charts/pieChart/PieChart';
 import classnames from 'classnames';
 import ClinicalTable from 'pages/studyView/table/ClinicalTable';
@@ -23,17 +23,17 @@ import SurvivalChart, {
 import BarChart from './barChart/BarChart';
 import {
     ChartMeta,
+    ChartMetaDataTypeEnum,
     ChartType,
     ClinicalDataCountSummary,
+    DataBin,
     getHeightByDimension,
     getTableHeightByDimension,
     getWidthByDimension,
-    mutationCountVsCnaTooltip,
+    logScalePossible,
     MutationCountVsCnaYBinsMin,
     NumericalGroupComparisonType,
-    DataBin,
 } from '../StudyViewUtils';
-import { GenePanel } from 'cbioportal-ts-api-client';
 import { makeSurvivalChartData } from './survival/StudyViewSurvivalUtils';
 import StudyViewDensityScatterPlot from './scatterPlot/StudyViewDensityScatterPlot';
 import {
@@ -45,11 +45,11 @@ import LoadingIndicator from '../../../shared/components/loadingIndicator/Loadin
 import { DataType, DownloadControlsButton } from 'cbioportal-frontend-commons';
 import MobxPromiseCache from 'shared/lib/MobxPromiseCache';
 import WindowStore from 'shared/components/window/WindowStore';
-import Timer = NodeJS.Timer;
 import { ISurvivalDescription } from 'pages/resultsView/survival/SurvivalDescriptionTable';
 import {
-    MultiSelectionTableColumnKey,
     MultiSelectionTable,
+    MultiSelectionTableColumn,
+    MultiSelectionTableColumnKey,
 } from 'pages/studyView/table/MultiSelectionTable';
 import { FreqColumnTypeEnum } from '../TableUtils';
 import {
@@ -58,16 +58,18 @@ import {
 } from '../table/treatments/SampleTreatmentsTable';
 import { TreatmentTableType } from '../table/treatments/treatmentsTableUtil';
 import {
-    PatientTreatmentsTableColumnKey,
     PatientTreatmentsTable,
+    PatientTreatmentsTableColumnKey,
 } from '../table/treatments/PatientTreatmentsTable';
 import { getComparisonParamsForTable } from 'pages/studyView/StudyViewComparisonUtils';
 import ComparisonVsIcon from 'shared/components/ComparisonVsIcon';
 import {
-    SURVIVAL_PLOT_X_LABEL_WITHOUT_EVENT_TOOLTIP,
     SURVIVAL_PLOT_X_LABEL_WITH_EVENT_TOOLTIP,
+    SURVIVAL_PLOT_X_LABEL_WITHOUT_EVENT_TOOLTIP,
     SURVIVAL_PLOT_Y_LABEL_TOOLTIP,
 } from 'pages/resultsView/survival/SurvivalUtil';
+import Timer = NodeJS.Timer;
+import StudyViewViolinPlotTable from 'pages/studyView/charts/violinPlotTable/StudyViewViolinPlotTable';
 
 export interface AbstractChart {
     toSVGDOMNode: () => Element;
@@ -87,7 +89,10 @@ const COMPARISON_CHART_TYPES: ChartType[] = [
     ChartTypeEnum.MUTATED_GENES_TABLE,
     ChartTypeEnum.CNA_GENES_TABLE,
     ChartTypeEnum.SAMPLE_TREATMENTS_TABLE,
+    ChartTypeEnum.SAMPLE_TREATMENT_GROUPS_TABLE,
     ChartTypeEnum.PATIENT_TREATMENTS_TABLE,
+    ChartTypeEnum.PATIENT_TREATMENT_GROUPS_TABLE,
+    ChartTypeEnum.STRUCTURAL_VARIANT_GENES_TABLE,
 ];
 
 export interface IChartContainerProps {
@@ -98,6 +103,13 @@ export interface IChartContainerProps {
     title: string;
     description?: ISurvivalDescription;
     promise: MobxPromise<any>;
+    tooltip?: (d: any) => JSX.Element;
+    axisLabelX?: string;
+    axisLabelY?: string;
+    plotDomain?: {
+        x?: { min?: number; max?: number };
+        y?: { min?: number; max?: number };
+    };
     filters: any;
     studyViewFilters: StudyViewFilter;
     setComparisonConfirmationModal: StudyViewPageStore['setComparisonConfirmationModal'];
@@ -110,18 +122,34 @@ export interface IChartContainerProps {
     onResetSelection?: any;
     onDeleteChart: (chartMeta: ChartMeta) => void;
     onChangeChartType: (chartMeta: ChartMeta, newChartType: ChartType) => void;
-    onToggleLogScale: (chartMeta: ChartMeta) => void;
-    onToggleNAValue: (chartMeta: ChartMeta) => void;
+    onToggleLogScale?: (chartMeta: ChartMeta) => void;
+    onToggleLogScaleX?: (chartMeta: ChartMeta) => void;
+    onToggleLogScaleY?: (chartMeta: ChartMeta) => void;
+    onToggleViolinPlot?: (chartMeta: ChartMeta) => void;
+    onToggleBoxPlot?: (chartMeta: ChartMeta) => void;
+    onToggleNAValue?: (chartMeta: ChartMeta) => void;
+    onSwapAxes?: (chartMeta: ChartMeta) => void;
     logScaleChecked?: boolean;
     showLogScaleToggle?: boolean;
+    logScaleXChecked?: boolean;
+    showLogScaleXToggle?: boolean;
+    logScaleYChecked?: boolean;
+    showLogScaleYToggle?: boolean;
+    showBoxPlotToggle?: boolean;
+    boxPlotChecked?: boolean;
+    showViolinPlotToggle?: boolean;
+    violinPlotChecked?: boolean;
     isShowNAChecked?: boolean;
     showNAToggle?: boolean;
+    selectedCategories?: string[];
     selectedGenes?: any;
     cancerGenes: number[];
     onGeneSelect?: any;
     isNewlyAdded: (uniqueKey: string) => boolean;
     cancerGeneFilterEnabled: boolean;
     filterByCancerGenes?: boolean;
+    alterationFilterEnabled: boolean;
+    filterAlterations?: boolean;
     onChangeCancerGeneFilter?: (filtered: boolean) => void;
     analysisGroupsSettings: StudyViewPageStore['analysisGroupsSettings'];
     patientToAnalysisGroup?: MobxPromise<{
@@ -129,6 +157,8 @@ export interface IChartContainerProps {
     }>;
     sampleToAnalysisGroup?: MobxPromise<{ [uniqueSampleKey: string]: string }>;
     genePanelCache: MobxPromiseCache<{ genePanelId: string }, GenePanel>;
+    mutationFilterActive?: boolean;
+    alterationFilterActive?: boolean;
 }
 
 @observer
@@ -138,7 +168,7 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
     private handlers: any;
     private plot: AbstractChart;
 
-    private mouseLeaveTimeout: Timer;
+    private mouseLeaveTimeout: any;
 
     @observable mouseInChart: boolean = false;
     @observable placement: 'left' | 'right' = 'right';
@@ -171,14 +201,25 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                 this.props.onDataBinSelection(this.props.chartMeta, dataBins);
             }),
             onToggleLogScale: action(() => {
-                if (this.props.onToggleLogScale) {
-                    this.props.onToggleLogScale(this.props.chartMeta);
-                }
+                this.props.onToggleLogScale?.(this.props.chartMeta);
+            }),
+            onToggleLogScaleX: action(() => {
+                this.props.onToggleLogScaleX?.(this.props.chartMeta);
+            }),
+            onToggleLogScaleY: action(() => {
+                this.props.onToggleLogScaleY?.(this.props.chartMeta);
+            }),
+            onToggleBoxPlot: action(() => {
+                this.props.onToggleBoxPlot?.(this.props.chartMeta);
+            }),
+            onToggleViolinPlot: action(() => {
+                this.props.onToggleViolinPlot?.(this.props.chartMeta);
             }),
             onToggleNAValue: action(() => {
-                if (this.props.onToggleNAValue) {
-                    this.props.onToggleNAValue(this.props.chartMeta);
-                }
+                this.props.onToggleNAValue?.(this.props.chartMeta);
+            }),
+            onSwapAxes: action(() => {
+                this.props.onSwapAxes?.(this.props.chartMeta);
             }),
             onMouseEnterChart: action((event: React.MouseEvent<any>) => {
                 if (this.mouseLeaveTimeout) {
@@ -246,6 +287,26 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                 };
                 break;
             }
+            case ChartTypeEnum.SCATTER: {
+                controls = {
+                    showLogScaleXToggle: this.props.showLogScaleXToggle,
+                    logScaleXChecked: this.props.logScaleXChecked,
+                    showLogScaleYToggle: this.props.showLogScaleYToggle,
+                    logScaleYChecked: this.props.logScaleYChecked,
+                    showSwapAxes: !!this.props.onSwapAxes,
+                };
+                break;
+            }
+            case ChartTypeEnum.VIOLIN_PLOT_TABLE:
+                controls = {
+                    showLogScaleToggle: this.props.showLogScaleToggle,
+                    logScaleChecked: this.props.logScaleChecked,
+                    showViolinPlotToggle: this.props.showViolinPlotToggle,
+                    violinPlotChecked: this.props.violinPlotChecked,
+                    showBoxPlotToggle: this.props.showBoxPlotToggle,
+                    boxPlotChecked: this.props.boxPlotChecked,
+                };
+                break;
             case ChartTypeEnum.PIE_CHART: {
                 controls = { showTableIcon: true };
                 break;
@@ -288,7 +349,8 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
         // for treatments tables
         treatmentUniqueKeys?: string[];
     }) {
-        if (this.comparisonPagePossible) {
+        const foo = this.comparisonPagePossible;
+        if (foo) {
             switch (this.props.chartType) {
                 case ChartTypeEnum.PIE_CHART:
                 case ChartTypeEnum.TABLE:
@@ -445,154 +507,235 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                 );
             }
             case ChartTypeEnum.MUTATED_GENES_TABLE: {
-                return () => (
-                    <MultiSelectionTable
-                        tableType={FreqColumnTypeEnum.MUTATION}
-                        promise={this.props.promise}
-                        width={getWidthByDimension(
-                            this.props.dimension,
-                            this.borderWidth
-                        )}
-                        height={getTableHeightByDimension(
-                            this.props.dimension,
-                            this.chartHeaderHeight
-                        )}
-                        filters={this.props.filters}
-                        onSubmitSelection={this.handlers.onValueSelection}
-                        onChangeSelectedRows={
-                            this.handlers.onChangeSelectedRows
-                        }
-                        extraButtons={
-                            this.comparisonButtonForTables && [
-                                this.comparisonButtonForTables,
-                            ]
-                        }
-                        selectedRowsKeys={this.selectedRowsKeys}
-                        onGeneSelect={this.props.onGeneSelect}
-                        selectedGenes={this.props.selectedGenes}
-                        genePanelCache={this.props.genePanelCache}
-                        cancerGeneFilterEnabled={
-                            this.props.cancerGeneFilterEnabled
-                        }
-                        filterByCancerGenes={this.props.filterByCancerGenes!}
-                        onChangeCancerGeneFilter={
-                            this.props.onChangeCancerGeneFilter!
-                        }
-                        columns={[
-                            { columnKey: MultiSelectionTableColumnKey.GENE },
-                            {
-                                columnKey:
-                                    MultiSelectionTableColumnKey.NUMBER_MUTATIONS,
-                            },
-                            { columnKey: MultiSelectionTableColumnKey.NUMBER },
-                            { columnKey: MultiSelectionTableColumnKey.FREQ },
-                        ]}
-                        defaultSortBy={MultiSelectionTableColumnKey.FREQ}
-                    />
-                );
+                return () => {
+                    const numColumn: MultiSelectionTableColumn = {
+                        columnKey: MultiSelectionTableColumnKey.NUMBER,
+                    };
+                    if (this.props.store.isGlobalMutationFilterActive) {
+                        numColumn.columnTooltip = (
+                            <span data-test="hidden-mutation-alterations">
+                                Total number of mutations
+                                <br />
+                                This table is filtered based on selections in
+                                the <i>Alteration Filter</i> menu.
+                            </span>
+                        );
+                    }
+                    return (
+                        <MultiSelectionTable
+                            tableType={FreqColumnTypeEnum.MUTATION}
+                            promise={this.props.promise}
+                            width={getWidthByDimension(
+                                this.props.dimension,
+                                this.borderWidth
+                            )}
+                            height={getTableHeightByDimension(
+                                this.props.dimension,
+                                this.chartHeaderHeight
+                            )}
+                            filters={this.props.filters}
+                            onSubmitSelection={this.handlers.onValueSelection}
+                            onChangeSelectedRows={
+                                this.handlers.onChangeSelectedRows
+                            }
+                            extraButtons={
+                                this.comparisonButtonForTables && [
+                                    this.comparisonButtonForTables,
+                                ]
+                            }
+                            selectedRowsKeys={this.selectedRowsKeys}
+                            onGeneSelect={this.props.onGeneSelect}
+                            selectedGenes={this.props.selectedGenes}
+                            genePanelCache={this.props.genePanelCache}
+                            cancerGeneFilterEnabled={
+                                this.props.cancerGeneFilterEnabled
+                            }
+                            filterByCancerGenes={
+                                this.props.filterByCancerGenes!
+                            }
+                            onChangeCancerGeneFilter={
+                                this.props.onChangeCancerGeneFilter!
+                            }
+                            alterationFilterEnabled={
+                                this.props.alterationFilterEnabled
+                            }
+                            filterAlterations={this.props.filterAlterations}
+                            columns={[
+                                {
+                                    columnKey:
+                                        MultiSelectionTableColumnKey.GENE,
+                                },
+                                {
+                                    columnKey:
+                                        MultiSelectionTableColumnKey.NUMBER_MUTATIONS,
+                                },
+                                numColumn,
+                                {
+                                    columnKey:
+                                        MultiSelectionTableColumnKey.FREQ,
+                                },
+                            ]}
+                            defaultSortBy={MultiSelectionTableColumnKey.FREQ}
+                        />
+                    );
+                };
             }
             case ChartTypeEnum.STRUCTURAL_VARIANT_GENES_TABLE: {
-                return () => (
-                    <MultiSelectionTable
-                        tableType={FreqColumnTypeEnum.STRUCTURAL_VARIANT}
-                        promise={this.props.promise}
-                        width={getWidthByDimension(
-                            this.props.dimension,
-                            this.borderWidth
-                        )}
-                        height={getTableHeightByDimension(
-                            this.props.dimension,
-                            this.chartHeaderHeight
-                        )}
-                        filters={this.props.filters}
-                        onSubmitSelection={this.handlers.onValueSelection}
-                        onChangeSelectedRows={
-                            this.handlers.onChangeSelectedRows
-                        }
-                        selectedRowsKeys={this.selectedRowsKeys}
-                        onGeneSelect={this.props.onGeneSelect}
-                        selectedGenes={this.props.selectedGenes}
-                        genePanelCache={this.props.genePanelCache}
-                        cancerGeneFilterEnabled={
-                            this.props.cancerGeneFilterEnabled
-                        }
-                        filterByCancerGenes={this.props.filterByCancerGenes!}
-                        onChangeCancerGeneFilter={
-                            this.props.onChangeCancerGeneFilter!
-                        }
-                        columns={[
-                            { columnKey: MultiSelectionTableColumnKey.GENE },
-                            {
-                                columnKey:
-                                    MultiSelectionTableColumnKey.NUMBER_STRUCTURAL_VARIANTS,
-                            },
-                            { columnKey: MultiSelectionTableColumnKey.NUMBER },
-                            { columnKey: MultiSelectionTableColumnKey.FREQ },
-                        ]}
-                        defaultSortBy={MultiSelectionTableColumnKey.FREQ}
-                    />
-                );
+                return () => {
+                    const numColumn: MultiSelectionTableColumn = {
+                        columnKey: MultiSelectionTableColumnKey.NUMBER,
+                    };
+                    if (this.props.store.isGlobalMutationFilterActive) {
+                        numColumn.columnTooltip = (
+                            <span data-test="hidden-fusion-alterations">
+                                Total number of fusions
+                                <br />
+                                This table is filtered based on selections in
+                                the <i>Alteration Filter</i> menu.
+                            </span>
+                        );
+                    }
+                    return (
+                        <MultiSelectionTable
+                            tableType={FreqColumnTypeEnum.STRUCTURAL_VARIANT}
+                            promise={this.props.promise}
+                            width={getWidthByDimension(
+                                this.props.dimension,
+                                this.borderWidth
+                            )}
+                            height={getTableHeightByDimension(
+                                this.props.dimension,
+                                this.chartHeaderHeight
+                            )}
+                            filters={this.props.filters}
+                            onSubmitSelection={this.handlers.onValueSelection}
+                            onChangeSelectedRows={
+                                this.handlers.onChangeSelectedRows
+                            }
+                            extraButtons={
+                                this.comparisonButtonForTables && [
+                                    this.comparisonButtonForTables,
+                                ]
+                            }
+                            selectedRowsKeys={this.selectedRowsKeys}
+                            onGeneSelect={this.props.onGeneSelect}
+                            selectedGenes={this.props.selectedGenes}
+                            genePanelCache={this.props.genePanelCache}
+                            cancerGeneFilterEnabled={
+                                this.props.cancerGeneFilterEnabled
+                            }
+                            filterByCancerGenes={
+                                this.props.filterByCancerGenes!
+                            }
+                            onChangeCancerGeneFilter={
+                                this.props.onChangeCancerGeneFilter!
+                            }
+                            alterationFilterEnabled={
+                                this.props.alterationFilterEnabled
+                            }
+                            filterAlterations={this.props.filterAlterations}
+                            columns={[
+                                {
+                                    columnKey:
+                                        MultiSelectionTableColumnKey.GENE,
+                                },
+                                {
+                                    columnKey:
+                                        MultiSelectionTableColumnKey.NUMBER_STRUCTURAL_VARIANTS,
+                                },
+                                numColumn,
+                                {
+                                    columnKey:
+                                        MultiSelectionTableColumnKey.FREQ,
+                                },
+                            ]}
+                            defaultSortBy={MultiSelectionTableColumnKey.FREQ}
+                        />
+                    );
+                };
             }
             case ChartTypeEnum.CNA_GENES_TABLE: {
-                return () => (
-                    <MultiSelectionTable
-                        tableType={FreqColumnTypeEnum.CNA}
-                        promise={this.props.promise}
-                        width={getWidthByDimension(
-                            this.props.dimension,
-                            this.borderWidth
-                        )}
-                        height={getTableHeightByDimension(
-                            this.props.dimension,
-                            this.chartHeaderHeight
-                        )}
-                        filters={this.props.filters}
-                        onSubmitSelection={this.handlers.onValueSelection}
-                        onChangeSelectedRows={
-                            this.handlers.onChangeSelectedRows
-                        }
-                        extraButtons={
-                            this.comparisonButtonForTables && [
-                                this.comparisonButtonForTables,
-                            ]
-                        }
-                        selectedRowsKeys={this.selectedRowsKeys}
-                        onGeneSelect={this.props.onGeneSelect}
-                        selectedGenes={this.props.selectedGenes}
-                        genePanelCache={this.props.genePanelCache}
-                        cancerGeneFilterEnabled={
-                            this.props.cancerGeneFilterEnabled
-                        }
-                        filterByCancerGenes={this.props.filterByCancerGenes!}
-                        onChangeCancerGeneFilter={
-                            this.props.onChangeCancerGeneFilter!
-                        }
-                        columns={[
-                            {
-                                columnKey: MultiSelectionTableColumnKey.GENE,
-                                columnWidthRatio: 0.24,
-                            },
-                            {
-                                columnKey:
-                                    MultiSelectionTableColumnKey.CYTOBAND,
-                                columnWidthRatio: 0.24,
-                            },
-                            {
-                                columnKey: MultiSelectionTableColumnKey.CNA,
-                                columnWidthRatio: 0.18,
-                            },
-                            {
-                                columnKey: MultiSelectionTableColumnKey.NUMBER,
-                                columnWidthRatio: 0.17,
-                            },
-                            {
-                                columnKey: MultiSelectionTableColumnKey.FREQ,
-                                columnWidthRatio: 0.17,
-                            },
-                        ]}
-                        defaultSortBy={MultiSelectionTableColumnKey.FREQ}
-                    />
-                );
+                return () => {
+                    const numColumn: MultiSelectionTableColumn = {
+                        columnKey: MultiSelectionTableColumnKey.NUMBER,
+                        columnWidthRatio: 0.17,
+                    };
+                    if (this.props.store.isGlobalAlterationFilterActive) {
+                        numColumn.columnTooltip = (
+                            <span data-test="hidden-fusion-alterations">
+                                Number of samples with one or more copy number
+                                alterations
+                                <br />
+                                This table is filtered based on selections in
+                                the <i>Alteration Filter</i> menu.
+                            </span>
+                        );
+                    }
+                    return (
+                        <MultiSelectionTable
+                            tableType={FreqColumnTypeEnum.CNA}
+                            promise={this.props.promise}
+                            width={getWidthByDimension(
+                                this.props.dimension,
+                                this.borderWidth
+                            )}
+                            height={getTableHeightByDimension(
+                                this.props.dimension,
+                                this.chartHeaderHeight
+                            )}
+                            filters={this.props.filters}
+                            onSubmitSelection={this.handlers.onValueSelection}
+                            onChangeSelectedRows={
+                                this.handlers.onChangeSelectedRows
+                            }
+                            extraButtons={
+                                this.comparisonButtonForTables && [
+                                    this.comparisonButtonForTables,
+                                ]
+                            }
+                            selectedRowsKeys={this.selectedRowsKeys}
+                            onGeneSelect={this.props.onGeneSelect}
+                            selectedGenes={this.props.selectedGenes}
+                            genePanelCache={this.props.genePanelCache}
+                            cancerGeneFilterEnabled={
+                                this.props.cancerGeneFilterEnabled
+                            }
+                            filterByCancerGenes={
+                                this.props.filterByCancerGenes!
+                            }
+                            onChangeCancerGeneFilter={
+                                this.props.onChangeCancerGeneFilter!
+                            }
+                            alterationFilterEnabled={
+                                this.props.alterationFilterEnabled
+                            }
+                            filterAlterations={this.props.filterAlterations}
+                            columns={[
+                                {
+                                    columnKey:
+                                        MultiSelectionTableColumnKey.GENE,
+                                    columnWidthRatio: 0.24,
+                                },
+                                {
+                                    columnKey:
+                                        MultiSelectionTableColumnKey.CYTOBAND,
+                                    columnWidthRatio: 0.24,
+                                },
+                                {
+                                    columnKey: MultiSelectionTableColumnKey.CNA,
+                                    columnWidthRatio: 0.18,
+                                },
+                                numColumn,
+                                {
+                                    columnKey:
+                                        MultiSelectionTableColumnKey.FREQ,
+                                    columnWidthRatio: 0.17,
+                                },
+                            ]}
+                            defaultSortBy={MultiSelectionTableColumnKey.FREQ}
+                        />
+                    );
+                };
             }
             case ChartTypeEnum.GENOMIC_PROFILES_TABLE: {
                 return () => (
@@ -755,6 +898,7 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                     return null;
                 }
             }
+            case ChartTypeEnum.SAMPLE_TREATMENT_GROUPS_TABLE:
             case ChartTypeEnum.SAMPLE_TREATMENTS_TABLE: {
                 return () => (
                     <SampleTreatmentsTable
@@ -792,6 +936,7 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                     />
                 );
             }
+            case ChartTypeEnum.PATIENT_TREATMENT_GROUPS_TABLE:
             case ChartTypeEnum.PATIENT_TREATMENTS_TABLE: {
                 return () => (
                     <PatientTreatmentsTable
@@ -855,6 +1000,13 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                                 height={this.getScatterPlotHeight(
                                     this.props.dimension.h
                                 )}
+                                spearmanCorr={
+                                    this.props.promise.result.spearmanCorr
+                                }
+                                pearsonCorr={
+                                    this.props.promise.result.pearsonCorr
+                                }
+                                plotDomain={this.props.plotDomain}
                                 yBinsMin={MutationCountVsCnaYBinsMin}
                                 onSelection={this.props.onValueSelection}
                                 selectionBounds={
@@ -867,14 +1019,57 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                                 xBinSize={this.props.promise.result.xBinSize}
                                 yBinSize={this.props.promise.result.yBinSize}
                                 isLoading={this.props.promise.isPending}
-                                axisLabelX="Fraction of copy number altered genome"
-                                axisLabelY="# of mutations"
-                                tooltip={mutationCountVsCnaTooltip}
+                                axisLabelX={this.props.axisLabelX!}
+                                axisLabelY={this.props.axisLabelY!}
+                                tooltip={this.props.tooltip}
                             />
                         </div>
                     </div>
                 );
             }
+            case ChartTypeEnum.VIOLIN_PLOT_TABLE:
+                const chartSettings = this.props.store.getXvsYChartSettings(
+                    this.props.chartMeta!.uniqueKey
+                )!;
+                const chartInfo = this.props.store.getXvsYViolinChartInfo(
+                    this.props.chartMeta!.uniqueKey
+                )!;
+                return () => {
+                    const isLoading =
+                        !this.props.store.clinicalDataBinPromises[
+                            chartInfo.numericalAttr.clinicalAttributeId
+                        ] ||
+                        this.props.store.clinicalDataBinPromises[
+                            chartInfo.numericalAttr.clinicalAttributeId
+                        ].isPending;
+                    return (
+                        <StudyViewViolinPlotTable
+                            dimension={this.props.dimension}
+                            width={getWidthByDimension(
+                                this.props.dimension,
+                                this.borderWidth
+                            )}
+                            height={getTableHeightByDimension(
+                                this.props.dimension,
+                                this.chartHeaderHeight
+                            )}
+                            categoryColumnName={this.props.axisLabelX!}
+                            violinColumnName={this.props.axisLabelY!}
+                            violinBounds={{
+                                min: this.props.promise.result.axisStart,
+                                max: this.props.promise.result.axisEnd,
+                            }}
+                            rows={this.props.promise.result.rows || []}
+                            showViolin={this.props.violinPlotChecked!}
+                            showBox={this.props.boxPlotChecked!}
+                            logScale={chartSettings?.violinLogScale!}
+                            setFilters={this.props.onValueSelection}
+                            selectedCategories={this.props.selectedCategories!}
+                            isLoading={isLoading}
+                        />
+                    );
+                };
+                break;
             default:
                 return null;
         }
@@ -925,6 +1120,11 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                     deleteChart={this.handlers.onDeleteChart}
                     selectedRowsKeys={this.selectedRowsKeys}
                     toggleLogScale={this.handlers.onToggleLogScale}
+                    toggleLogScaleX={this.handlers.onToggleLogScaleX}
+                    toggleLogScaleY={this.handlers.onToggleLogScaleY}
+                    toggleBoxPlot={this.handlers.onToggleBoxPlot}
+                    toggleViolinPlot={this.handlers.onToggleViolinPlot}
+                    swapAxes={this.handlers.onSwapAxes}
                     toggleNAValue={this.handlers.onToggleNAValue}
                     chartControls={this.chartControls}
                     changeChartType={this.changeChartType}

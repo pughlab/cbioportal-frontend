@@ -4,8 +4,7 @@ import { StudyViewPageStore } from 'pages/studyView/StudyViewPageStore';
 import RightPanel from './rightPanel/RightPanel';
 import StudySummary from './studySummary/StudySummary';
 import UserSelections from '../UserSelections';
-import * as _ from 'lodash';
-import { computed, makeObservable } from 'mobx';
+import _ from 'lodash';
 
 export interface IStudyPageHeaderProps {
     store: StudyViewPageStore;
@@ -19,12 +18,6 @@ export default class StudyPageHeader extends React.Component<
 > {
     constructor(props: IStudyPageHeaderProps) {
         super(props);
-        makeObservable(this);
-    }
-    @computed get customChartsFilter() {
-        return _.fromPairs(
-            this.props.store.preDefinedCustomChartFilterSet.toJSON()
-        );
     }
 
     render() {
@@ -63,6 +56,7 @@ export default class StudyPageHeader extends React.Component<
 
                 {this.props.store.clinicalAttributeIdToDataType.isComplete && (
                     <UserSelections
+                        store={this.props.store}
                         filter={this.props.store.userSelections}
                         comparisonGroupSelection={
                             this.props.store.filterComparisonGroups
@@ -71,7 +65,9 @@ export default class StudyPageHeader extends React.Component<
                             this.props.store
                                 .numberOfSelectedSamplesInCustomSelection
                         }
-                        customChartsFilter={this.customChartsFilter}
+                        customChartsFilter={Array.from(
+                            this.props.store.preDefinedCustomChartFilterSet.values()
+                        )}
                         attributesMetaSet={
                             this.props.store.chartMetaSetWithChartType
                         }
@@ -86,9 +82,9 @@ export default class StudyPageHeader extends React.Component<
                             this.props.store
                                 .updateGenomicDataIntervalFiltersByValues
                         }
-                        updateGenericAssayDataIntervalFilter={
+                        updateGenericAssayDataFilter={
                             this.props.store
-                                .updateGenericAssayDataIntervalFiltersByValues
+                                .updateGenericAssayDataFiltersByValues
                         }
                         updateCustomChartFilter={
                             this.props.store.setCustomChartFilters
@@ -116,11 +112,8 @@ export default class StudyPageHeader extends React.Component<
                         removeCaseListsFilter={
                             this.props.store.removeCaseListsFilter
                         }
-                        removeSampleTreatmentsFilter={
-                            this.props.store.removeSampleTreatmentsFilter
-                        }
-                        removePatientTreatmentsFilter={
-                            this.props.store.removePatientTreatmentsFilter
+                        removeTreatmentsFilter={
+                            this.props.store.removeTreatmentsFilter
                         }
                     />
                 )}

@@ -1,4 +1,5 @@
 import SimpleTable from '../simpleTable/SimpleTable';
+import $ from 'jquery';
 import * as React from 'react';
 import {
     action,
@@ -46,6 +47,7 @@ import { inputBoxChangeTimeoutEvent } from '../../lib/EventUtils';
 export type SortDirection = 'asc' | 'desc';
 
 export type Column<T> = {
+    id?: string;
     name: string;
     headerRender?: (name: string) => JSX.Element;
     headerDownload?: (name: string) => string;
@@ -61,14 +63,17 @@ export type Column<T> = {
     sortBy?:
         | ((data: T) => number | null)
         | ((data: T) => string | null)
+        | ((data: T) => string | number | null)
         | ((data: T) => (number | null)[])
-        | ((data: T) => (string | null)[]);
-    render: (data: T) => JSX.Element;
+        | ((data: T) => (string | null)[])
+        | ((data: T) => (string | number | null)[]);
+    render: (data: T, rowIndex?: number) => JSX.Element;
     download?: (data: T) => string | string[];
     tooltip?: JSX.Element;
     defaultSortDirection?: SortDirection;
     togglable?: boolean;
     resizable?: boolean;
+    truncateOnResize?: boolean;
 };
 
 type LazyMobXTableProps<T> = {
@@ -97,12 +102,23 @@ type LazyMobXTableProps<T> = {
     showColumnVisibility?: boolean;
     columnVisibilityProps?: IColumnVisibilityControlsProps;
     columnVisibility?: { [columnId: string]: boolean };
+    storeColumnVisibility?: (
+        columnVisibility:
+            | {
+                  [columnId: string]: boolean;
+              }
+            | undefined
+    ) => void;
     pageToHighlight?: boolean;
     showCountHeader?: boolean;
     onRowClick?: (d: T) => void;
     onRowMouseEnter?: (d: T) => void;
     onRowMouseLeave?: (d: T) => void;
     filterPlaceholder?: string;
+    columnToHeaderFilterIconModal?: (
+        column: Column<T>
+    ) => JSX.Element | undefined;
+    deactivateColumnFilter?: (columnId: string) => void;
 };
 
 function compareValues<U extends number | string>(
@@ -259,6 +275,7 @@ export class LazyMobXTableStore<T> {
     @observable public sortAscending: boolean;
     @observable.ref public columns: Column<T>[];
     @observable public dataStore: ILazyMobXTableApplicationDataStore<T>;
+    @observable public headerRefs: React.RefObject<any>[];
     @observable public downloadDataFetcher:
         | ILazyMobXTableApplicationLazyDownloadDataFetcher
         | undefined;
@@ -266,7 +283,12 @@ export class LazyMobXTableStore<T> {
     @observable private onRowMouseEnter: ((d: T) => void) | undefined;
     @observable private onRowMouseLeave: ((d: T) => void) | undefined;
 
+    // this observable is intended to always refer to props.columnToHeaderFilterIconModal
+    @observable private _columnToHeaderFilterIconModal:
+        | ((column: Column<T>) => JSX.Element | undefined)
+        | undefined;
     // this observable is intended to always refer to props.columnVisibility
+    // except possibly once "Reset columns" has been clicked
     @observable private _columnVisibility:
         | { [columnId: string]: boolean }
         | undefined;
@@ -335,6 +357,13 @@ export class LazyMobXTableStore<T> {
         return resolveColumnVisibilityByColumnDefinition(this.columns);
     }
 
+    @computed public get showResetColumnsButton() {
+        return (
+            JSON.stringify(this.columnVisibility) !==
+            JSON.stringify(this.columnVisibilityByColumnDefinition)
+        );
+    }
+
     @computed public get downloadData() {
         const tableDownloadData: string[][] = [];
 
@@ -379,8 +408,7 @@ export class LazyMobXTableStore<T> {
 
     @computed get sortColumnObject(): Column<T> | undefined {
         return this.columns.find(
-            (col: Column<T>) =>
-                this.isVisible(col) && col.name === this.sortColumn
+            (col: Column<T>) => col.name === this.sortColumn
         );
     }
 
@@ -424,9 +452,7 @@ export class LazyMobXTableStore<T> {
         return this.visibleColumns.map((column: Column<T>, index: number) => {
             const headerProps: {
                 role?: 'button';
-                className?:
-                    | 'multilineHeader sort-asc'
-                    | 'multilineHeader sort-des';
+                className?: 'sort-asc' | 'sort-des';
                 onClick?: (e: React.MouseEvent) => void;
             } = {};
             if (column.sortBy) {
@@ -443,10 +469,28 @@ export class LazyMobXTableStore<T> {
                     }
                 };
             }
+
+            let sortIcon = null;
             if (this.sortColumn === column.name) {
-                headerProps.className = this.sortAscending
-                    ? 'multilineHeader sort-asc'
-                    : 'multilineHeader sort-des';
+                if (this.sortAscending) {
+                    headerProps.className = 'sort-asc';
+                    sortIcon = (
+                        <i
+                            className={
+                                'fa fa-sort-asc lazyMobxTableSortArrowAsc'
+                            }
+                        />
+                    );
+                } else {
+                    headerProps.className = 'sort-des';
+                    sortIcon = (
+                        <i
+                            className={
+                                'fa fa-sort-desc lazyMobxTableSortArrowDesc'
+                            }
+                        />
+                    );
+                }
             }
 
             let label;
@@ -466,6 +510,38 @@ export class LazyMobXTableStore<T> {
             } else {
                 thContents = label;
             }
+
+            thContents = (
+                <span {...headerProps}>
+                    {thContents}
+                    {sortIcon}
+                </span>
+            );
+
+            if (
+                this._columnToHeaderFilterIconModal &&
+                this._columnToHeaderFilterIconModal(column)
+            ) {
+                const alignToJustify = {
+                    left: 'flex-start',
+                    center: 'center',
+                    right: 'flex-end',
+                };
+                thContents = (
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: column.align
+                                ? alignToJustify[column.align]
+                                : 'flex-start',
+                        }}
+                    >
+                        {thContents}
+                        {this._columnToHeaderFilterIconModal(column)}
+                    </div>
+                );
+            }
+
             let style: any = {};
             if (column.align) {
                 style.textAlign = column.align;
@@ -477,8 +553,8 @@ export class LazyMobXTableStore<T> {
             return (
                 <React.Fragment key={index}>
                     <th
+                        ref={this.headerRefs[index]}
                         className="multilineHeader"
-                        {...headerProps}
                         style={style}
                     >
                         {thContents}
@@ -503,9 +579,9 @@ export class LazyMobXTableStore<T> {
 
         this.columns.forEach((column: Column<T>) => {
             colVisProp.push({
-                id: column.name,
+                id: column.hasOwnProperty('id') ? column.id! : column.name,
                 name: column.name,
-                visible: this.columnVisibility[column.name],
+                visible: this.isVisible(column),
                 togglable: column.hasOwnProperty('togglable')
                     ? column.togglable
                     : true,
@@ -545,11 +621,20 @@ export class LazyMobXTableStore<T> {
     }
 
     @computed get tds(): JSX.Element[][] {
-        return this.visibleData.map((datum: T) => {
+        return this.visibleData.map((datum: T, rowIndex: number) => {
             return this.visibleColumns.map((column: Column<T>) => {
+                const cellProps: any = {
+                    key: column.name,
+                };
+
+                if (column.resizable && column.truncateOnResize) {
+                    cellProps.className = 'lazyMobXTableTruncatedCell';
+                }
+
                 const result = (
-                    <td key={column.name}>{column.render(datum)}</td>
+                    <td {...cellProps}>{column.render(datum, rowIndex)}</td>
                 );
+
                 if (column.resizable) {
                     return (
                         <React.Fragment>
@@ -724,14 +809,26 @@ export class LazyMobXTableStore<T> {
         }
     }
 
+    @action.bound
+    resetColumnVisibility() {
+        this._columnVisibility = undefined;
+        this._columnVisibilityOverride = undefined;
+    }
+
     public isVisible(column: Column<T>): boolean {
-        return this.columnVisibility[column.name] || false;
+        const index = column.hasOwnProperty('id') ? column.id! : column.name;
+        return this.columnVisibility[index] || false;
     }
 
     constructor(lazyMobXTableProps: LazyMobXTableProps<T>) {
         makeObservable(this);
         this.sortColumn = lazyMobXTableProps.initialSortColumn || '';
         this.sortAscending = lazyMobXTableProps.initialSortDirection !== 'desc'; // default ascending
+        this.headerRefs = lazyMobXTableProps.columns.map(x =>
+            React.createRef()
+        );
+        this._columnToHeaderFilterIconModal =
+            lazyMobXTableProps.columnToHeaderFilterIconModal;
         this.setProps(lazyMobXTableProps);
         reaction(
             () => this.displayData.length,
@@ -755,6 +852,7 @@ export default class LazyMobXTable<T> extends React.Component<
     private filterInput: HTMLInputElement;
     private filterInputReaction: IReactionDisposer;
     private pageToHighlightReaction: IReactionDisposer;
+    private isChildTable: boolean;
 
     public static defaultProps = {
         showFilter: true,
@@ -833,6 +931,11 @@ export default class LazyMobXTable<T> extends React.Component<
                 this.store.setFilterString('');
             },
             visibilityToggle: (columnId: string): void => {
+                // deactivate column filter (if it exists)
+                if (this.props.deactivateColumnFilter) {
+                    this.props.deactivateColumnFilter(columnId);
+                }
+
                 // toggle visibility
                 this.updateColumnVisibility(
                     columnId,
@@ -881,9 +984,76 @@ export default class LazyMobXTable<T> extends React.Component<
         );
     }
 
+    componentDidMount() {
+        if (document.onmousemove === null) {
+            document.onmousemove = (mouse: any) => {
+                const headerInfo: {
+                    left: number;
+                    filterIcon?: any;
+                    filterMenu?: any;
+                }[] = [];
+                for (let i = 0; i < this.store.headerRefs.length; i++) {
+                    const elem = this.store.headerRefs[i].current;
+                    if (!!elem) {
+                        headerInfo[i] = {
+                            left: elem.getBoundingClientRect().left,
+                            filterIcon: (elem.firstChild as Element)
+                                ?.children[1]?.children[0],
+                            filterMenu: (elem.firstChild as Element)
+                                ?.children[1]?.children[1],
+                        };
+                    }
+                }
+
+                let i = -1;
+                // determine column under current mouse position
+                while (
+                    i + 1 < headerInfo.length &&
+                    mouse.clientX >= headerInfo[i + 1].left
+                ) {
+                    i += 1;
+                }
+                // show filter icon for current column (if exists)
+                if (i !== -1) {
+                    const filterIcon = headerInfo[i].filterIcon;
+                    if (
+                        filterIcon &&
+                        filterIcon.style &&
+                        filterIcon.innerHTML &&
+                        filterIcon.innerHTML.includes('fa-filter')
+                    ) {
+                        filterIcon.style.visibility = 'visible';
+                    }
+                }
+                // hide all other filter icons (if not active)
+                for (let j = 0; j < headerInfo.length; j++) {
+                    if (j !== i) {
+                        const filterIcon = headerInfo[j].filterIcon;
+                        const filterMenu = headerInfo[j].filterMenu;
+                        if (
+                            filterIcon?.innerHTML?.includes('fa-filter') &&
+                            filterIcon?.style?.color !== 'rgb(0, 0, 255)' &&
+                            filterMenu?.style?.visibility === 'hidden'
+                        ) {
+                            filterIcon.style.visibility = 'hidden';
+                        }
+                    }
+                }
+            };
+        } else {
+            this.isChildTable = true;
+        }
+    }
+
     componentWillUnmount() {
+        if (!this.isChildTable) {
+            document.onmousemove = null;
+        }
         this.filterInputReaction();
         this.pageToHighlightReaction();
+        if (this.props.storeColumnVisibility) {
+            this.props.storeColumnVisibility(this.store.columnVisibility);
+        }
     }
 
     @action componentWillReceiveProps(nextProps: LazyMobXTableProps<T>) {
@@ -970,6 +1140,7 @@ export default class LazyMobXTable<T> extends React.Component<
                                 onInput={this.handlers.onFilterTextChange}
                                 className="form-control tableSearchInput"
                                 style={{ width: this.props.filterBoxWidth }}
+                                data-test="table-search-input"
                             />
                             {this.props.showFilterClearButton &&
                             this.store.filterString ? (
@@ -1008,6 +1179,12 @@ export default class LazyMobXTable<T> extends React.Component<
                             className="pull-right"
                             columnVisibility={this.store.colVisProp}
                             onColumnToggled={this.handlers.visibilityToggle}
+                            resetColumnVisibility={
+                                this.store.resetColumnVisibility
+                            }
+                            showResetColumnsButton={
+                                this.store.showResetColumnsButton
+                            }
                             {...this.props.columnVisibilityProps}
                         />
                     ) : (

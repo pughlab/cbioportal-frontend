@@ -1,6 +1,7 @@
 // allow these file patterns to be imported
 declare module '*.scss';
 declare module '*.json';
+declare module '*.md';
 
 // these packages are missing typings
 declare module 'fmin';
@@ -51,6 +52,7 @@ declare module 'react-reveal';
 declare module 'react-column-resizer';
 declare module 'linear-algebra';
 declare module 'Cheerio';
+declare module 'superagent-cache';
 
 // this is to silence annoying Cheerio ts error from enzyme
 type Cheerio = any;

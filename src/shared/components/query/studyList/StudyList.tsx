@@ -1,8 +1,5 @@
 import * as React from 'react';
-import {
-    TypeOfCancer as CancerType,
-    CancerStudy,
-} from 'cbioportal-ts-api-client';
+import { CancerStudy } from 'cbioportal-ts-api-client';
 import * as styles_any from './styles.module.scss';
 import classNames from 'classnames';
 import FontAwesome from 'react-fontawesome';
@@ -10,11 +7,7 @@ import LabeledCheckbox from '../../labeledCheckbox/LabeledCheckbox';
 import { observer, Observer } from 'mobx-react';
 import { computed, makeObservable } from 'mobx';
 import _ from 'lodash';
-import {
-    getPubMedUrl,
-    getStudySummaryUrl,
-    redirectToStudyView,
-} from '../../../api/urls';
+import { getPubMedUrl } from '../../../api/urls';
 import { QueryStoreComponent } from '../QueryStore';
 import { DefaultTooltip } from 'cbioportal-frontend-commons';
 import { FilteredCancerTreeView } from '../StudyListLogic';
@@ -23,8 +16,11 @@ import {
     CancerTypeWithVisibility,
 } from '../CancerStudyTreeData';
 import { StudyLink } from '../../StudyLink/StudyLink';
-import StudyTagsTooltip from '../../studyTagsTooltip/StudyTagsTooltip';
+import StudyTagsTooltip, {
+    IconType,
+} from '../../studyTagsTooltip/StudyTagsTooltip';
 import { formatStudyReferenceGenome } from 'shared/lib/referenceGenomeUtils';
+import { getServerConfig } from 'config/config';
 
 const styles = {
     ...styles_any,
@@ -126,7 +122,7 @@ export default class StudyList extends QueryStoreComponent<
                         {indentArrow}
 
                         <span>{cancerType.name}</span>
-                        {!!!this.store.forDownloadTab && (
+                        {!this.store.forDownloadTab && (
                             <span className={styles.SelectAll}>
                                 {_.intersection(
                                     childStudyIds,
@@ -218,6 +214,10 @@ export default class StudyList extends QueryStoreComponent<
                                 study.studyId
                             ),
                             [`studyItem_${study.studyId}`]: true,
+                            [styles.UnauthorizedStudy]:
+                                getServerConfig()
+                                    .skin_home_page_show_unauthorized_studies &&
+                                study.readPermission === false,
                         });
                         return (
                             <CancerTreeCheckbox view={this.view} node={study}>
@@ -384,6 +384,7 @@ export default class StudyList extends QueryStoreComponent<
                                     )}
                                     mouseEnterDelay={0}
                                     placement="top"
+                                    iconType={IconType.INFO_ICON}
                                 >
                                     <a>{content}</a>
                                 </StudyTagsTooltip>
@@ -413,6 +414,33 @@ export default class StudyList extends QueryStoreComponent<
                             </span>
                         </DefaultTooltip>
                     )}
+                    {getServerConfig()
+                        .skin_home_page_show_unauthorized_studies &&
+                        study.studyId &&
+                        study.readPermission === false && (
+                            <StudyTagsTooltip
+                                key={0}
+                                studyDescription={
+                                    this.store.isVirtualStudy(study.studyId)
+                                        ? study.description.replace(
+                                              /\r?\n/g,
+                                              '<br />'
+                                          )
+                                        : study.description
+                                }
+                                studyId={study.studyId}
+                                isVirtualStudy={this.store.isVirtualStudy(
+                                    study.studyId
+                                )}
+                                mouseEnterDelay={0}
+                                placement="top"
+                                iconType={IconType.LOCK_ICON}
+                            >
+                                <span>
+                                    <i className="fa fa-lock"></i>
+                                </span>
+                            </StudyTagsTooltip>
+                        )}
                 </span>
             );
         }

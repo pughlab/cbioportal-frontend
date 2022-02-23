@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { observer } from 'mobx-react';
-import { computed, makeObservable } from 'mobx';
-import * as _ from 'lodash';
+import { action, computed, makeObservable, observable } from 'mobx';
+import _ from 'lodash';
 import LazyMobXTable from 'shared/components/lazyMobXTable/LazyMobXTable';
 import {
     CancerStudy,
@@ -25,13 +25,19 @@ import HeaderIconMenu from '../mutation/HeaderIconMenu';
 import GeneFilterMenu, { GeneFilterOption } from '../mutation/GeneFilterMenu';
 import PanelColumnFormatter from 'shared/components/mutationTable/column/PanelColumnFormatter';
 import {
-    ICivicGene,
-    ICivicVariant,
+    ICivicGeneIndex,
+    ICivicVariantIndex,
     IOncoKbData,
     RemoteData,
 } from 'cbioportal-utils';
 import { CancerGene } from 'oncokb-ts-api-client';
-import { getPercentage } from 'shared/lib/FormatUtils';
+import {
+    calculateOncoKbContentPadding,
+    calculateOncoKbContentWidthOnNextFrame,
+    calculateOncoKbContentWidthWithInterval,
+    DEFAULT_ONCOKB_CONTENT_WIDTH,
+    updateOncoKbIconStyle,
+} from 'shared/lib/AnnotationColumnUtils';
 
 class CNATableComponent extends LazyMobXTable<DiscreteCopyNumberData[]> {}
 
@@ -45,10 +51,11 @@ type ICopyNumberTableWrapperProps = {
     uniqueSampleKeyToTumorType?: { [sampleId: string]: string };
     genePanelIdToEntrezGeneIds: { [genePanelId: string]: number[] };
     cnaOncoKbData?: RemoteData<IOncoKbData | Error | undefined>;
-    cnaCivicGenes?: RemoteData<ICivicGene | undefined>;
-    cnaCivicVariants?: RemoteData<ICivicVariant | undefined>;
+    cnaCivicGenes?: RemoteData<ICivicGeneIndex | undefined>;
+    cnaCivicVariants?: RemoteData<ICivicVariantIndex | undefined>;
     oncoKbCancerGenes?: RemoteData<CancerGene[] | Error | undefined>;
     usingPublicOncoKbInstance: boolean;
+    mergeOncoKbIcons?: boolean;
     enableOncoKb?: boolean;
     enableCivic?: boolean;
     pubMedCache?: PubMedCache;
@@ -69,14 +76,33 @@ type ICopyNumberTableWrapperProps = {
     disableTooltip?: boolean;
 };
 
+const ANNOTATION_ELEMENT_ID = 'copy-number-annotation';
+
 @observer
 export default class CopyNumberTableWrapper extends React.Component<
     ICopyNumberTableWrapperProps,
     {}
 > {
+    @observable mergeOncoKbIcons;
+    @observable oncokbWidth = DEFAULT_ONCOKB_CONTENT_WIDTH;
+    private oncokbInterval: any;
+
     constructor(props: ICopyNumberTableWrapperProps) {
         super(props);
         makeObservable(this);
+
+        // here we wait for the oncokb icons to fully finish rendering
+        // then update the oncokb width in order to align annotation column header icons with the cell content
+        this.oncokbInterval = calculateOncoKbContentWidthWithInterval(
+            ANNOTATION_ELEMENT_ID,
+            oncoKbContentWidth => (this.oncokbWidth = oncoKbContentWidth)
+        );
+
+        this.mergeOncoKbIcons = !!props.mergeOncoKbIcons;
+    }
+
+    public destroy() {
+        clearInterval(this.oncokbInterval);
     }
 
     public static defaultProps = {
@@ -209,24 +235,38 @@ export default class CopyNumberTableWrapper extends React.Component<
 
         columns.push({
             name: 'Annotation',
-            render: (d: DiscreteCopyNumberData[]) =>
-                AnnotationColumnFormatter.renderFunction(d, {
-                    uniqueSampleKeyToTumorType: this.props
-                        .uniqueSampleKeyToTumorType,
-                    oncoKbData: this.props.cnaOncoKbData,
-                    oncoKbCancerGenes: this.props.oncoKbCancerGenes,
-                    usingPublicOncoKbInstance: this.props
-                        .usingPublicOncoKbInstance,
-                    enableOncoKb: this.props.enableOncoKb as boolean,
-                    pubMedCache: this.props.pubMedCache,
-                    civicGenes: this.props.cnaCivicGenes,
-                    civicVariants: this.props.cnaCivicVariants,
-                    enableCivic: this.props.enableCivic as boolean,
-                    enableMyCancerGenome: false,
-                    enableHotspot: false,
-                    userEmailAddress: this.props.userEmailAddress,
-                    studyIdToStudy: this.props.studyIdToStudy,
-                }),
+            headerRender: (name: string) =>
+                AnnotationColumnFormatter.headerRender(
+                    name,
+                    this.oncokbWidth,
+                    this.mergeOncoKbIcons,
+                    this.handleOncoKbIconModeToggle
+                ),
+            render: (d: DiscreteCopyNumberData[]) => (
+                <span id="copy-number-annotation">
+                    {AnnotationColumnFormatter.renderFunction(d, {
+                        uniqueSampleKeyToTumorType: this.props
+                            .uniqueSampleKeyToTumorType,
+                        oncoKbData: this.props.cnaOncoKbData,
+                        oncoKbCancerGenes: this.props.oncoKbCancerGenes,
+                        usingPublicOncoKbInstance: this.props
+                            .usingPublicOncoKbInstance,
+                        mergeOncoKbIcons: this.mergeOncoKbIcons,
+                        oncoKbContentPadding: calculateOncoKbContentPadding(
+                            this.oncokbWidth
+                        ),
+                        enableOncoKb: this.props.enableOncoKb as boolean,
+                        pubMedCache: this.props.pubMedCache,
+                        civicGenes: this.props.cnaCivicGenes,
+                        civicVariants: this.props.cnaCivicVariants,
+                        enableCivic: this.props.enableCivic as boolean,
+                        enableMyCancerGenome: false,
+                        enableHotspot: false,
+                        userEmailAddress: this.props.userEmailAddress,
+                        studyIdToStudy: this.props.studyIdToStudy,
+                    })}
+                </span>
+            ),
             sortBy: (d: DiscreteCopyNumberData[]) => {
                 return AnnotationColumnFormatter.sortValue(
                     d,
@@ -344,6 +384,18 @@ export default class CopyNumberTableWrapper extends React.Component<
                     />
                 )}
             </div>
+        );
+    }
+
+    @action.bound
+    private handleOncoKbIconModeToggle(mergeIcons: boolean) {
+        this.mergeOncoKbIcons = mergeIcons;
+        updateOncoKbIconStyle({ mergeIcons });
+
+        // we need to set the OncoKB width on the next render cycle, otherwise it is not updated yet
+        calculateOncoKbContentWidthOnNextFrame(
+            ANNOTATION_ELEMENT_ID,
+            width => (this.oncokbWidth = width || DEFAULT_ONCOKB_CONTENT_WIDTH)
         );
     }
 }

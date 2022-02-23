@@ -7,7 +7,7 @@ import {
     GenericAssayFilter,
 } from 'cbioportal-ts-api-client';
 import { MolecularProfile } from 'cbioportal-ts-api-client';
-import _ from 'lodash';
+import _, { Dictionary } from 'lodash';
 import { IDataQueryFilter } from '../StoreUtils';
 
 export const NOT_APPLICABLE_VALUE = 'NA';
@@ -20,11 +20,34 @@ export const COMMON_GENERIC_ASSAY_PROPERTY = {
 export const GenericAssayTypeConstants: { [s: string]: string } = {
     TREATMENT_RESPONSE: 'TREATMENT_RESPONSE',
     MUTATIONAL_SIGNATURE: 'MUTATIONAL_SIGNATURE',
+    ARMLEVEL_CNA: 'ARMLEVEL_CNA',
 };
 
+export const RESERVED_CATEGORY_ORDER_DICT: Dictionary<string[]> = {
+    // Add more generic assay types here to change category order in plots tab
+    [GenericAssayTypeConstants.ARMLEVEL_CNA]: [
+        'Loss',
+        'Unchanged',
+        'Gain',
+        'NA',
+    ],
+};
+
+export enum GenericAssayDataType {
+    LIMIT_VALUE = 'LIMIT-VALUE',
+    CATEGORICAL = 'CATEGORICAL',
+    BINARY = 'BINARY',
+}
+
 export async function fetchGenericAssayMetaByMolecularProfileIdsGroupedByGenericAssayType(
-    genericAssayProfiles: MolecularProfile[]
+    molecularProfiles: MolecularProfile[]
 ) {
+    const genericAssayProfiles = molecularProfiles.filter(
+        profile =>
+            profile.molecularAlterationType ===
+            AlterationTypeConstants.GENERIC_ASSAY
+    );
+
     const genericAssayProfilesGroupedByGenericAssayType = _.groupBy(
         genericAssayProfiles,
         'genericAssayType'
@@ -172,11 +195,13 @@ export function makeGenericAssayOption(
     // indentical to the entity_stable_id.
     const name = getGenericAssayMetaPropertyOrDefault(
         meta,
-        COMMON_GENERIC_ASSAY_PROPERTY.NAME
+        COMMON_GENERIC_ASSAY_PROPERTY.NAME,
+        meta.stableId
     );
     const description = getGenericAssayMetaPropertyOrDefault(
         meta,
-        COMMON_GENERIC_ASSAY_PROPERTY.DESCRIPTION
+        COMMON_GENERIC_ASSAY_PROPERTY.DESCRIPTION,
+        meta.stableId
     );
     const uniqueName = name !== meta.stableId;
     const uniqueDesc = description !== meta.stableId && description !== name;
@@ -221,4 +246,12 @@ export function getGenericAssayMetaPropertyOrDefault(
     } else {
         return defaultValue;
     }
+}
+
+export function getCategoryOrderByGenericAssayType(genericAssayType: string) {
+    // return category order for reserved generic assay type
+    // return undefined for other types
+    return genericAssayType in RESERVED_CATEGORY_ORDER_DICT
+        ? RESERVED_CATEGORY_ORDER_DICT[genericAssayType]
+        : undefined;
 }

@@ -15,7 +15,7 @@ import {
 import 'react-virtualized/styles.css';
 import { action, computed, observable, toJS, makeObservable } from 'mobx';
 import styles from './tables.module.scss';
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { Observer, observer } from 'mobx-react';
 import classnames from 'classnames';
 import { If } from 'react-if';
@@ -25,6 +25,7 @@ import { DefaultTooltip } from 'cbioportal-frontend-commons';
 import { SimpleGetterLazyMobXTableApplicationDataStore } from 'shared/lib/ILazyMobXTableApplicationDataStore';
 import { SelectionOperatorEnum } from '../TableUtils';
 import { DropdownButton, MenuItem } from 'react-bootstrap';
+import classNames from 'classnames';
 
 export type IFixedHeaderTableProps<T> = {
     columns: Column<T>[];
@@ -33,6 +34,7 @@ export type IFixedHeaderTableProps<T> = {
     sortBy?: string;
     sortDirection?: SortDirection;
     defaultSelectionOperator?: SelectionOperatorEnum;
+    onScroll?: () => void;
     width?: number;
     height?: number;
     headerHeight?: number;
@@ -49,11 +51,13 @@ export type IFixedHeaderTableProps<T> = {
         onClick: () => void;
         isDisabled: () => boolean;
     }[];
+    extraFooterElements?: any[];
     showAddRemoveAllButton?: boolean;
     addAll?: (data: T[]) => void;
     removeAll?: (data: T[]) => void;
     showSelectableNumber?: boolean;
     isSelectedRow?: (data: T) => boolean;
+    headerClassName?: string;
     highlightedRowClassName?: (data: T) => string;
     autoFocusSearchAfterRendering?: boolean;
     afterSorting?: (sortBy: string, sortDirection: SortDirection) => void;
@@ -277,7 +281,9 @@ export default class FixedHeaderTable<T> extends React.Component<
                     label.push(
                         <i
                             className={classnames(
-                                styles.headerSortingIcon,
+                                this._sortDirection === 'desc'
+                                    ? styles.headerSortingIconDesc
+                                    : styles.headerSortingIconAsc,
                                 'fa',
                                 this._sortDirection === 'desc'
                                     ? 'fa-sort-desc'
@@ -364,11 +370,11 @@ export default class FixedHeaderTable<T> extends React.Component<
         const showDeselectAll = !noneSelected && this.props.removeAll;
 
         return (
-            <>
+            <div style={{ display: 'flex', alignItems: 'baseline' }}>
                 {showSelectAll && (
                     <button
                         className="btn btn-default btn-xs"
-                        data-test={'fixed-header-table-add-all'}
+                        data-test="fixed-header-table-add-all"
                         onClick={this.onAddAll}
                     >
                         {selectAllContent!}
@@ -377,13 +383,13 @@ export default class FixedHeaderTable<T> extends React.Component<
                 {showDeselectAll && (
                     <button
                         className="btn btn-default btn-xs"
-                        data-test={'fixed-header-table-remove-all'}
+                        data-test="fixed-header-table-remove-all"
                         onClick={this.onRemoveAll}
                     >
                         {'Deselect all'}
                     </button>
                 )}
-            </>
+            </div>
         );
     }
 
@@ -413,7 +419,7 @@ export default class FixedHeaderTable<T> extends React.Component<
                         this.props.numberOfSelectedRows > 0
                     }
                 >
-                    <div className="btn-group">
+                    <div className="btn-group" style={{ display: 'flex' }}>
                         <button
                             className="btn btn-default btn-xs"
                             onClick={this.afterSelectingRows}
@@ -467,6 +473,7 @@ export default class FixedHeaderTable<T> extends React.Component<
                         )}
                     />
                 )}
+                {this.props.extraFooterElements}
             </div>
         );
     }
@@ -482,6 +489,7 @@ export default class FixedHeaderTable<T> extends React.Component<
                         <RVTable
                             width={this.props.width!}
                             height={this.props.height!}
+                            onScroll={this.props.onScroll}
                             headerHeight={this.props.headerHeight!}
                             rowHeight={this.props.rowHeight!}
                             rowCount={
@@ -489,7 +497,10 @@ export default class FixedHeaderTable<T> extends React.Component<
                             }
                             rowGetter={this.rowGetter}
                             rowClassName={this.rowClassName}
-                            headerClassName={styles.headerColumn}
+                            headerClassName={classNames(
+                                styles.headerColumn,
+                                this.props.headerClassName
+                            )}
                             sort={this.sort}
                             sortDirection={RVSDTtoStrType[this._sortDirection]}
                             sortBy={this._sortBy}
@@ -507,7 +518,10 @@ export default class FixedHeaderTable<T> extends React.Component<
                                         cellRenderer={(
                                             props: TableCellProps
                                         ) => {
-                                            return column.render(props.rowData);
+                                            return column.render(
+                                                props.rowData,
+                                                props.rowIndex
+                                            );
                                         }}
                                     />
                                 );

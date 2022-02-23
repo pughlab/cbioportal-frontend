@@ -1,8 +1,7 @@
 import React from 'react';
 import { assert, default as chai } from 'chai';
 import chaiEnzyme from 'chai-enzyme';
-import Enzyme, { mount, ReactWrapper } from 'enzyme';
-import Adapter from 'enzyme-adapter-react-16';
+import { mount, ReactWrapper } from 'enzyme';
 import sinon from 'sinon';
 import {
     Column,
@@ -26,8 +25,6 @@ import cloneJSXWithoutKeyAndRef from 'shared/lib/cloneJSXWithoutKeyAndRef';
 import { filterNumericalColumn, maxPage, parseNumericalFilter } from './utils';
 import _ from 'lodash';
 
-Enzyme.configure({ adapter: new Adapter() });
-
 expect.extend(expectJSX);
 chai.use(chaiEnzyme());
 
@@ -45,7 +42,7 @@ class HighlightingDataStore extends SimpleLazyMobXTableApplicationDataStore<
 function getVisibleColumnHeaders(
     tableWrapper: ReactWrapper<any, any>
 ): string[] {
-    return tableWrapper.find('th span').map(span => span.text());
+    return tableWrapper.find('th').map(header => header.text());
 }
 
 function simulateTableSearchInput(table: ReactWrapper<any, any>, str: string) {
@@ -382,7 +379,7 @@ describe('LazyMobXTable', () => {
     ];
 
     let clock: Clock;
-    before(() => {
+    beforeAll(() => {
         clock = lolex.install();
         simpleColumns = [
             {
@@ -397,7 +394,7 @@ describe('LazyMobXTable', () => {
         }
     });
 
-    after(() => {
+    afterAll(() => {
         clock.uninstall();
     });
 
@@ -824,6 +821,7 @@ describe('LazyMobXTable', () => {
             let headersHaveClasses = table
                 .find(SimpleTable)
                 .find('th')
+                .find('span')
                 .map(x => x.hasClass('sort-asc') || x.hasClass('sort-des'));
             assert.isFalse(
                 headersHaveClasses.reduce((x, y) => x || y, false),
@@ -842,10 +840,12 @@ describe('LazyMobXTable', () => {
             let nameHeader = table
                 .find(SimpleTable)
                 .find('th')
-                .at(0);
+                .find('span')
+                .filterWhere(x => x.text() === 'Name')
+                .first();
             assert.equal(
-                nameHeader.text(),
-                'Name',
+                nameHeader.length,
+                1,
                 "we're dealing with the name header"
             );
             assert.isTrue(
@@ -881,10 +881,12 @@ describe('LazyMobXTable', () => {
             let stringHeader = table
                 .find(SimpleTable)
                 .find('th')
-                .at(2);
+                .find('span')
+                .filterWhere(x => x.text() === 'String')
+                .first();
             assert.equal(
-                stringHeader.text(),
-                'String',
+                stringHeader.length,
+                1,
                 "we're dealing with the string header"
             );
             assert.isFalse(
@@ -987,19 +989,23 @@ describe('LazyMobXTable', () => {
             let numberListHeader = table
                 .find(SimpleTable)
                 .find('th')
-                .at(3);
+                .find('span')
+                .filterWhere(x => x.text() === 'Number List')
+                .first();
             assert.equal(
-                numberListHeader.text(),
-                'Number List',
+                numberListHeader.length,
+                1,
                 "we're dealing with the number list header"
             );
             let nameHeader = table
                 .find(SimpleTable)
                 .find('th')
-                .at(0);
+                .find('span')
+                .filterWhere(x => x.text() === 'Name')
+                .first();
             assert.equal(
-                nameHeader.text(),
-                'Name',
+                nameHeader.length,
+                1,
                 "we're dealing with the name header"
             );
 
@@ -1328,10 +1334,12 @@ describe('LazyMobXTable', () => {
             let header = table
                 .find(SimpleTable)
                 .find('th')
-                .at(1);
+                .find('span')
+                .filterWhere(x => x.text() === 'Number')
+                .first();
             assert.equal(
-                header.text(),
-                'Number',
+                header.length,
+                1,
                 "we're dealing with the number header"
             );
             header.simulate('click');
@@ -1445,10 +1453,12 @@ describe('LazyMobXTable', () => {
             let numberListHeader = table
                 .find(SimpleTable)
                 .find('th')
-                .at(3);
+                .find('span')
+                .filterWhere(x => x.text() === 'Number List')
+                .first();
             assert.equal(
-                numberListHeader.text(),
-                'Number List',
+                numberListHeader.length,
+                1,
                 "we're dealing with the number list header"
             );
             numberListHeader.simulate('click');
@@ -1657,10 +1667,12 @@ describe('LazyMobXTable', () => {
             header = table
                 .find(SimpleTable)
                 .find('th')
-                .at(0);
+                .find('span')
+                .filterWhere(x => x.text() === 'Name')
+                .first();
             assert.equal(
-                header.text(),
-                'Name',
+                header.length,
+                1,
                 "we're dealing with the name header"
             );
             header.simulate('click');
@@ -1772,7 +1784,8 @@ describe('LazyMobXTable', () => {
             let header = table
                 .find(SimpleTable)
                 .find('th')
-                .at(0);
+                .find('span')
+                .first();
             assert.equal(
                 getItemsPerPage(table),
                 50,
@@ -1951,7 +1964,7 @@ describe('LazyMobXTable', () => {
     describe('column visibility', () => {
         // test visibility of headers and correponding data cells in the rows
         let table: ReactWrapper<any, any>;
-        before(() => {
+        beforeAll(() => {
             table = mount(<Table columns={columns} data={data} />);
         });
         it('shows initially visible columns at first, and does not show invisible ones', () => {

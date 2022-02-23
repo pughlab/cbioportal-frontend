@@ -1,19 +1,20 @@
 import {
     Gene,
-    ICivicGene,
-    ICivicVariant,
+    ICivicGeneIndex,
+    ICivicVariantIndex,
     IHotspotIndex,
     IMyCancerGenomeData,
     IOncoKbData,
     Mutation,
+    PostTranslationalModification,
     RemoteData,
+    UniprotTopology,
 } from 'cbioportal-utils';
 import {
     EnsemblTranscript,
     Hotspot,
     MyVariantInfo,
     PfamDomain,
-    PostTranslationalModification,
     VariantAnnotation,
 } from 'genome-nexus-ts-api-client';
 import {
@@ -44,6 +45,7 @@ export interface MutationMapperStore<T extends Mutation> {
         group: string;
         counts: { [pos: number]: number };
     }[];
+    ptmData: RemoteData<PostTranslationalModification[] | undefined>;
     ptmDataByProteinPosStart: RemoteData<
         { [pos: number]: PostTranslationalModification[] } | undefined
     >;
@@ -55,6 +57,7 @@ export interface MutationMapperStore<T extends Mutation> {
           }
         | undefined
     >;
+    uniprotTopologyData: RemoteData<UniprotTopology[] | undefined>;
     indexedHotspotData: RemoteData<IHotspotIndex | undefined>;
     hotspotsByPosition: { [pos: number]: Hotspot[] };
     oncoKbCancerGenes: RemoteData<CancerGene[] | Error | undefined>;
@@ -62,8 +65,8 @@ export interface MutationMapperStore<T extends Mutation> {
     oncoKbDataByPosition: { [pos: number]: IndicatorQueryResp[] };
     oncoKbInfo: RemoteData<OncoKBInfo | undefined>;
     usingPublicOncoKbInstance: boolean;
-    civicGenes?: RemoteData<ICivicGene | undefined>;
-    civicVariants?: RemoteData<ICivicVariant | undefined>;
+    civicGenes?: RemoteData<ICivicGeneIndex | undefined>;
+    civicVariants?: RemoteData<ICivicVariantIndex | undefined>;
     myCancerGenomeData?: IMyCancerGenomeData;
     indexedVariantAnnotations: RemoteData<
         { [genomicLocation: string]: VariantAnnotation } | undefined
@@ -74,9 +77,12 @@ export interface MutationMapperStore<T extends Mutation> {
     transcriptsWithAnnotations: RemoteData<string[] | undefined>;
     transcriptsWithProteinLength: RemoteData<string[] | undefined>;
     mutationsByTranscriptId: { [transcriptId: string]: T[] };
+    ensemblTranscriptLookUp: RemoteData<any | Error | undefined>;
+    genomeBuild: string;
     setSelectedTranscript?: (id: string | undefined) => void;
     getTranscriptId?: () => string | undefined;
     selectedTranscript?: string | undefined;
+    ptmSources?: string[];
 }
 
 export default MutationMapperStore;

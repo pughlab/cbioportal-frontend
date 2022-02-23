@@ -1,4 +1,4 @@
-import * as _ from 'lodash';
+import _ from 'lodash';
 import { CoverageInformation } from './GenePanelUtils';
 
 export function isSampleProfiled(
@@ -62,17 +62,22 @@ export function isSampleProfiledInSomeMolecularProfile(
 
 export function isSampleProfiledInMultiple(
     uniqueSampleKey: string,
-    molecularProfileIds: string[],
+    molecularProfileIds: string[] | undefined,
     coverageInformation: CoverageInformation,
     hugoGeneSymbol?: string
 ): boolean[] {
-    // returns boolean[] in same order as molecularProfileIds
-    const profiledReport = getSampleProfiledReport(
-        uniqueSampleKey,
-        coverageInformation,
-        hugoGeneSymbol
-    );
-    return molecularProfileIds.map(
-        molecularProfileId => !!profiledReport[molecularProfileId]
-    );
+    // returns empty list if molecularProfileIds is undefined
+    if (!molecularProfileIds) {
+        return [];
+    } else {
+        // returns boolean[] in same order as molecularProfileIds
+        const profiledReport = getSampleProfiledReport(
+            uniqueSampleKey,
+            coverageInformation,
+            hugoGeneSymbol
+        );
+        return molecularProfileIds.map(
+            molecularProfileId => !!profiledReport[molecularProfileId]
+        );
+    }
 }

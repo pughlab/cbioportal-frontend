@@ -1041,6 +1041,11 @@ export async function fetchDiscreteCNAData(
                 molecularProfileId: molecularProfileIdDiscrete.result,
             }
         );
+    } else {
+        return [];
+    }
+}
+
 /*
 PharmacoDB CNA View
 */ 

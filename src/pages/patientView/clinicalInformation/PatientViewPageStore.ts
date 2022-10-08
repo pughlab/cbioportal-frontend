@@ -136,7 +136,7 @@ import {
 import { MutationTableDownloadDataFetcher } from 'shared/lib/MutationTableDownloadDataFetcher';
 import { getNavCaseIdsCache } from 'shared/lib/handleLongUrls';
 import {
-    fetchTrialMatchesUsingPOST,
+    fetchTrialMatches,
     fetchTrialsById,
 } from '../../../shared/api/MatchMinerAPI';
 import {
@@ -2349,7 +2349,7 @@ export class PatientViewPageStore {
     readonly trialMatches = remoteData<ITrialMatch[]>(
         {
             invoke: () => {
-                return fetchTrialMatchesUsingPOST({ mrn: this.patientId });
+                return fetchTrialMatches({ mrn: this.patientId });
             },
         },
         []

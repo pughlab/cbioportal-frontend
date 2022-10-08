@@ -7,6 +7,7 @@ export enum PatientViewPageTabs {
     TissueImage = 'tissueImage',
     MSKTissueImage = 'MSKTissueImage',
     TrialMatchTab = 'trialMatchTab',
+    TrialMatchTabNew = 'trialMatchTabnew',
     MutationalSignatures = 'mutationalSignatures',
     PathwayMapper = 'pathways',
     PathologySlides = 'pathSlidesTab',

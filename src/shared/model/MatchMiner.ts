@@ -49,6 +49,8 @@ export interface ITrialMatch {
     id: string;
     nctId: string | '';
     protocolNo: string | '';
+    shortTitle: string | '';
+    status: string | '';
     oncotreePrimaryDiagnosisName?: string;
     gender?: string;
     matchType: string;

@@ -180,6 +180,8 @@ describe('TrialMatchTableUtils', () => {
                 genomicAlteration: 'FGFR2 Oncogenic Mutations',
                 trialAgeNumerical: '>=18',
                 trialOncotreePrimaryDiagnosis: 'All Solid Tumors',
+                shortTitle: '',
+                status: '',
             },
             {
                 id: 'NCT01948297+13-131',
@@ -195,6 +197,8 @@ describe('TrialMatchTableUtils', () => {
                 genomicAlteration: 'FGFR2 Fusions',
                 trialAgeNumerical: '>=18',
                 trialOncotreePrimaryDiagnosis: 'All Solid Tumors',
+                shortTitle: '',
+                status: '',
             },
             {
                 id: 'NCT02924376+17-405',
@@ -209,6 +213,8 @@ describe('TrialMatchTableUtils', () => {
                 genomicAlteration: 'FGF23 !Oncogenic Mutations',
                 trialAgeNumerical: '>=18',
                 trialOncotreePrimaryDiagnosis: 'Cholangiocarcinoma',
+                shortTitle: '',
+                status: '',
             },
             {
                 id: 'NCT02924376+17-405',
@@ -223,6 +229,8 @@ describe('TrialMatchTableUtils', () => {
                 genomicAlteration: 'FGFR1 !Oncogenic Mutations',
                 trialAgeNumerical: '>=18',
                 trialOncotreePrimaryDiagnosis: 'Cholangiocarcinoma',
+                shortTitle: '',
+                status: '',
             },
         ];
         const expectedResult: ITrialMatch[] = [
@@ -240,6 +248,8 @@ describe('TrialMatchTableUtils', () => {
                 genomicAlteration: 'FGFR2 Oncogenic Mutations',
                 trialAgeNumerical: '>=18',
                 trialOncotreePrimaryDiagnosis: 'All Solid Tumors',
+                shortTitle: '',
+                status: '',
             },
             {
                 id: 'NCT01948297+13-131',
@@ -255,6 +265,8 @@ describe('TrialMatchTableUtils', () => {
                 genomicAlteration: 'FGFR2 Fusions',
                 trialAgeNumerical: '>=18',
                 trialOncotreePrimaryDiagnosis: 'All Solid Tumors',
+                shortTitle: '',
+                status: '',
             },
         ];
         assert.deepEqual(

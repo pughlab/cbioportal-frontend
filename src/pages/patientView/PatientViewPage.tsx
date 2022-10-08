@@ -58,6 +58,7 @@ import { AppStore } from '../../AppStore';
 import request from 'superagent';
 import { remoteData, getBrowserWindow } from 'cbioportal-frontend-commons';
 import TrialMatchTable from './trialMatch/TrialMatchTable';
+import TrialMatchTableNew from './trialMatch/TrialMatchTableNew';
 
 import 'cbioportal-frontend-commons/dist/styles.css';
 import 'react-mutation-mapper/dist/styles.css';
@@ -361,7 +362,6 @@ export default class PatientViewPage extends React.Component<
     @computed
     private get shouldShowTrialMatch(): boolean {
         return (
-            getBrowserWindow().localStorage.trialmatch === 'true' &&
             this.patientViewPageStore.detailedTrialMatches.isComplete &&
             this.patientViewPageStore.detailedTrialMatches.result.length > 0
         );
@@ -1604,6 +1604,35 @@ export default class PatientViewPage extends React.Component<
                                             detailedTrialMatches={
                                                 this.patientViewPageStore
                                                     .detailedTrialMatches.result
+                                            }
+                                            containerWidth={
+                                                WindowStore.size.width - 20
+                                            }
+                                        />
+                                        <TrialMatchTableNew
+                                            sampleManager={sampleManager}
+                                            trialMatches={
+                                                this.patientViewPageStore
+                                                    .trialMatches.result
+                                            }
+                                            containerWidth={
+                                                WindowStore.size.width - 20
+                                            }
+                                        />
+                                    </MSKTab>
+                                )}
+
+                                {this.shouldShowTrialMatch && (
+                                    <MSKTab
+                                        key={8}
+                                        id={PatientViewPageTabs.TrialMatchTabNew}
+                                        linkText="Matched Trials New"
+                                    >                                    
+                                        <TrialMatchTableNew
+                                            sampleManager={sampleManager}
+                                            trialMatches={
+                                                this.patientViewPageStore
+                                                    .trialMatches.result
                                             }
                                             containerWidth={
                                                 WindowStore.size.width - 20

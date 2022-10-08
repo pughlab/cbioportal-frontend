@@ -83,17 +83,10 @@ export default class TrialMatchTable extends React.Component<ITrialMatchProps> {
                 <div>
                     <If condition={trial.protocolNo.length > 0}>
                         <div>
-                            <a
-                                target="_blank"
-                                href={
-                                    'https://www.mskcc.org/cancer-care/clinical-trials/' +
-                                    trial.protocolNo
-                                }
-                            >
                                 {trial.protocolNo}
-                            </a>
                         </div>
                     </If>
+                    
                     <If condition={trial.nctId.length > 0}>
                         <div>
                             <a
@@ -279,35 +272,10 @@ export default class TrialMatchTable extends React.Component<ITrialMatchProps> {
         {
             name: ColumnKey.STATUS,
             render: (trial: IDetailedTrialMatch) => (
-                <div className={styles.statusContainer}>
-                    <a
-                        target="_blank"
-                        href={
-                            'https://www.mskcc.org/cancer-care/clinical-trials/' +
-                            trial.protocolNo
-                        }
-                    >
+                <div className={styles.statusContainer}>            
                         <span className={styles.statusBackground}>
                             {trial.status}
-                        </span>
-                    </a>
-                    <span className={styles.feedback}>
-                        <Button
-                            type="button"
-                            className={
-                                'btn btn-default btn-sm btn-xs ' +
-                                styles.feedbackButton
-                            }
-                            onClick={() =>
-                                this.openCloseFeedbackForm({
-                                    nctId: trial.nctId,
-                                    protocolNo: trial.protocolNo,
-                                })
-                            }
-                        >
-                            Feedback
-                        </Button>
-                    </span>
+                        </span>                
                 </div>
             ),
             sortBy: (trial: IDetailedTrialMatch) => trial.status,
@@ -622,15 +590,6 @@ export default class TrialMatchTable extends React.Component<ITrialMatchProps> {
     render() {
         return (
             <div>
-                <p style={{ marginBottom: '0' }}>
-                    Curated genomic and clinical criteria from open clinical
-                    trials at Memorial Sloan Kettering. Please{' '}
-                    <a href="mailto:team@oncokb.org">contact us</a> or submit{' '}
-                    <a onClick={() => (this.showGeneralFeedback = true)}>
-                        feedback form
-                    </a>{' '}
-                    if you have any questions.
-                </p>
                 {!_.isUndefined(this.showGeneralFeedback) && (
                     <TrialMatchFeedback
                         show={this.showGeneralFeedback}

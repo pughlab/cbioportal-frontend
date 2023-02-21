@@ -14,24 +14,21 @@ import {
     IReactionDisposer,
     makeObservable,
     observable,
-    reaction,
 } from 'mobx';
-import { ReactChild, ReactChildren } from 'react';
+import { ReactChild } from 'react';
 import { observer } from 'mobx-react';
-import { JsxElement } from 'typescript';
 import MemoizedHandlerFactory from '../../lib/MemoizedHandlerFactory';
-import WindowStore from '../window/WindowStore';
 import URL from 'url';
-import { buildCBioPortalPageUrl } from 'shared/api/urls';
-import { getBrowserWindow } from 'cbioportal-frontend-commons';
+import { DefaultTooltip, getBrowserWindow } from 'cbioportal-frontend-commons';
 
 export interface IMSKTabProps {
     inactive?: boolean;
     id: string;
     linkText: string | JSX.Element;
+    linkTooltip?: string | JSX.Element;
     activeId?: string;
     className?: string;
-    hide?: boolean;
+    hide?: boolean | (() => boolean);
     datum?: any;
     anchorStyle?: { [k: string]: string | number | boolean };
     anchorClassName?: string;
@@ -39,6 +36,7 @@ export interface IMSKTabProps {
     onTabDidMount?: (tab: HTMLDivElement) => void;
     onTabUnmount?: (tab: HTMLDivElement) => void;
     onClickClose?: (tabId: string) => void;
+    pending?: boolean;
 }
 
 @observer
@@ -118,6 +116,8 @@ interface IMSKTabsProps {
     loadingComponent?: JSX.Element;
     contentWindowExtra?: JSX.Element;
     hrefRoot?: string;
+    onMount?: () => void;
+    defaultTabId?: string | Boolean;
 }
 
 @observer
@@ -152,6 +152,7 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
     constructor(props: IMSKTabsProps) {
         super(props);
         makeObservable(this);
+        props.onMount && props.onMount();
     }
 
     private cloneTab(
@@ -218,14 +219,19 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
                 ) {
                     return this.props.activeTabId;
                 } else {
-                    return (toArrayedChildren[0] as React.ReactElement<
-                        IMSKTabProps
-                    >).props.id;
+                    return this.props.defaultTabId === false
+                        ? undefined
+                        : (toArrayedChildren[0] as React.ReactElement<
+                              IMSKTabProps
+                          >).props.id;
                 }
             })();
 
             let arr: React.ReactElement<IMSKTabProps>[] = [];
 
+            // NOTE: we have to clone tab in order to manipulate
+            // it's props, which are immutable for an instance of a child element
+            // in this case we are to manipulate it's "inactive" prop
             arr = _.reduce(
                 toArrayedChildren,
                 (
@@ -284,7 +290,7 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
 
     protected navTabs(
         children: React.ReactElement<IMSKTabProps>[],
-        effectiveActiveTab: string
+        effectiveActiveTab: string | undefined
     ) {
         // restart the tab refs before each tab rendering
         this.tabRefs = [];
@@ -346,7 +352,7 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
 
     protected tabPages(
         children: React.ReactElement<IMSKTabProps>[],
-        effectiveActiveTab: string
+        effectiveActiveTab: string | undefined
     ): JSX.Element[][] {
         const pages: JSX.Element[][] = [[]];
         let currentPage = 1;
@@ -354,8 +360,22 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
         React.Children.forEach(
             children,
             (tab: React.ReactElement<IMSKTabProps>) => {
-                if (!tab || tab.props.hide) {
-                    return;
+                // tab could be null/undefined here if getTab() happens to return null
+                // instead of using hide prop
+                if (!tab) return;
+
+                const isActive = effectiveActiveTab === tab.props.id;
+
+                // if we are not currently ROUTED to tab
+                // then hide it as indicated
+                // if we ARE ROUTED to it, we want to ignore
+                if (!isActive) {
+                    if (tab.props.hide) {
+                        return;
+                    }
+                    if (tab.props.pending) {
+                        return;
+                    }
                 }
 
                 let activeClass =
@@ -389,6 +409,18 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
 
                 const href = this.getTabHref(tab.props.id);
 
+                const linkContent = tab.props.linkTooltip ? (
+                    <DefaultTooltip
+                        overlay={tab.props.linkTooltip}
+                        mouseEnterDelay={0}
+                        placement="top"
+                    >
+                        <span>{tab.props.linkText}</span>
+                    </DefaultTooltip>
+                ) : (
+                    tab.props.linkText
+                );
+
                 pages[currentPage - 1].push(
                     <li
                         key={tab.props.id}
@@ -406,7 +438,7 @@ export class MSKTabs extends React.Component<IMSKTabsProps> {
                             href={href}
                             style={tab.props.anchorStyle}
                         >
-                            {tab.props.linkText}
+                            {linkContent}
                             {closeButton}
                         </a>
                     </li>

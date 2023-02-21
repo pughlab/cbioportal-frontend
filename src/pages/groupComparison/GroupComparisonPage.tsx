@@ -31,18 +31,25 @@ import ReactSelect from 'react-select';
 import { trackEvent } from 'shared/lib/tracking';
 import URL from 'url';
 import GroupComparisonURLWrapper from './GroupComparisonURLWrapper';
-
+import classnames from 'classnames';
 import styles from './styles.module.scss';
 import { OverlapStrategy } from '../../shared/lib/comparison/ComparisonStore';
 import { buildCBioPortalPageUrl } from 'shared/api/urls';
 import MethylationEnrichments from './MethylationEnrichments';
 import GenericAssayEnrichments from './GenericAssayEnrichments';
 import _ from 'lodash';
-import { deriveDisplayTextFromGenericAssayType } from 'pages/resultsView/plots/PlotsTabUtils';
 import AlterationEnrichments from './AlterationEnrichments';
 import AlterationEnrichmentTypeSelector from '../../shared/lib/comparison/AlterationEnrichmentTypeSelector';
 import { AlterationFilterMenuSection } from 'pages/groupComparison/GroupComparisonUtils';
 import { getServerConfig } from 'config/config';
+import {
+    buildCustomTabs,
+    prepareCustomTabConfigurations,
+} from 'shared/lib/customTabs/customTabHelpers';
+import { getSortedGenericAssayTabSpecs } from 'shared/lib/GenericAssayUtils/GenericAssayCommonUtils';
+import { HelpWidget } from 'shared/components/HelpWidget/HelpWidget';
+import GroupComparisonPathwayMapper from './pathwayMapper/GroupComparisonPathwayMapper';
+import GroupComparisonMutationsTab from './GroupComparisonMutationsTab';
 
 export interface IGroupComparisonPageProps {
     routing: any;
@@ -106,6 +113,13 @@ export default class GroupComparisonPage extends React.Component<
         this.urlWrapper.destroy();
     }
 
+    @computed get customTabs() {
+        return prepareCustomTabConfigurations(
+            getServerConfig().custom_tabs,
+            'COMPARISON_PAGE'
+        );
+    }
+
     readonly tabs = MakeMobxView({
         await: () => [
             this.store._activeGroupsNotOverlapRemoved,
@@ -118,6 +132,9 @@ export default class GroupComparisonPage extends React.Component<
             this.store.methylationEnrichmentProfiles,
             this.store.survivalClinicalDataExists,
             this.store.genericAssayEnrichmentProfilesGroupedByGenericAssayType,
+            this.store.alterationsEnrichmentData,
+            this.store.alterationsEnrichmentAnalysisGroups,
+            this.store.genesSortedByMutationFrequency,
         ],
         render: () => {
             return (
@@ -127,6 +144,11 @@ export default class GroupComparisonPage extends React.Component<
                     onTabClick={this.urlWrapper.setTabId}
                     className="primaryTabs mainTabs"
                     hrefRoot={buildCBioPortalPageUrl('comparison')}
+                    contentWindowExtra={
+                        <HelpWidget
+                            path={this.props.routing.location.pathname}
+                        />
+                    }
                 >
                     <MSKTab id={GroupComparisonTab.OVERLAP} linkText="Overlap">
                         <Overlap
@@ -196,6 +218,60 @@ export default class GroupComparisonPage extends React.Component<
                             <AlterationEnrichments store={this.store} />
                         </MSKTab>
                     )}
+                    {this.store.showMutationsTab && (
+                        <MSKTab
+                            id={GroupComparisonTab.MUTATIONS}
+                            linkText={
+                                <span>
+                                    Mutations{' '}
+                                    <strong className={'beta-text'}>
+                                        Beta!
+                                    </strong>
+                                </span>
+                            }
+                        >
+                            <GroupComparisonMutationsTab
+                                store={this.store}
+                                urlWrapper={this.urlWrapper}
+                            />
+                            {/* stacked lollipop plots for > 2 groups */}
+                            {/* {this.store.activeGroups.result!.map(g => {
+                                return (
+                                    <div>
+                                        <h3>{g.name}</h3>
+                                        <Mutations
+                                            store={this.store}
+                                            mutations={
+                                                this.store.mutationsByGroup
+                                                    .result![g.uid]
+                                            }
+                                            filters={{}}
+                                        />
+                                    </div>
+                                );
+                            })} */}
+                        </MSKTab>
+                    )}
+                    {this.props.appStore.featureFlagStore.has(
+                        'group_comparison_pathways'
+                    ) && (
+                        <MSKTab
+                            id={GroupComparisonTab.PATHWAYS}
+                            linkText={'Pathways'}
+                            anchorClassName={classnames({
+                                greyedOut: this.store.alterationsTabUnavailable,
+                            })}
+                        >
+                            <GroupComparisonPathwayMapper
+                                genomicData={
+                                    this.store.alterationEnrichmentRowData
+                                        .result || []
+                                }
+                                activeGroups={this.store.activeGroups.result}
+                                store={this.store}
+                            />
+                        </MSKTab>
+                    )}
                     {this.store.showMRNATab && (
                         <MSKTab
                             id={GroupComparisonTab.MRNA}
@@ -234,19 +310,17 @@ export default class GroupComparisonPage extends React.Component<
                         </MSKTab>
                     )}
                     {this.store.showGenericAssayTab &&
-                        _.keys(
+                        getSortedGenericAssayTabSpecs(
                             this.store
                                 .genericAssayEnrichmentProfilesGroupedByGenericAssayType
                                 .result
-                        ).map(genericAssayType => {
+                        ).map(genericAssayTabSpecs => {
                             return (
                                 <MSKTab
                                     id={`${
                                         GroupComparisonTab.GENERIC_ASSAY_PREFIX
-                                    }_${genericAssayType.toLowerCase()}`}
-                                    linkText={deriveDisplayTextFromGenericAssayType(
-                                        genericAssayType
-                                    )}
+                                    }_${genericAssayTabSpecs.genericAssayType.toLowerCase()}`}
+                                    linkText={genericAssayTabSpecs.linkText}
                                     anchorClassName={
                                         this.store.genericAssayTabUnavailable
                                             ? 'greyedOut'
@@ -255,18 +329,24 @@ export default class GroupComparisonPage extends React.Component<
                                 >
                                     <GenericAssayEnrichments
                                         store={this.store}
-                                        genericAssayType={genericAssayType}
+                                        genericAssayType={
+                                            genericAssayTabSpecs.genericAssayType
+                                        }
                                     />
                                 </MSKTab>
                             );
                         })}
+
+                    {buildCustomTabs(this.customTabs)}
                 </MSKTabs>
             );
         },
         renderPending: () => (
             <LoadingIndicator center={true} isLoading={true} size={'big'} />
         ),
-        renderError: () => <ErrorMessage />,
+        renderError: () => {
+            return <ErrorMessage />;
+        },
     });
 
     readonly studyLink = MakeMobxView({

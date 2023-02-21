@@ -48,7 +48,7 @@ function waitForPatientView(timeout) {
 }
 
 function waitForOncoprint(timeout) {
-    browser.pause(100); // give oncoprint time to disappear
+    browser.pause(200); // give oncoprint time to disappear
     browser.waitUntil(
         () => {
             return (
@@ -85,7 +85,7 @@ function setSettingsMenuOpen(open, buttonId = 'GlobalSettingsButton') {
                 return true;
             } else {
                 $(button).click();
-                $('[data-test=GlobalSettingsDropdown]').waitForDisplayed({
+                $(dropdown).waitForDisplayed({
                     timeout: 6000,
                     reverse: !open,
                 });
@@ -100,6 +100,10 @@ function setSettingsMenuOpen(open, buttonId = 'GlobalSettingsButton') {
             interval: 2000,
         }
     );
+}
+
+function getElementByTestHandle(handle) {
+    return $(`[data-test="${handle}"]`);
 }
 
 function setOncoprintMutationsMenuOpen(open) {
@@ -145,6 +149,11 @@ function setCheckboxChecked(checked, selector, failure_message) {
     );
 }
 
+/**
+ * Note: before calling this function,
+ * check if dropdown element is in correct state
+ * (i.e. displayed or not)qq
+ */
 function setDropdownOpen(
     open,
     button_selector_or_elt,
@@ -344,9 +353,9 @@ function waitForStudyView() {
     });
 }
 
-function waitForGroupComparisonTabOpen() {
+function waitForGroupComparisonTabOpen(timeout) {
     $('[data-test=ComparisonPageOverlapTabDiv]').waitForDisplayed({
-        timeout: 100000,
+        timeout: timeout || 10000,
     });
 }
 
@@ -511,7 +520,9 @@ function checkElementWithElementHidden(selector, selectorToHide, options) {
 }
 
 function clickQueryByGeneButton() {
-    $('a=Query By Gene').waitForEnabled();
+    $('.disabled[data-test=queryByGeneButton]').waitForExist({
+        reverse: true,
+    });
     $('a=Query By Gene').click();
     $('body').scrollIntoView();
 }
@@ -587,13 +598,31 @@ function keycloakLogin(timeout) {
     $('body').waitForDisplayed(timeout);
 }
 
+function closeOtherTabs() {
+    const studyWindow = browser.getWindowHandle();
+    browser.getWindowHandles().forEach(id => {
+        if (id === studyWindow) {
+            return;
+        }
+        console.log('close tab:', id);
+        browser.switchToWindow(id);
+        browser.closeWindow();
+    });
+    browser.switchToWindow(studyWindow);
+}
+
 function openGroupComparison(studyViewUrl, chartDataTest, timeout) {
     goToUrlAndSetLocalStorage(studyViewUrl, true);
     $('[data-test=summary-tab-content]').waitForDisplayed();
     waitForNetworkQuiet();
+
+    // needed to switch to group comparison tab later on:
+    closeOtherTabs();
+
     const chart = '[data-test=' + chartDataTest + ']';
     $(chart).waitForDisplayed({ timeout: timeout || 10000 });
     jsApiHover(chart);
+
     browser.waitUntil(
         () => {
             return $(chart + ' .controls').isExisting();
@@ -610,8 +639,11 @@ function openGroupComparison(studyViewUrl, chartDataTest, timeout) {
 
     // open comparison session
     const studyViewTabId = browser.getWindowHandle();
-    $(chart)
-        .$(hamburgerIcon)
+
+    const chartHamburgerIcon = $(chart).$(hamburgerIcon);
+    $(chartHamburgerIcon).waitForDisplayed({ timeout: timeout || 10000 });
+
+    $(chartHamburgerIcon)
         .$$('li')[1]
         .click();
 
@@ -620,8 +652,9 @@ function openGroupComparison(studyViewUrl, chartDataTest, timeout) {
     const groupComparisonTabId = browser
         .getWindowHandles()
         .find(id => id !== studyViewTabId);
+
     browser.switchToWindow(groupComparisonTabId);
-    waitForGroupComparisonTabOpen();
+    waitForGroupComparisonTabOpen(timeout);
 }
 
 function selectElementByText(text) {
@@ -632,6 +665,15 @@ function jq(selector) {
     return browser.execute(selector => {
         return jQuery(selector).toArray();
     }, selector);
+}
+
+function setServerConfiguration(serverConfig) {
+    browser.execute(function(_serverConfig) {
+        this.localStorage.setItem(
+            'frontendConfig',
+            JSON.stringify({ serverConfig: _serverConfig })
+        );
+    }, serverConfig);
 }
 
 var openAlterationTypeSelectionMenu = () => {
@@ -647,60 +689,75 @@ function strIsNumeric(str) {
     ); // ...and ensure strings of whitespace fail
 }
 
+function selectClinicalTabPlotType(type) {
+    setDropdownOpen(
+        true,
+        '[data-test="plotTypeSelector"] .Select-arrow-zone',
+        '[data-test="plotTypeSelector"] .Select-menu',
+        "Couldn't open clinical tab chart type dropdown"
+    );
+    $(
+        `[data-test="plotTypeSelector"] .Select-option[aria-label="${type}"]`
+    ).click();
+}
+
 module.exports = {
-    checkElementWithElementHidden: checkElementWithElementHidden,
-    waitForPlotsTab: waitForPlotsTab,
-    waitForAndCheckPlotsTab: waitForAndCheckPlotsTab,
-    waitForStudyQueryPage: waitForStudyQueryPage,
-    waitForGeneQueryPage: waitForGeneQueryPage,
-    waitForOncoprint: waitForOncoprint,
-    waitForCoExpressionTab: waitForCoExpressionTab,
-    waitForPatientView: waitForPatientView,
-    waitForComparisonTab: waitForComparisonTab,
-    goToUrlAndSetLocalStorage: goToUrlAndSetLocalStorage,
-    goToUrlAndSetLocalStorageWithProperty: goToUrlAndSetLocalStorageWithProperty,
-    useExternalFrontend: useExternalFrontend,
-    useNetlifyDeployPreview: useNetlifyDeployPreview,
-    sessionServiceIsEnabled: sessionServiceIsEnabled,
-    waitForNumberOfStudyCheckboxes: waitForNumberOfStudyCheckboxes,
-    waitForNetworkQuiet: waitForNetworkQuiet,
-    getTextInOncoprintLegend: getTextInOncoprintLegend,
-    toStudyViewSummaryTab: toStudyViewSummaryTab,
-    toStudyViewClinicalDataTab: toStudyViewClinicalDataTab,
-    removeAllStudyViewFilters: removeAllStudyViewFilters,
-    waitForStudyViewSelectedInfo: waitForStudyViewSelectedInfo,
-    waitForStudyView: waitForStudyView,
-    waitForGroupComparisonTabOpen: waitForGroupComparisonTabOpen,
-    getTextFromElement: getTextFromElement,
-    getNumberOfStudyViewCharts: getNumberOfStudyViewCharts,
-    setOncoprintMutationsMenuOpen: setOncoprintMutationsMenuOpen,
-    getNthOncoprintTrackOptionsElements: getNthOncoprintTrackOptionsElements,
-    setInputText: setInputText,
-    pasteToElement: pasteToElement,
-    checkOncoprintElement: checkOncoprintElement,
-    executeInBrowser: executeInBrowser,
-    checkElementWithTemporaryClass: checkElementWithTemporaryClass,
-    checkElementWithMouseDisabled: checkElementWithMouseDisabled,
-    clickQueryByGeneButton: clickQueryByGeneButton,
-    clickModifyStudySelectionButton: clickModifyStudySelectionButton,
-    selectReactSelectOption: selectReactSelectOption,
-    reactSelectOption: reactSelectOption,
-    getReactSelectOptions: getReactSelectOptions,
+    checkElementWithElementHidden,
+    waitForPlotsTab,
+    waitForAndCheckPlotsTab,
+    waitForStudyQueryPage,
+    waitForGeneQueryPage,
+    waitForOncoprint,
+    waitForCoExpressionTab,
+    waitForPatientView,
+    waitForComparisonTab,
+    goToUrlAndSetLocalStorage,
+    goToUrlAndSetLocalStorageWithProperty,
+    useExternalFrontend,
+    useNetlifyDeployPreview,
+    sessionServiceIsEnabled,
+    waitForNumberOfStudyCheckboxes,
+    waitForNetworkQuiet,
+    getTextInOncoprintLegend,
+    toStudyViewSummaryTab,
+    toStudyViewClinicalDataTab,
+    removeAllStudyViewFilters,
+    waitForStudyViewSelectedInfo,
+    waitForStudyView,
+    waitForGroupComparisonTabOpen,
+    getTextFromElement,
+    getNumberOfStudyViewCharts,
+    setOncoprintMutationsMenuOpen,
+    getNthOncoprintTrackOptionsElements,
+    setInputText,
+    pasteToElement,
+    checkOncoprintElement,
+    executeInBrowser,
+    checkElementWithTemporaryClass,
+    checkElementWithMouseDisabled,
+    clickQueryByGeneButton,
+    clickModifyStudySelectionButton,
+    selectReactSelectOption,
+    reactSelectOption,
+    getReactSelectOptions,
     COEXPRESSION_TIMEOUT: 120000,
-    getSelectCheckedOptions: getSelectCheckedOptions,
-    selectCheckedOption: selectCheckedOption,
-    getOncoprintGroupHeaderOptionsElements: getOncoprintGroupHeaderOptionsElements,
-    showGsva: showGsva,
-    setSettingsMenuOpen: setSettingsMenuOpen,
-    setDropdownOpen: setDropdownOpen,
-    postDataToUrl: postDataToUrl,
-    getPortalUrlFromEnv: getPortalUrlFromEnv,
-    openGroupComparison: openGroupComparison,
-    selectElementByText: selectElementByText,
+    getSelectCheckedOptions,
+    selectCheckedOption,
+    getOncoprintGroupHeaderOptionsElements,
+    showGsva,
+    setSettingsMenuOpen,
+    setDropdownOpen,
+    postDataToUrl,
+    getPortalUrlFromEnv,
+    openGroupComparison,
+    selectElementByText,
     jsApiHover,
     jsApiClick,
     setCheckboxChecked,
     openAlterationTypeSelectionMenu,
     strIsNumeric,
     jq,
+    setServerConfiguration,
+    selectClinicalTabPlotType,
+    getElementByTestHandle,
 };

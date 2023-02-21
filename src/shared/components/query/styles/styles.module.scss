@@ -112,14 +112,6 @@ div.SelectedStudiesWindow {
         height: 28px;
     }
 
-    :global(.autosuggest) {
-        width: 200px;
-
-        input {
-            padding-right: 20px !important;
-        }
-    }
-
     :global(.Select-placeholder),
     :global(.Select--single) > :global(.Select-control .Select-value) {
         line-height: 28px !important;
@@ -191,9 +183,17 @@ div.SelectedStudiesWindow {
 
     div.cancerTypeListContainer,
     div.cancerStudyListContainer {
+        position: relative;
         overflow-y: scroll;
         overflow-x: auto;
         height: 100%;
+
+        .queryHelp {
+            position: absolute;
+            right: 25px;
+            top: 13px;
+            z-index: 100;
+        }
     }
 
     div.cancerStudyListContainer {

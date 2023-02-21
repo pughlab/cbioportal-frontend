@@ -3,7 +3,7 @@ import { observer } from 'mobx-react';
 import { observable, action, computed, makeObservable } from 'mobx';
 import { DownloadControls, DefaultTooltip } from 'cbioportal-frontend-commons';
 import autobind from 'autobind-decorator';
-import MultipleCategoryBarPlot from 'shared/components/plots/MultipleCategoryBarPlot';
+import MultipleCategoryBarPlot from 'pages/groupComparison/MultipleCategoryBarPlot';
 import ReactSelect from 'react-select';
 import OQLTextArea, {
     GeneBoxType,
@@ -21,10 +21,7 @@ import styles from './frequencyPlotStyles.module.scss';
 import { AlterationEnrichmentRow } from 'shared/model/AlterationEnrichmentRow';
 import { toConditionalPrecision } from 'shared/lib/NumberUtils';
 import { FormControl } from 'react-bootstrap';
-import {
-    GeneReplacement,
-    QueryStore,
-} from 'shared/components/query/QueryStore';
+import { GeneReplacement } from 'shared/components/query/QueryStore';
 import { EnrichmentsTableDataStore } from './EnrichmentsTableDataStore';
 
 export interface IGeneBarPlotProps {
@@ -337,7 +334,7 @@ interface IGeneSelectionProps {
 }
 
 @observer
-class GenesSelection extends React.Component<IGeneSelectionProps, {}> {
+export class GenesSelection extends React.Component<IGeneSelectionProps, {}> {
     static defaultProps: Partial<IGeneSelectionProps> = {
         maxNumberOfGenes: MAXIMUM_ALLOWED_GENES,
     };

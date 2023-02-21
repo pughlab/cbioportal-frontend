@@ -40,6 +40,14 @@
     }
 
     .tabAnchor_heatmaps {
+        display: none !important;
+    }
+
+    .helpWidget {
+        display: none;
+    }
+
+    .e2eHide {
         display: none;
     }
 }

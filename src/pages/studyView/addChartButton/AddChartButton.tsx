@@ -35,10 +35,12 @@ import SuccessBanner from '../infoBanner/SuccessBanner';
 import { serializeEvent, trackEvent } from '../../../shared/lib/tracking';
 import classNames from 'classnames';
 import GeneLevelSelection from './geneLevelSelection/GeneLevelSelection';
-import { deriveDisplayTextFromGenericAssayType } from 'pages/resultsView/plots/PlotsTabUtils';
 import GenericAssaySelection from './genericAssaySelection/GenericAssaySelection';
-import { makeGenericAssayOption } from 'shared/lib/GenericAssayUtils/GenericAssayCommonUtils';
-import { DataTypeConstants } from 'pages/resultsView/ResultsViewPageStore';
+import {
+    deriveDisplayTextFromGenericAssayType,
+    makeGenericAssayOption,
+} from 'shared/lib/GenericAssayUtils/GenericAssayCommonUtils';
+
 import { getInfoMessageForGenericAssayChart } from './AddChartButtonHelper';
 import classnames from 'classnames';
 import styles from './styles.module.scss';
@@ -46,6 +48,7 @@ import { openSocialAuthWindow } from 'shared/lib/openSocialAuthWindow';
 import { CustomChartData } from 'shared/api/session-service/sessionServiceModels';
 import ReactSelect from 'react-select';
 import { GenericAssayMeta } from 'cbioportal-ts-api-client';
+import { DataTypeConstants } from 'shared/constants';
 
 export interface IAddChartTabsProps {
     store: StudyViewPageStore;
@@ -152,13 +155,9 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
     readonly XvsYClinicalAttributes = remoteData({
         await: () => [this.props.store.chartClinicalAttributes],
         invoke: () => {
-            let attributes = this.props.store.chartClinicalAttributes.result!;
-            if (localStorage.getItem('XvsYCategorical') !== 'true') {
-                attributes = attributes.filter(attr => {
-                    return attr.datatype === 'NUMBER';
-                });
-            }
-            return Promise.resolve(attributes);
+            return Promise.resolve(
+                this.props.store.chartClinicalAttributes.result!
+            );
         },
         default: [],
     });
@@ -525,7 +524,7 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
                             this.selectedGenericAssayProfileIdByType.get(type)
                     )?.profileIds || [];
 
-                const entitityMap = molecularProfileIdsInType.reduce(
+                const entityMap = molecularProfileIdsInType.reduce(
                     (acc, profileId) => {
                         this.props.store.genericAssayEntitiesGroupedByProfileId.result![
                             profileId
@@ -537,8 +536,9 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
                     {} as { [stableId: string]: GenericAssayMeta }
                 );
 
-                const genericAssayEntityOptions = _.map(entitityMap, entity =>
-                    makeGenericAssayOption(entity, false)
+                const genericAssayEntityOptions = _.map(
+                    entityMap,
+                    makeGenericAssayOption
                 );
 
                 const shouldShowChartOptionTable =
@@ -569,6 +569,7 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
                             genericAssayEntityOptions={
                                 genericAssayEntityOptions
                             }
+                            entityMap={entityMap}
                             onChartSubmit={this.onGenericAssaySubmit}
                             onSelectGenericAssayProfile={profileId =>
                                 this.onSelectGenericAssayProfileByType(
@@ -732,7 +733,7 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
                 (attr1.datatype === 'NUMBER' && attr2.datatype === 'STRING') ||
                 (attr1.datatype === 'STRING' && attr2.datatype === 'NUMBER')
             ) {
-                text = 'Add violin plot table';
+                text = 'Add violin/box plot table';
                 type = 'violin';
 
                 if (attr1.datatype === 'STRING') {
@@ -796,7 +797,7 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
                     unmountOnHide={false}
                     activeTabId={this.activeId}
                     onTabClick={this.updateActiveId}
-                    className="addChartTabs mainTabs"
+                    className="addChartTabs menuTabs"
                 >
                     <MSKTab
                         key={0}
@@ -1058,8 +1059,8 @@ class AddChartTabs extends React.Component<IAddChartTabsProps, {}> {
                     <button
                         style={{
                             position: 'absolute',
-                            top: 14,
-                            right: 18,
+                            top: 10,
+                            right: 10,
                             zIndex: 2,
                         }}
                         className="btn btn-primary btn-xs"

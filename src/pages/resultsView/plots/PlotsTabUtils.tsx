@@ -22,13 +22,11 @@ import {
     Mutation,
     NumericGeneMolecularData,
     Sample,
-    StructuralVariant,
 } from 'cbioportal-ts-api-client';
-import {
-    capitalize,
-    remoteData,
-    stringListToIndexSet,
-} from 'cbioportal-frontend-commons';
+
+import { StructuralVariant } from 'cbioportal-ts-api-client';
+
+import { remoteData, stringListToIndexSet } from 'cbioportal-frontend-commons';
 import MobxPromiseCache from '../../../shared/lib/MobxPromiseCache';
 import { getSampleViewUrl, getStudySummaryUrl } from '../../../shared/api/urls';
 import _ from 'lodash';
@@ -42,12 +40,15 @@ import { BLACK, DEFAULT_GREY, LIGHT_GREY } from 'shared/lib/Colors';
 import { CoverageInformation } from '../../../shared/lib/GenePanelUtils';
 import { IBoxScatterPlotData } from '../../../shared/components/plots/BoxScatterPlot';
 import {
-    AlterationTypeConstants,
-    AnnotatedMutation,
     AnnotatedNumericGeneMolecularData,
     CustomDriverNumericGeneMolecularData,
-    DataTypeConstants,
 } from '../ResultsViewPageStore';
+import {
+    AlterationTypeConstants,
+    DataTypeConstants,
+    CLINICAL_ATTRIBUTE_FIELD_ENUM,
+} from 'shared/constants';
+
 import numeral from 'numeral';
 import GenesetMolecularDataCache from '../../../shared/cache/GenesetMolecularDataCache';
 import ClinicalDataCache, {
@@ -62,8 +63,6 @@ import {
     LegendDataWithId,
 } from '../../../shared/components/plots/PlotUtils';
 import { isSampleProfiledInMultiple } from '../../../shared/lib/isSampleProfiled';
-import Pluralize from 'pluralize';
-import { getServerConfig } from 'config/config';
 import { SpecialChartsUniqueKeyEnum } from 'pages/studyView/StudyViewUtils';
 import { ObservableMap } from 'mobx';
 import { toFixedWithoutTrailingZeros } from '../../../shared/lib/FormatUtils';
@@ -85,6 +84,7 @@ import {
     MUT_COLOR_TRUNC_PASSENGER,
 } from 'cbioportal-frontend-commons';
 import { getCategoryOrderByGenericAssayType } from 'shared/lib/GenericAssayUtils/GenericAssayCommonUtils';
+import { AnnotatedMutation } from 'shared/model/AnnotatedMutation';
 
 export const CLIN_ATTR_DATA_TYPE = 'clinical_attribute';
 export const GENESET_DATA_TYPE = 'GENESET_SCORE';
@@ -125,41 +125,6 @@ export const dataTypeDisplayOrder = [
     AlterationTypeConstants.PROTEIN_LEVEL,
     AlterationTypeConstants.METHYLATION,
 ];
-
-export function deriveDisplayTextFromGenericAssayType(
-    genericAssayType: string,
-    plural?: boolean
-) {
-    let derivedDisplayText = '';
-    const typewWithTextList = getServerConfig().generic_assay_display_text.split(
-        ','
-    );
-    const typeToTextDict = _.reduce(
-        typewWithTextList,
-        (acc, typewWithText) => {
-            const typeAndText = typewWithText.split(':');
-            if (typeAndText.length == 2) {
-                acc[typeAndText[0]] = typeAndText[1];
-            }
-            return acc;
-        },
-        {} as { [type: string]: string }
-    );
-    if (genericAssayType in typeToTextDict) {
-        derivedDisplayText = typeToTextDict[genericAssayType];
-    } else {
-        const textArray = genericAssayType.split('_');
-        const capitalizeTextArray = textArray.map(text =>
-            capitalize(text.toLowerCase())
-        );
-        derivedDisplayText = capitalizeTextArray.join(' ');
-    }
-
-    if (plural) {
-        return Pluralize.plural(derivedDisplayText);
-    }
-    return derivedDisplayText;
-}
 
 export function sortMolecularProfilesForDisplay(profiles: MolecularProfile[]) {
     if (!profiles.length) {
@@ -2552,13 +2517,16 @@ export function logScalePossibleForProfile(profileId: string) {
     return !/zscore/i.test(profileId) && /rna_seq/i.test(profileId);
 }
 
-export function logScalePossible(axisSelection: AxisMenuSelection) {
-    if (axisSelection.dataType === CLIN_ATTR_DATA_TYPE) {
-        // clinical attribute
-        return (
-            axisSelection.dataSourceId ===
-            SpecialChartsUniqueKeyEnum.MUTATION_COUNT
-        );
+export function logScalePossible(
+    axisSelection: AxisMenuSelection,
+    axisData?: IAxisData
+) {
+    if (
+        axisData &&
+        isNumberData(axisData) &&
+        !axisHasNegativeNumbers(axisData)
+    ) {
+        return true;
     } else if (
         isGenericAssaySelected(axisSelection) &&
         axisSelection.genericAssayDataType === DataTypeConstants.LIMITVALUE

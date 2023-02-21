@@ -15,7 +15,7 @@ import Helmet from 'react-helmet';
 
 import Loader from 'shared/components/loadingIndicator/LoadingIndicator';
 import { MSKTab, MSKTabs } from 'shared/components/MSKTabs/MSKTabs';
-import { convertToMutationMapperProps } from 'shared/components/mutationMapper/MutationMapperConfig';
+import { convertToMutationMapperProps } from 'shared/components/mutationMapper/MutationMapperServerConfig';
 import MutationMapperUserSelectionStore from 'shared/components/mutationMapper/MutationMapperUserSelectionStore';
 import { parseInput } from 'shared/lib/MutationInputParser';
 
@@ -705,7 +705,7 @@ export default class MutationMapperTool extends React.Component<
                 Genome build GRCh38 is currently in beta. Several annotation
                 sources displayed on the page might not have official GRCh38
                 support i.e.&nbsp;
-                <a href={ONCOKB_URL}>OncoKB</a>,&nbsp;
+                <a href={ONCOKB_URL}>OncoKB™</a>,&nbsp;
                 <a href={CIVIC_URL}>CIViC</a>,&nbsp;
                 <a href={CANCER_HOTSPOTS_URL}>Cancer Hotspots</a>,&nbsp;
                 <a href={MY_CANCER_GENOME_URL}>My Cancer Genome</a> and&nbsp;

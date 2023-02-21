@@ -6,19 +6,19 @@ import {
     GenericAnnotation,
     IAnnotation,
     USE_DEFAULT_PUBLIC_INSTANCE_FOR_ONCOKB,
-    oncoKbAnnotationSortValue,
 } from 'react-mutation-mapper';
-import { CancerStudy, StructuralVariant } from 'cbioportal-ts-api-client';
+import { oncoKbAnnotationSortValue } from 'oncokb-frontend-commons';
+import { CancerStudy } from 'cbioportal-ts-api-client';
 import { IAnnotationColumnProps } from 'shared/components/mutationTable/column/AnnotationColumnFormatter';
 import { CancerGene, IndicatorQueryResp } from 'oncokb-ts-api-client';
+import { RemoteData, IOncoKbData, OncoKbCardDataType } from 'cbioportal-utils';
 import {
-    RemoteData,
-    IOncoKbData,
-    generateQueryStructuralVariantId,
-    OncoKbCardDataType,
+    deriveStructuralVariantType,
     calculateOncoKbAvailableDataType,
-} from 'cbioportal-utils';
+    generateQueryStructuralVariantId,
+} from 'oncokb-frontend-commons';
 import AnnotationHeader from 'shared/components/mutationTable/column/annotation/AnnotationHeader';
+import { StructuralVariant } from 'cbioportal-ts-api-client';
 
 export default class AnnotationColumnFormatter {
     public static getData(
@@ -165,7 +165,8 @@ export default class AnnotationColumnFormatter {
             structuralVariantData[0].site2EntrezGeneId,
             uniqueSampleKeyToTumorType![
                 structuralVariantData[0].uniqueSampleKey
-            ]
+            ],
+            deriveStructuralVariantType(structuralVariantData[0])
         );
 
         if (oncoKbData.indicatorMap[id]) {

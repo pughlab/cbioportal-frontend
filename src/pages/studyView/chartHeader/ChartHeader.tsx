@@ -22,6 +22,7 @@ import { StudyViewPageStore } from 'pages/studyView/StudyViewPageStore';
 import { ISurvivalDescription } from 'pages/resultsView/survival/SurvivalDescriptionTable';
 import ComparisonVsIcon from 'shared/components/ComparisonVsIcon';
 import { getComparisonParamsForTable } from 'pages/studyView/StudyViewComparisonUtils';
+import { AppContext } from 'cbioportal-frontend-commons';
 
 export interface IChartHeaderProps {
     chartMeta: ChartMeta;
@@ -40,6 +41,8 @@ export interface IChartHeaderProps {
     toggleBoxPlot?: () => void;
     toggleViolinPlot?: () => void;
     toggleNAValue?: () => void;
+    isLeftTruncationAvailable?: boolean;
+    toggleSurvivalPlotLeftTruncation?: () => void;
     swapAxes?: () => void;
     hideLabel?: boolean;
     chartControls?: ChartControls;
@@ -75,6 +78,8 @@ export interface ChartControls {
     isShowNAChecked?: boolean;
     showNAToggle?: boolean;
     showSwapAxes?: boolean;
+    showSurvivalPlotLeftTruncationToggle?: boolean;
+    survivalPlotLeftTruncationChecked?: boolean;
 }
 
 @observer
@@ -259,6 +264,15 @@ export class ChartHeader extends React.Component<IChartHeaderProps, {}> {
                     </a>
                 );
         }
+    }
+
+    @computed get showDownload() {
+        return (
+            this.props.chartControls &&
+            this.props.downloadTypes &&
+            this.props.downloadTypes.length > 0 &&
+            this.context.showDownloadControls === true
+        );
     }
 
     @computed get menuItems() {
@@ -490,6 +504,39 @@ export class ChartHeader extends React.Component<IChartHeaderProps, {}> {
             );
         }
 
+        if (
+            this.props.chartControls &&
+            this.props.chartControls.showSurvivalPlotLeftTruncationToggle &&
+            this.props.toggleSurvivalPlotLeftTruncation
+        ) {
+            items.push(
+                <li>
+                    <a
+                        className="dropdown-item"
+                        onClick={this.props.toggleSurvivalPlotLeftTruncation}
+                    >
+                        <FlexAlignedCheckbox
+                            checked={
+                                !!(
+                                    this.props.chartControls &&
+                                    this.props.chartControls
+                                        .survivalPlotLeftTruncationChecked
+                                )
+                            }
+                            label={
+                                <span
+                                    style={{ marginTop: -3, paddingRight: 10 }}
+                                >
+                                    Left truncation
+                                </span>
+                            }
+                            style={{ marginTop: 1, marginBottom: -3 }}
+                        />
+                    </a>
+                </li>
+            );
+        }
+
         if (this.props.chartType === ChartTypeEnum.BAR_CHART) {
             items.push(
                 <li>
@@ -515,6 +562,11 @@ export class ChartHeader extends React.Component<IChartHeaderProps, {}> {
                             this.props.chartMeta
                         )}
                         updateCustomBins={this.props.store.updateCustomBins}
+                        onChangeBinMethod={this.props.store.updateBinMethod}
+                        onChangeBinsGeneratorConfig={
+                            this.props.store.updateGenerateBinsConfig
+                        }
+                        store={this.props.store}
                     />
                 </li>
             );
@@ -549,11 +601,7 @@ export class ChartHeader extends React.Component<IChartHeaderProps, {}> {
             }
         }
 
-        if (
-            this.props.chartControls &&
-            this.props.downloadTypes &&
-            this.props.downloadTypes.length > 0
-        ) {
+        if (this.showDownload) {
             const downloadSubmenuWidth = 70;
             items.push(
                 <li style={{ position: 'relative' }}>
@@ -821,3 +869,5 @@ export class ChartHeader extends React.Component<IChartHeaderProps, {}> {
         );
     }
 }
+
+ChartHeader.contextType = AppContext;

@@ -1,10 +1,13 @@
 import _ from 'lodash';
 import { SingleGeneQuery } from 'shared/lib/oql/oql-parser';
 import {
+    BinsGeneratorConfig,
     CancerStudy,
     ClinicalAttribute,
     ClinicalData,
+    ClinicalDataBin,
     ClinicalDataBinFilter,
+    ClinicalDataCollection,
     ClinicalDataCount,
     ClinicalDataMultiStudyFilter,
     DataFilterValue,
@@ -13,6 +16,7 @@ import {
     GeneFilterQuery,
     GenePanelData,
     GenericAssayData,
+    GenericAssayDataBin,
     GenericAssayDataMultipleStudyFilter,
     GenomicDataBin,
     GenomicDataCount,
@@ -33,6 +37,7 @@ import {
     XvsYScatterChart,
     XvsYChartSettings,
     XvsYViolinChart,
+    BinMethodOption,
 } from './StudyViewPageStore';
 import { StudyViewPageTabKeyEnum } from 'pages/studyView/StudyViewPageTabs';
 import { Layout } from 'react-grid-layout';
@@ -67,10 +72,6 @@ import {
     CNAProfilesEnum,
     StructuralVariantProfilesEnum,
 } from 'shared/components/query/QueryStoreUtils';
-import {
-    ClinicalDataBin,
-    GenericAssayDataBin,
-} from 'cbioportal-ts-api-client/dist/generated/CBioPortalAPIInternal';
 import { ChartOption } from './addChartButton/AddChartButton';
 import { observer } from 'mobx-react';
 import {
@@ -113,8 +114,10 @@ export enum SpecialChartsUniqueKeyEnum {
     CASE_LISTS_SAMPLE_COUNT = 'CASE_LISTS_SAMPLE_COUNT',
     PATIENT_TREATMENTS = 'PATIENT_TREATMENTS',
     PATIENT_TREATMENT_GROUPS = 'PATIENT_TREATMENT_GROUPS',
+    PATIENT_TREATMENT_TARGET = 'PATIENT_TREATMENT_TARGET',
     SAMPLE_TREATMENTS = 'SAMPLE_TREATMENTS',
     SAMPLE_TREATMENT_GROUPS = 'SAMPLE_TREATMENT_GROUPS',
+    SAMPLE_TREATMENT_TARGET = 'SAMPLE_TREATMENT_TARGET',
 }
 
 export type AnalysisGroup = {
@@ -965,7 +968,11 @@ export function isFiltered(
             (!filter.patientTreatmentGroupFilters ||
                 _.isEmpty(filter.patientTreatmentGroupFilters.filters)) &&
             (!filter.sampleTreatmentGroupFilters ||
-                _.isEmpty(filter.sampleTreatmentGroupFilters.filters)))
+                _.isEmpty(filter.sampleTreatmentGroupFilters.filters)) &&
+            (!filter.patientTreatmentTargetFilters ||
+                _.isEmpty(filter.patientTreatmentTargetFilters.filters)) &&
+            (!filter.sampleTreatmentTargetFilters ||
+                _.isEmpty(filter.sampleTreatmentTargetFilters.filters)))
     );
 
     if (filter.sampleIdentifiersSet) {
@@ -1153,6 +1160,7 @@ export function generateNumericalData(numericalBins: DataBin[]): BarDatum[] {
             // no need to add 1 (no interval needed for the previous value)
             if (
                 index - 1 > -1 &&
+                numericalBins[index - 1].start !== undefined &&
                 numericalBins[index - 1].start !== numericalBins[index - 1].end
             ) {
                 x++;
@@ -1581,7 +1589,11 @@ export function intervalFiltersDisplayValue(
             intervalDisplayValues.push(`≤ `);
             intervalDisplayValues.push(endText);
         } else if (end === undefined) {
-            intervalDisplayValues.push(`> `);
+            if (numericals[0].start === numericals[0].end) {
+                intervalDisplayValues.push(`≥ `);
+            } else {
+                intervalDisplayValues.push(`> `);
+            }
             intervalDisplayValues.push(startText);
         } else if (start === end) {
             intervalDisplayValues.push(startEqualsEndText);
@@ -2628,9 +2640,9 @@ export function getChartSettingsMap(
     clinicalDataBinFilterSet: {
         [uniqueId: string]: ClinicalDataBinFilter & { showNA?: boolean };
     },
-    filterMutatedGenesTableByCancerGenes: boolean = true,
-    filterSVGenesTableByCancerGenes: boolean = true,
-    filterCNAGenesTableByCancerGenes: boolean = true,
+    filterMutatedGenesTableByCancerGenes: boolean = false,
+    filterSVGenesTableByCancerGenes: boolean = false,
+    filterCNAGenesTableByCancerGenes: boolean = false,
     gridLayout?: ReactGridLayout.Layout[]
 ) {
     if (!gridLayout) {
@@ -2909,58 +2921,6 @@ export function getFilteredAndCompressedDataIntervalFilters(
     return { start, end } as any;
 }
 
-export async function getClinicalDataBySamples(samples: Sample[]) {
-    let clinicalData: {
-        [sampleId: string]: { [attributeId: string]: string };
-    } = {};
-
-    let sampleClinicalData = await defaultClient.fetchClinicalDataUsingPOST({
-        clinicalDataType: 'SAMPLE',
-        clinicalDataMultiStudyFilter: {
-            identifiers: _.map(samples, sample => {
-                return {
-                    entityId: sample.sampleId,
-                    studyId: sample.studyId,
-                };
-            }),
-        } as ClinicalDataMultiStudyFilter,
-    });
-
-    _.forEach(sampleClinicalData, item => {
-        clinicalData[item.uniqueSampleKey] = {
-            ...(clinicalData[item.uniqueSampleKey] || {}),
-            [item.clinicalAttributeId]: item.value,
-        };
-    });
-
-    let patientClinicalData = await defaultClient.fetchClinicalDataUsingPOST({
-        clinicalDataType: ClinicalDataTypeEnum.PATIENT,
-        clinicalDataMultiStudyFilter: {
-            identifiers: _.map(samples, sample => {
-                return {
-                    entityId: sample.patientId,
-                    studyId: sample.studyId,
-                };
-            }),
-        } as ClinicalDataMultiStudyFilter,
-    });
-
-    const patientSamplesMap = _.groupBy(
-        samples,
-        sample => sample.uniquePatientKey
-    );
-
-    _.forEach(patientClinicalData, item => {
-        (patientSamplesMap[item.uniquePatientKey] || []).forEach(sample => {
-            clinicalData[sample.uniqueSampleKey] = {
-                ...(clinicalData[sample.uniqueSampleKey] || {}),
-                [item.clinicalAttributeId]: item.value,
-            };
-        });
-    });
-    return clinicalData;
-}
-
 export function updateSavedUserPreferenceChartIds(
     chartSettings: ChartUserSetting[]
 ): ChartUserSetting[] {
@@ -3007,6 +2967,87 @@ export function updateSavedUserPreferenceChartIds(
         });
     }
     return chartSettings;
+}
+
+export async function getAllClinicalDataByStudyViewFilter(
+    studyViewFilter: StudyViewFilter
+): Promise<{ [sampleId: string]: { [attributeId: string]: string } }> {
+    const localClinicalDataCollection: ClinicalDataCollection = {
+        sampleClinicalData: [],
+        patientClinicalData: [],
+    };
+    let remoteClinicalDataCollection: ClinicalDataCollection = {
+        sampleClinicalData: [],
+        patientClinicalData: [],
+    };
+
+    const maxPageSize = 500000;
+    let pageNumber = 0;
+
+    do {
+        const remoteClinicalDataCollection = await internalClient.fetchClinicalDataClinicalTableUsingPOST(
+            {
+                studyViewFilter,
+                pageSize: maxPageSize,
+                pageNumber: pageNumber,
+                searchTerm: undefined,
+                sortBy: undefined,
+                direction: 'ASC',
+            }
+        );
+        localClinicalDataCollection.sampleClinicalData = localClinicalDataCollection.sampleClinicalData.concat(
+            remoteClinicalDataCollection.sampleClinicalData
+        );
+        localClinicalDataCollection.patientClinicalData = localClinicalDataCollection.patientClinicalData.concat(
+            remoteClinicalDataCollection.patientClinicalData
+        );
+        pageNumber++;
+    } while (remoteClinicalDataCollection.sampleClinicalData.length > 0);
+
+    return mergeClinicalDataCollection(localClinicalDataCollection);
+}
+
+export function mergeClinicalDataCollection(
+    clinicalDataCollection: ClinicalDataCollection
+): { [sampleId: string]: { [attributeId: string]: string } } {
+    const patientKeyedSampleData = _.groupBy(
+        clinicalDataCollection.sampleClinicalData,
+        d => d.uniquePatientKey
+    );
+    let patientKeyedSampleKeyedData = _.mapValues(
+        patientKeyedSampleData,
+        sampleData => _.groupBy(sampleData, d => d.uniqueSampleKey)
+    );
+    const patientKeyedPatientData = _.groupBy(
+        clinicalDataCollection.patientClinicalData,
+        d => d.uniquePatientKey
+    );
+    // Add patient level clinical data to sample clinical data.
+    patientKeyedSampleKeyedData = _.mapValues(
+        patientKeyedSampleKeyedData,
+        (sampleKeyedData, patientId) =>
+            _.mapValues(sampleKeyedData, (attrs, sampleId) =>
+                attrs.concat(patientKeyedPatientData[patientId] || [])
+            )
+    );
+    // Remove patient id levels (only keep sample id keys).
+    const sampleKeyedData = _.assign(
+        {},
+        ..._.values(patientKeyedSampleKeyedData)
+    );
+    // Put all clinical attributes in one object.
+    const sampleCollapsedAttributes = _.mapValues(
+        sampleKeyedData,
+        clinicalData => {
+            const data = _.map(clinicalData, (datum: ClinicalData) => {
+                const obj: { [attrId: string]: string } = {};
+                obj[datum.clinicalAttributeId] = datum.value;
+                return obj;
+            });
+            return _.assign({}, ...data);
+        }
+    );
+    return sampleCollapsedAttributes;
 }
 
 export function convertClinicalDataBinsToDataBins(
@@ -3494,6 +3535,23 @@ export function statusFilterActive(
     );
 }
 
+export function findInvalidMolecularProfileIds(
+    filters: StudyViewFilter,
+    molecularProfiles: MolecularProfile[]
+): string[] {
+    const molecularProfilesInFilters = _(
+        filters.geneFilters?.map(f => f.molecularProfileIds)
+    )
+        .flatten()
+        .uniq()
+        .value();
+
+    return _.difference(
+        molecularProfilesInFilters,
+        molecularProfiles.map(p => p.molecularProfileId)
+    );
+}
+
 export function getFilteredMolecularProfilesByAlterationType(
     studyIdToMolecularProfiles: { [studyId: string]: MolecularProfile[] },
     alterationType: string,
@@ -3508,7 +3566,7 @@ export function getFilteredMolecularProfilesByAlterationType(
                         profile.molecularAlterationType === alterationType;
                     if (!_.isEmpty(allowedDataTypes)) {
                         isFiltered =
-                            isFiltered ||
+                            isFiltered &&
                             allowedDataTypes!.includes(profile.datatype);
                     }
                     return isFiltered;
@@ -3559,6 +3617,42 @@ export function getUserGroupColor(
         : undefined;
 }
 
+export function getRangeFromDataBins(bins: DataFilterValue[]) {
+    const numericals = bins.filter(
+        value => value.start !== undefined || value.end !== undefined
+    );
+
+    if (numericals.length === 0) {
+        return undefined;
+    }
+
+    // merge numericals into one interval
+    const min = numericals[0].start;
+    const max = numericals[numericals.length - 1].end;
+
+    return {
+        min,
+        max,
+    };
+
+    /*const allNumericals = bins.filter(
+        bin => bin.start !== undefined || bin.end !== undefined
+    );
+
+    const binBounds = _.chain(allNumericals)
+        .flatMap(bin => [bin.start, bin.end]) // put starts and ends into a list
+        .filter(x => x !== undefined && x !== null)
+        .value() as number[]; // get rid of any non-numbers;
+
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const b of binBounds) {
+        min = Math.min(b, min);
+        max = Math.max(b, max);
+    }
+    return {min, max};*/
+}
+
 export async function updateCustomIntervalFilter(
     newRange: { start?: number; end?: number },
     chartMeta: Pick<ChartMeta, 'uniqueKey'>,
@@ -3566,7 +3660,12 @@ export async function updateCustomIntervalFilter(
         chartMeta: Pick<ChartMeta, 'uniqueKey'>
     ) => MobxPromise<DataBin[]>,
     getCurrentFilters: (chartUniqueKey: string) => DataFilterValue[],
-    updateCustomBins: (chartUniqueKey: string, bins: number[]) => void,
+    updateCustomBins: (
+        chartUniqueKey: string,
+        bins: number[],
+        binMethod: 'MEDIAN' | 'QUARTILE' | 'CUSTOM' | 'GENERATE',
+        generateBinsConfig?: BinsGeneratorConfig
+    ) => void,
     updateIntervalFilters: (uniqueKey: string, bins: DataBin[]) => void
 ) {
     /* This function does what is necessary in order to set a custom range to filter a numerical attribute.
@@ -3596,7 +3695,15 @@ export async function updateCustomIntervalFilter(
         .value() as number[];
 
     // Invoke the given callback to update the custom bins
-    updateCustomBins(chartMeta.uniqueKey, newBinBounds);
+    updateCustomBins(
+        chartMeta.uniqueKey,
+        newBinBounds,
+        BinMethodOption.CUSTOM,
+        {
+            anchorValue: 0,
+            binSize: 0,
+        }
+    );
 
     // Now, we will use the custom bins to define the new filter.
     // First, wait for the new bins to come back from the server.
@@ -3689,11 +3796,20 @@ export function isQueriedStudyAuthorized(study: CancerStudy) {
 
 export function excludeFiltersForAttribute(
     filters: StudyViewFilter,
-    clinicalAttributeId: string
+    clinicalAttributeId: string | string[]
 ) {
     let { clinicalDataFilters, ...rest } = filters;
+    const clinicalAttributeIds = new Set();
+    if (typeof clinicalAttributeId === 'string') {
+        clinicalAttributeIds.add(clinicalAttributeId);
+    } else {
+        for (const id of clinicalAttributeId) {
+            clinicalAttributeIds.add(id);
+        }
+    }
+
     clinicalDataFilters = clinicalDataFilters?.filter(
-        f => f.attributeId !== clinicalAttributeId
+        f => !clinicalAttributeIds.has(f.attributeId)
     );
     return { clinicalDataFilters, ...rest };
 }

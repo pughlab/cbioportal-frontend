@@ -2,7 +2,7 @@
 
 export { default as CheckedSelect } from './components/checkedSelect/CheckedSelect';
 export * from './components/checkedSelect/CheckedSelectUtils';
-export { default as Checklist } from './components/checkedSelect/Checklist';
+export { default as BadgeListSelector } from './components/checkedSelect/BadgeListSelector';
 export {
     default as DefaultTooltip,
     placeArrowBottomLeft,
@@ -59,3 +59,4 @@ export * from './theme/cBioPortalTheme';
 export { default as TruncatedText } from './components/truncatedText/TruncatedText';
 export * from './lib/hashString';
 export * from './lib/getColor';
+export * from './components/appContext/AppContext';

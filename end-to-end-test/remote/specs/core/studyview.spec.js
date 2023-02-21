@@ -74,7 +74,7 @@ describe('study laml_tcga tests', () => {
             timeout: WAIT_FOR_VISIBLE_TIMEOUT,
         });
         waitForNetworkQuiet();
-        const res = browser.checkElement('#mainColumn');
+        const res = checkElementWithMouseDisabled('#mainColumn');
         assertScreenShotMatch(res);
     });
 
@@ -326,7 +326,7 @@ describe('check the filters are working properly', () => {
 // This needs to be done separately due to leak of data in the other tests
 describe('check the fusion filter is working properly', () => {
     before(function() {
-        const url = `${CBIOPORTAL_URL}/study/summary?id=es_dfarber_broad_2014&filters=%7B%22geneFilters%22%3A%5B%7B%22molecularProfileIds%22%3A%5B%22es_dfarber_broad_2014_fusion%22%5D%2C%22geneQueries%22%3A%5B%5B%22FLI1%22%5D%5D%7D%5D%7D`;
+        const url = `${CBIOPORTAL_URL}/study/summary?id=es_dfarber_broad_2014&filters=%7B%22geneFilters%22%3A%5B%7B%22molecularProfileIds%22%3A%5B%22es_dfarber_broad_2014_structural_variants%22%5D%2C%22geneQueries%22%3A%5B%5B%22FLI1%22%5D%5D%7D%5D%7D`;
         goToUrlAndSetLocalStorage(url);
         waitForNetworkQuiet(60000);
     });
@@ -544,7 +544,7 @@ describe('study view tcga pancancer atlas tests', () => {
         const url = `${CBIOPORTAL_URL}/study?id=laml_tcga_pan_can_atlas_2018%2Cacc_tcga_pan_can_atlas_2018%2Cblca_tcga_pan_can_atlas_2018%2Clgg_tcga_pan_can_atlas_2018%2Cbrca_tcga_pan_can_atlas_2018%2Ccesc_tcga_pan_can_atlas_2018%2Cchol_tcga_pan_can_atlas_2018%2Ccoadread_tcga_pan_can_atlas_2018%2Cdlbc_tcga_pan_can_atlas_2018%2Cesca_tcga_pan_can_atlas_2018%2Cgbm_tcga_pan_can_atlas_2018%2Chnsc_tcga_pan_can_atlas_2018%2Ckich_tcga_pan_can_atlas_2018%2Ckirc_tcga_pan_can_atlas_2018%2Ckirp_tcga_pan_can_atlas_2018%2Clihc_tcga_pan_can_atlas_2018%2Cluad_tcga_pan_can_atlas_2018%2Clusc_tcga_pan_can_atlas_2018%2Cmeso_tcga_pan_can_atlas_2018%2Cov_tcga_pan_can_atlas_2018%2Cpaad_tcga_pan_can_atlas_2018%2Cpcpg_tcga_pan_can_atlas_2018%2Cprad_tcga_pan_can_atlas_2018%2Csarc_tcga_pan_can_atlas_2018%2Cskcm_tcga_pan_can_atlas_2018%2Cstad_tcga_pan_can_atlas_2018%2Ctgct_tcga_pan_can_atlas_2018%2Cthym_tcga_pan_can_atlas_2018%2Cthca_tcga_pan_can_atlas_2018%2Cucs_tcga_pan_can_atlas_2018%2Cucec_tcga_pan_can_atlas_2018%2Cuvm_tcga_pan_can_atlas_2018`;
         goToUrlAndSetLocalStorage(url);
         toStudyViewSummaryTab();
-        waitForNetworkQuiet();
+        waitForNetworkQuiet(30000);
     });
     it('tcga pancancer atlas page', () => {
         assertScreenShotMatch(checkElementWithMouseDisabled('#mainColumn'));
@@ -721,12 +721,10 @@ describe('submit genes to results view query', () => {
             waitForNetworkQuiet();
         });
         it('generic assay chart should be added in the summary tab', () => {
-            $(ADD_CHART_BUTTON).waitForDisplayed({
-                timeout: WAIT_FOR_VISIBLE_TIMEOUT,
+            $(ADD_CHART_BUTTON).waitForEnabled({
+                timeout: 60000,
             });
             $(ADD_CHART_BUTTON).click();
-
-            waitForNetworkQuiet();
 
             // Change to GENERIC ASSAY tab
             $(ADD_CHART_GENERIC_ASSAY_TAB).waitForDisplayed({

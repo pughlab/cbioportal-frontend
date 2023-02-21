@@ -140,7 +140,7 @@ th.reactable-header-sort-asc:after {
 
 .rc-tooltip {
     border-radius: $border-radius-base;
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.2);
+    box-shadow: $boxShadow;
     padding: 0;
     opacity: 1;
 
@@ -157,19 +157,43 @@ th.reactable-header-sort-asc:after {
     }
 }
 
+.menuTabs {
+    ul.nav {
+        margin: 0 auto;
+        display: flex;
+        background: $main-bg;
+
+        a {
+            font-size: $font-size-small;
+            padding: 5px 8px;
+        }
+        li {
+            white-space: nowrap;
+            margin-bottom: -2px;
+        }
+    }
+
+    .tab-content {
+        min-height: 100px !important;
+        padding: 10px 0 10px 0 !important;
+        .msk-tab {
+            padding-left: 10px !important;
+            padding-right: 10px !important;
+            margin: 0 auto;
+        }
+    }
+}
+
 .secondaryNavigation {
-    > div,
     > ul {
-        border-bottom: none !important;
         margin-top: -19px;
         padding-left: 20px;
         margin-left: -20px;
+        margin-right: -20px;
     }
 
-    > ul,
-    > div {
-        margin-right: -20px;
-        box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.08);
+    > ul.nav {
+        border-bottom: 1px solid $borderColor;
     }
 
     li {
@@ -187,7 +211,6 @@ th.reactable-header-sort-asc:after {
 
         &.active a {
             border-bottom: 2px solid $brand-primary !important;
-            padding-bottom: 6px !important;
         }
     }
 
@@ -229,6 +252,11 @@ th.reactable-header-sort-asc:after {
     .msk-tab {
         margin-top: 10px;
     }
+}
+
+.comparisonMutationMapperTabs {
+    height: 0;
+    padding-top: 5px;
 }
 
 .mainTabs {
@@ -543,7 +571,7 @@ h3.hr {
         border-radius: $border-radius-base;
         box-shadow: 0 2px 3px rgba(0, 0, 0, 0.2);
         div:last-child {
-            white-space: nowrap;
+            white-space: normal;
         }
 
         p {
@@ -664,8 +692,68 @@ h6.blackHeader {
     white-space: nowrap;
 }
 
+.nomouse {
+    pointer-events: none;
+}
+
 h2.divider {
     margin: 40px 0 !important;
     padding-bottom: 10px;
     border-bottom: 1px solid $borderColor;
+}
+
+.myoverlay {
+    position: fixed;
+    top: 0;
+    z-index: 10000;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.5);
+
+    .myclose {
+        position: absolute;
+        top: 5px;
+        right: 12px;
+        z-index: 200;
+
+        button {
+            cursor: pointer;
+        }
+    }
+
+    .modal-iframe {
+        z-index: 100;
+        margin: 0px;
+        position: absolute;
+        top: 0px;
+        bottom: 0px;
+        left: 0px;
+        right: 0px;
+        height: 100%;
+        width: 100%;
+        padding: 30px 10px 10px 10px;
+    }
+}
+
+.displayFlex {
+    display: flex;
+}
+
+// igv overrides
+.igv-ui-popover {
+    border: 1px solid $borderColor;
+    padding: 5px;
+    box-shadow: $boxShadow;
+
+    > div:first-child {
+        background: none;
+        border: none;
+        height: 1px;
+        svg {
+            position: relative;
+            top: 2px;
+            right: -4px;
+        }
+    }
 }

@@ -8,7 +8,7 @@ import OncoprintControls, {
 } from 'shared/components/oncoprint/controls/OncoprintControls';
 import { percentAltered } from '../../../../shared/components/oncoprint/OncoprintUtils';
 import { getServerConfig } from 'config/config';
-import OncoprintJS from 'oncoprintjs';
+import { OncoprintJS } from 'oncoprintjs';
 import fileDownload from 'react-file-download';
 import { FadeInteraction, svgToPdfDownload } from 'cbioportal-frontend-commons';
 import classNames from 'classnames';
@@ -99,21 +99,11 @@ export default class Oncoprinter extends React.Component<
             get annotateDriversOncoKbError() {
                 return self.props.store.didOncoKbFail;
             },
-            get annotateDriversCBioPortal() {
-                return self.props.store.driverAnnotationSettings
-                    .cbioportalCount;
-            },
             get hidePutativePassengers() {
                 return !self.props.store.driverAnnotationSettings.includeVUS;
             },
             get hideGermlineMutations() {
                 return self.props.store.hideGermlineMutations;
-            },
-            get annotateCBioPortalInputValue() {
-                return (
-                    self.props.store.driverAnnotationSettings
-                        .cbioportalCountThreshold + ''
-                );
             },
             get sortByDrivers() {
                 return self.sortByDrivers;
@@ -141,6 +131,18 @@ export default class Oncoprinter extends React.Component<
                     return undefined;
                 }
             },
+            get isLoggedIn() {
+                // do nothing in oncoprinter mode:
+                return false;
+            },
+            get isClinicalTrackConfigDirty() {
+                // do nothing in oncoprinter mode:
+                return false;
+            },
+            get isSessionServiceEnabled() {
+                // do nothing in oncoprinter mode:
+                return false;
+            },
         });
     }
 
@@ -156,12 +158,6 @@ export default class Oncoprinter extends React.Component<
     @autobind
     onMouseLeave() {
         this.mouseInsideBounds = false;
-    }
-
-    @action
-    public setAnnotateCBioPortalInputValue(value: string) {
-        this.controlsHandlers.onChangeAnnotateCBioPortalInputValue &&
-            this.controlsHandlers.onChangeAnnotateCBioPortalInputValue(value);
     }
 
     private buildControlsHandlers() {
@@ -187,7 +183,6 @@ export default class Oncoprinter extends React.Component<
             onSelectDistinguishDrivers: action((s: boolean) => {
                 if (!s) {
                     this.props.store.driverAnnotationSettings.oncoKb = false;
-                    this.props.store.driverAnnotationSettings.cbioportalCount = false;
                     this.props.store.driverAnnotationSettings.customBinary = false;
                     this.props.store.driverAnnotationSettings.includeVUS = true;
                 } else {
@@ -198,26 +193,11 @@ export default class Oncoprinter extends React.Component<
                         this.props.store.driverAnnotationSettings.oncoKb = true;
                     }
 
-                    this.props.store.driverAnnotationSettings.cbioportalCount = true;
                     this.props.store.driverAnnotationSettings.customBinary = true;
                 }
             }),
             onSelectAnnotateOncoKb: action((s: boolean) => {
                 this.props.store.driverAnnotationSettings.oncoKb = s;
-            }),
-            onSelectAnnotateCBioPortal: action((s: boolean) => {
-                this.props.store.driverAnnotationSettings.cbioportalCount = s;
-            }),
-            /*onSelectAnnotateHotspots:action((s:boolean)=>{
-                this.props.store.driverAnnotationSettings.hotspots = s;
-            }),*/
-            onChangeAnnotateCBioPortalInputValue: action((s: string) => {
-                this.props.store.driverAnnotationSettings.cbioportalCountThreshold = parseInt(
-                    s,
-                    10
-                );
-                this.controlsHandlers.onSelectAnnotateCBioPortal &&
-                    this.controlsHandlers.onSelectAnnotateCBioPortal(true);
             }),
             onSelectCustomDriverAnnotationBinary: action((s: boolean) => {
                 this.props.store.driverAnnotationSettings.customBinary = s;
@@ -431,7 +411,7 @@ export default class Oncoprinter extends React.Component<
                             {this.alterationInfo}
                             <Oncoprint
                                 key={this.props.store.submitCount}
-                                oncoprintRef={this.oncoprintRef}
+                                broadcastOncoprintJsRef={this.oncoprintRef}
                                 clinicalTracks={this.props.store.clinicalTracks}
                                 geneticTracks={
                                     this.props.store.geneticTracks.result

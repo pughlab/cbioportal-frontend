@@ -49,10 +49,10 @@ export interface IServerConfig {
     genomenexus_url: string | null;
     genomenexus_url_grch38: string | null;
     genomenexus_website_url: string | null;
+    genomenexus_isoform_override_source: string;
     mygene_info_url: string | null;
     g2s_url: string | null;
     google_analytics_profile_id: string | null;
-    isoformOverrideSource: string;
     ptmSources: string[] | undefined;
     oncoprint_hide_vus_default: boolean;
     mycancergenome_show: boolean | undefined;
@@ -73,6 +73,7 @@ export interface IServerConfig {
     show_mutation_mapper_tool_grch38: boolean;
     show_transcript_dropdown: boolean;
     show_signal: boolean;
+    show_ndex: boolean;
     survival_initial_x_axis_limit: number;
     survival_show_p_q_values_in_survival_type_table: boolean;
     survival_min_group_threshold: number;
@@ -118,6 +119,7 @@ export interface IServerConfig {
     skin_title: string;
     skin_authorization_message: string | null;
     skin_patientview_filter_genes_profiled_all_samples: boolean;
+    skin_hide_download_controls: boolean;
     show_mdacc_heatmap: boolean;
     quick_search_enabled: boolean;
     default_cross_cancer_study_list: string; // this has a default
@@ -135,11 +137,13 @@ export interface IServerConfig {
     query_sets_of_genes: string | null;
     skin_quick_select_buttons: string | null;
     base_url: string | null;
-    user_email_address: string;
+    user_email_address: string; //Property to be completely replaced by user_display_name when backend PR #9986 is merged
+    user_display_name: string;
     sessionServiceEnabled: boolean;
     session_url_length_threshold: string;
     mskWholeSlideViewerToken: string;
     query_product_limit: number;
+    clinical_attribute_product_limit: number;
     dat_method: string;
     skin_show_gsva: boolean;
     skin_geneset_hierarchy_default_gsva_score: number;
@@ -149,7 +153,6 @@ export interface IServerConfig {
     oncokb_merge_icons_by_default: boolean;
     generic_assay_display_text: string; // this has a default
     saml_logout_local: boolean;
-    patient_view_use_legacy_timeline: boolean;
     installation_map_url: string;
     enable_request_body_gzip_compression: boolean;
     enable_treatment_groups: boolean;
@@ -157,4 +160,10 @@ export interface IServerConfig {
     skin_home_page_show_unauthorized_studies: boolean;
     skin_home_page_unauthorized_studies_global_message: string;
     skin_mutation_table_namespace_column_show_by_default: boolean;
+    skin_patient_view_mutation_table_columns_show_on_init: string;
+    skin_results_view_mutation_table_columns_show_on_init: string;
+    skin_patient_view_copy_number_table_columns_show_on_init: string;
+    skin_patient_view_structural_variant_table_columns_show_on_init: string;
+    comparison_categorical_na_values: string;
+    oncoprint_clinical_tracks_config_json: string;
 }

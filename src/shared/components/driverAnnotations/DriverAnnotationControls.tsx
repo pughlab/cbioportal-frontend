@@ -25,7 +25,7 @@ enum EVENT_KEY {
 export interface DriverAnnotationControlsProps {
     state: IDriverAnnotationControlsState;
     handlers: IDriverAnnotationControlsHandlers;
-    resultsView?: boolean;
+    showOnckbAnnotationControls?: boolean;
 }
 
 @observer
@@ -50,17 +50,6 @@ export default class DriverAnnotationControls extends React.Component<
                 this.props.handlers.onSelectAnnotateHotspots &&
                     this.props.handlers.onSelectAnnotateHotspots(
                         !this.props.state.annotateDriversHotspots
-                    );
-                break;
-            case EVENT_KEY.annotateCBioPortal:
-                this.props.handlers.onSelectAnnotateCBioPortal(
-                    !this.props.state.annotateDriversCBioPortal
-                );
-                break;
-            case EVENT_KEY.annotateCOSMIC:
-                this.props.handlers.onSelectAnnotateCOSMIC &&
-                    this.props.handlers.onSelectAnnotateCOSMIC(
-                        !this.props.state.annotateDriversCOSMIC
                     );
                 break;
             case EVENT_KEY.customDriverBinaryAnnotation:
@@ -104,7 +93,7 @@ export default class DriverAnnotationControls extends React.Component<
                     </label>
                 </div>
                 <div style={{ marginLeft: '20px' }}>
-                    {this.props.resultsView && (
+                    {this.props.showOnckbAnnotationControls && (
                         <span>
                             {!this.props.state
                                 .annotateDriversOncoKbDisabled && (
@@ -140,13 +129,13 @@ export default class DriverAnnotationControls extends React.Component<
                                         <DefaultTooltip
                                             overlay={
                                                 <span>
-                                                    Oncogenicity from OncoKB
+                                                    Oncogenicity from OncoKB™
                                                 </span>
                                             }
                                             placement="top"
                                         >
                                             <img
-                                                src={require('../../../rootImages/oncokb.png')}
+                                                src={require('oncokb-styles/dist/images/logo/oncokb.svg')}
                                                 style={{
                                                     maxHeight: '12px',
                                                     cursor: 'pointer',
@@ -244,69 +233,6 @@ export default class DriverAnnotationControls extends React.Component<
                                         </label>
                                     </div>
                                 )}
-                            {this.props.handlers
-                                .onChangeAnnotateCBioPortalInputValue && (
-                                <div className="checkbox">
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            value={EVENT_KEY.annotateCBioPortal}
-                                            checked={
-                                                this.props.state
-                                                    .annotateDriversCBioPortal
-                                            }
-                                            onClick={this.onInputClick}
-                                            data-test="annotateCBioPortalCount"
-                                        />
-                                        cBioPortal {'>'}=
-                                    </label>
-                                    <EditableSpan
-                                        value={
-                                            this.props.state
-                                                .annotateCBioPortalInputValue ||
-                                            ''
-                                        }
-                                        setValue={
-                                            this.props.handlers
-                                                .onChangeAnnotateCBioPortalInputValue
-                                        }
-                                        numericOnly={true}
-                                        textFieldAppearance={true}
-                                        maxChars={10}
-                                    />
-                                </div>
-                            )}
-                            {this.props.handlers
-                                .onChangeAnnotateCOSMICInputValue && (
-                                <div className="checkbox">
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            value={EVENT_KEY.annotateCOSMIC}
-                                            checked={
-                                                this.props.state
-                                                    .annotateDriversCOSMIC
-                                            }
-                                            onClick={this.onInputClick}
-                                            data-test="annotateCOSMICCount"
-                                        />
-                                        COSMIC {'>'}=
-                                    </label>
-                                    <EditableSpan
-                                        value={
-                                            this.props.state
-                                                .annotateCOSMICInputValue || ''
-                                        }
-                                        setValue={
-                                            this.props.handlers
-                                                .onChangeAnnotateCOSMICInputValue
-                                        }
-                                        numericOnly={true}
-                                        textFieldAppearance={true}
-                                        maxChars={10}
-                                    />
-                                </div>
-                            )}
                         </span>
                     )}
                     {!!this.props.state
@@ -330,7 +256,7 @@ export default class DriverAnnotationControls extends React.Component<
                                         .customDriverAnnotationBinaryMenuLabel
                                 }
                                 <img
-                                    src={require('../../../rootImages/driver.png')}
+                                    src={require('../../../rootImages/driver.svg')}
                                     alt="driver filter"
                                     style={{
                                         height: '15px',

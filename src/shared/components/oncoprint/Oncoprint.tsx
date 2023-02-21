@@ -1,5 +1,6 @@
 import * as React from 'react';
-import OncoprintJS, {
+import {
+    OncoprintJS,
     TrackId,
     CustomTrackOption,
     TrackGroupHeader,
@@ -14,12 +15,15 @@ import { transition } from './DeltaUtils';
 import _ from 'lodash';
 import {
     CustomDriverNumericGeneMolecularData,
-    AnnotatedMutation,
     ExtendedAlteration,
-    AnnotatedStructuralVariant,
 } from '../../../pages/resultsView/ResultsViewPageStore';
 import './styles.scss';
 import { ShapeParams } from 'oncoprintjs/dist/js/oncoprintshape';
+import { SpecialAttribute } from 'shared/cache/ClinicalDataCache';
+import {
+    AnnotatedMutation,
+    AnnotatedStructuralVariant,
+} from 'shared/model/AnnotatedMutation';
 
 export type CategoricalTrackDatum = {
     entity: string;
@@ -54,6 +58,8 @@ export type ClinicalTrackSpec = {
     na_legend_label?: string;
     na_tooltip_value?: string; // If given, then show a tooltip over NA columns that has this value
     custom_options?: CustomTrackOption[];
+    sortOrder?: string;
+    gapOn?: boolean;
 } & (
     | {
           datatype: 'counts';
@@ -73,6 +79,25 @@ export type ClinicalTrackSpec = {
           universal_rule_categories?: { [category: string]: any };
       }
 );
+
+export class ClinicalTrackConfig {
+    constructor(stableId: string | SpecialAttribute) {
+        this.stableId = stableId;
+    }
+    public stableId: string | SpecialAttribute;
+    public sortOrder: string | null = null;
+    public gapOn: boolean | null = null;
+}
+
+export type ClinicalTrackConfigChange = {
+    stableId?: string;
+    sortOrder?: string;
+    gapOn?: boolean;
+};
+
+export type ClinicalTrackConfigMap = {
+    [clinicalAttribute: string]: ClinicalTrackConfig;
+};
 
 export interface IBaseHeatmapTrackDatum {
     profile_data: number | null;
@@ -108,6 +133,7 @@ export type GeneticTrackDatum_Data = Pick<
     | 'driverTiersFilterAnnotation'
     | 'oncoKbOncogenic'
     | 'alterationSubType'
+    | 'alterationType'
     | 'value'
     | 'mutationType'
     | 'isHotspot'
@@ -220,7 +246,7 @@ export const GENETIC_TRACK_GROUP_INDEX = 1;
 export const CLINICAL_TRACK_GROUP_INDEX = 0;
 
 export interface IOncoprintProps {
-    oncoprintRef?: (oncoprint: OncoprintJS) => void;
+    broadcastOncoprintJsRef?: (oncoprint: OncoprintJS) => void;
 
     clinicalTracks: ClinicalTrackSpec[];
     geneticTracks: GeneticTrackSpec[];
@@ -272,6 +298,7 @@ export interface IOncoprintProps {
     onMinimapClose?: () => void;
     onDeleteClinicalTrack?: (key: string) => void;
     onTrackSortDirectionChange?: (trackId: TrackId, dir: number) => void;
+    onTrackGapChange?: (trackId: TrackId, gap: boolean) => void;
 
     suppressRendering?: boolean;
     onSuppressRendering?: () => void;
@@ -282,8 +309,10 @@ export interface IOncoprintProps {
 
 @observer
 export default class Oncoprint extends React.Component<IOncoprintProps, {}> {
-    private div: HTMLDivElement;
     public oncoprint: OncoprintJS | undefined;
+
+    private div: HTMLDivElement;
+    public oncoprintJs: OncoprintJS | undefined;
     private trackSpecKeyToTrackId: { [key: string]: TrackId };
     private lastTransitionProps: IOncoprintProps;
 
@@ -334,28 +363,28 @@ export default class Oncoprint extends React.Component<IOncoprintProps, {}> {
     }
 
     private refreshOncoprint(props: IOncoprintProps) {
-        const now = performance.now();
-        if (!this.oncoprint) {
+        const start = performance.now();
+        if (!this.oncoprintJs) {
             // instantiate new one
-            this.oncoprint = new OncoprintJS(
+            this.oncoprintJs = new OncoprintJS(
                 `#${props.divId}`,
                 props.width,
                 props.initParams
             );
-            this.oncoprint.setTrackGroupLegendOrder([
+            this.oncoprintJs.setTrackGroupLegendOrder([
                 GENETIC_TRACK_GROUP_INDEX,
                 CLINICAL_TRACK_GROUP_INDEX,
             ]);
-            (window as any).frontendOnc = this.oncoprint;
-            if (props.oncoprintRef) {
-                props.oncoprintRef(this.oncoprint);
+            (window as any).frontendOnc = this.oncoprintJs;
+            if (props.broadcastOncoprintJsRef) {
+                props.broadcastOncoprintJsRef(this.oncoprintJs);
             }
         }
-        if (!this.oncoprint.webgl_unavailable) {
+        if (!this.oncoprintJs.webgl_unavailable) {
             transition(
                 props,
                 this.lastTransitionProps || {},
-                this.oncoprint,
+                this.oncoprintJs,
                 () => this.trackSpecKeyToTrackId,
                 () => {
                     return this.props.molecularProfileIdToMolecularProfile;
@@ -363,7 +392,7 @@ export default class Oncoprint extends React.Component<IOncoprintProps, {}> {
             );
             this.lastTransitionProps = _.clone(props);
         }
-        console.log('oncoprint render time: ', performance.now() - now);
+        console.log('oncoprint render time: ', performance.now() - start);
     }
 
     componentWillReceiveProps(nextProps: IOncoprintProps) {
@@ -375,9 +404,9 @@ export default class Oncoprint extends React.Component<IOncoprintProps, {}> {
     }
 
     componentWillUnmount() {
-        if (this.oncoprint) {
-            this.oncoprint.destroy();
-            this.oncoprint = undefined;
+        if (this.oncoprintJs) {
+            this.oncoprintJs.destroy();
+            this.oncoprintJs = undefined;
         }
     }
 

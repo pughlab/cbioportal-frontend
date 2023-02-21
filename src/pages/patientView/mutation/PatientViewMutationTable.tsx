@@ -23,7 +23,9 @@ import { getDefaultExpectedAltCopiesColumnDefinition } from 'shared/components/m
 import { ASCNAttributes } from 'shared/enums/ASCNEnums';
 import AnnotationHeader from 'shared/components/mutationTable/column/annotation/AnnotationHeader';
 import _ from 'lodash';
-import { createNamespaceColumns } from 'shared/components/mutationTable/MutationTableUtils';
+import { createMutationNamespaceColumns } from 'shared/components/mutationTable/MutationTableUtils';
+import { getServerConfig } from 'config/config';
+import { adjustVisibility } from 'shared/components/alterationsTableUtils';
 
 export interface IPatientViewMutationTableProps extends IMutationTableProps {
     sampleManager: SampleManager | null;
@@ -36,7 +38,12 @@ export interface IPatientViewMutationTableProps extends IMutationTableProps {
     onSelectGenePanel?: (name: string) => void;
     disableTooltip?: boolean;
     existsSomeMutationWithAscnProperty: { [property: string]: boolean };
+    alleleFreqHeaderRender?: (name: string) => JSX.Element;
 }
+
+export const defaultAlleleFrequencyHeaderTooltip = (
+    <span>Variant allele frequency in the tumor sample</span>
+);
 
 export default class PatientViewMutationTable extends MutationTable<
     IPatientViewMutationTableProps
@@ -105,6 +112,7 @@ export default class PatientViewMutationTable extends MutationTable<
 
         this._columns[MutationTableColumnType.TUMOR_ALLELE_FREQ] = {
             name: 'Allele Freq',
+            headerRender: this.props.alleleFreqHeaderRender,
             render: (d: Mutation[]) =>
                 AlleleFreqColumnFormatter.renderFunction(
                     d,
@@ -117,7 +125,9 @@ export default class PatientViewMutationTable extends MutationTable<
                 ),
             download: (d: Mutation[]) =>
                 AlleleFreqColumnFormatter.getFrequency(d),
-            tooltip: <span>Variant allele frequency in the tumor sample</span>,
+            tooltip: this.props.alleleFreqHeaderRender
+                ? undefined
+                : defaultAlleleFrequencyHeaderTooltip,
             visible: AlleleFreqColumnFormatter.isVisible(
                 this.props.sampleManager,
                 this.props.dataStore
@@ -390,7 +400,7 @@ export default class PatientViewMutationTable extends MutationTable<
         };
 
         // generate namespace columns
-        const namespaceColumns = createNamespaceColumns(
+        const namespaceColumns = createMutationNamespaceColumns(
             this.props.namespaceColumns
         );
         _.forIn(
@@ -398,6 +408,16 @@ export default class PatientViewMutationTable extends MutationTable<
             (column: MutationTableColumn, columnName: string) => {
                 this._columns[columnName] = column;
             }
+        );
+
+        //Adjust column visibility according to portal.properties
+        adjustVisibility(
+            this._columns,
+            Object.keys(namespaceColumns),
+            getServerConfig()
+                .skin_patient_view_mutation_table_columns_show_on_init,
+            getServerConfig()
+                .skin_mutation_table_namespace_column_show_by_default
         );
     }
 

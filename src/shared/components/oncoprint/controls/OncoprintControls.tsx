@@ -28,13 +28,18 @@ import {
 import OQLTextArea, { GeneBoxType } from '../../GeneSelectionBox/OQLTextArea';
 import autobind from 'autobind-decorator';
 import { SingleGeneQuery } from '../../../lib/oql/oql-parser';
-import AddTracks from 'pages/resultsView/oncoprint/AddTracks';
+import TracksMenu from 'pages/resultsView/oncoprint/TracksMenu';
 import { GenericAssayTrackInfo } from 'pages/studyView/addChartButton/genericAssaySelection/GenericAssaySelection';
 import {
     IDriverAnnotationControlsHandlers,
     IDriverAnnotationControlsState,
 } from 'shared/alterationFiltering/AnnotationFilteringSettings';
 import DriverAnnotationControls from 'shared/components/driverAnnotations/DriverAnnotationControls';
+import { AppContext } from 'cbioportal-frontend-commons';
+import {
+    ClinicalTrackConfig,
+    ClinicalTrackConfigMap,
+} from 'shared/components/oncoprint/Oncoprint';
 
 export interface IOncoprintControlsHandlers
     extends IDriverAnnotationControlsHandlers {
@@ -62,7 +67,7 @@ export interface IOncoprintControlsHandlers
         type: 'pdf' | 'png' | 'svg' | 'order' | 'tabular' | 'oncoprinter'
     ) => void;
     onChangeSelectedClinicalTracks?: (
-        attributeIds: (string | SpecialAttribute)[]
+        trackConfigs: ClinicalTrackConfig[]
     ) => void;
     onClickAddGenesToHeatmap?: () => void;
     onSelectGenericAssayProfile?: (molecularProfileId: string) => void;
@@ -82,6 +87,9 @@ export interface IOncoprintControlsState
     onlyShowClinicalLegendForAlteredCases?: boolean;
     showOqlInLabels?: boolean;
     showMinimap: boolean;
+    isClinicalTrackConfigDirty: boolean;
+    isLoggedIn: boolean;
+    isSessionServiceEnabled: boolean;
     distinguishMutationType: boolean;
     distinguishGermlineMutations: boolean;
     sortByMutationType: boolean;
@@ -95,7 +103,7 @@ export interface IOncoprintControlsState
     clinicalAttributeSampleCountPromise?: MobxPromise<{
         [clinicalAttributeId: string]: number;
     }>;
-    selectedClinicalAttributeIds?: string[];
+    selectedClinicalAttributeSpecInits?: ClinicalTrackConfigMap;
     heatmapProfilesPromise?: MobxPromise<MolecularProfile[]>;
     genericAssayEntitiesGroupedByGenericAssayTypePromise?: MobxPromise<{
         [genericAssayType: string]: GenericAssayMeta[];
@@ -325,18 +333,6 @@ export default class OncoprintControls extends React.Component<
                         !this.props.state.annotateDriversHotspots
                     );
                 break;
-            case EVENT_KEY.annotateCBioPortal:
-                this.props.handlers.onSelectAnnotateCBioPortal &&
-                    this.props.handlers.onSelectAnnotateCBioPortal(
-                        !this.props.state.annotateDriversCBioPortal
-                    );
-                break;
-            case EVENT_KEY.annotateCOSMIC:
-                this.props.handlers.onSelectAnnotateCOSMIC &&
-                    this.props.handlers.onSelectAnnotateCOSMIC(
-                        !this.props.state.annotateDriversCOSMIC
-                    );
-                break;
             case EVENT_KEY.hidePutativePassengers:
                 this.props.handlers.onSelectHideVUS &&
                     this.props.handlers.onSelectHideVUS(
@@ -442,24 +438,6 @@ export default class OncoprintControls extends React.Component<
         ); // all genes valid
     }
 
-    @autobind
-    private onType(event: React.ChangeEvent<HTMLTextAreaElement>) {
-        switch ((event.target as HTMLTextAreaElement).name) {
-            case EVENT_KEY.annotateCBioPortalInput:
-                this.props.handlers.onChangeAnnotateCBioPortalInputValue &&
-                    this.props.handlers.onChangeAnnotateCBioPortalInputValue(
-                        event.target.value
-                    );
-                break;
-            case EVENT_KEY.annotateCOSMICInput:
-                this.props.handlers.onChangeAnnotateCOSMICInputValue &&
-                    this.props.handlers.onChangeAnnotateCOSMICInputValue(
-                        event.target.value
-                    );
-                break;
-        }
-    }
-
     @computed get heatmapProfileOptions() {
         if (
             this.props.state.heatmapProfilesPromise &&
@@ -485,10 +463,10 @@ export default class OncoprintControls extends React.Component<
         this.tabId = newId;
     }
 
-    private AddTracksMenu = observer(() => {
+    private tracksMenu = observer(() => {
         if (this.props.store) {
             return (
-                <AddTracks
+                <TracksMenu
                     store={this.props.store}
                     heatmapMenu={this.heatmapMenu}
                     handlers={this.props.handlers}
@@ -767,7 +745,7 @@ export default class OncoprintControls extends React.Component<
                                 } as Partial<IDriverAnnotationControlsHandlers>,
                                 this.props.handlers
                             )}
-                            resultsView={true}
+                            showOnckbAnnotationControls={true}
                         />
                     </div>
 
@@ -1069,7 +1047,7 @@ export default class OncoprintControls extends React.Component<
     });
 
     private DownloadMenu = observer(() => {
-        return (
+        return this.context.showDownloadControls === true ? (
             <CustomDropdown
                 bsStyle="default"
                 title="Download"
@@ -1126,7 +1104,7 @@ export default class OncoprintControls extends React.Component<
                     </button>
                 )}
             </CustomDropdown>
-        );
+        ) : null;
     });
 
     private HorzZoomControls = observer(() => {
@@ -1225,7 +1203,7 @@ export default class OncoprintControls extends React.Component<
         return (
             <div className="oncoprint__controls">
                 <ButtonGroup>
-                    <this.AddTracksMenu />
+                    <this.tracksMenu />
                     <this.SortMenu />
                     <this.MutationColorMenu />
                     <this.ViewMenu />
@@ -1242,3 +1220,5 @@ export default class OncoprintControls extends React.Component<
         );
     }
 }
+
+OncoprintControls.contextType = AppContext;

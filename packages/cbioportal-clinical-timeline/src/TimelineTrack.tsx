@@ -2,16 +2,17 @@ import {
     EventPosition,
     POINT_COLOR,
     POINT_RADIUS,
+    TimeLineColorGetter,
     TimelineEvent,
     TimelineTrackSpecification,
     TimelineTrackType,
 } from './types';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import _ from 'lodash';
 import {
+    colorGetterFactory,
     formatDate,
-    getAttributeValue,
-    getTrackEventColorGetter,
+    getTrackEventCustomColorGetterFromConfiguration,
     REMOVE_FOR_DOWNLOAD_CLASSNAME,
     TIMELINE_TRACK_HEIGHT,
 } from './lib/helpers';
@@ -23,7 +24,7 @@ import {
     getTicksForLineChartAxis,
     getTrackValueRange,
 } from './lib/lineChartAxisUtils';
-import { getColor } from 'cbioportal-frontend-commons';
+import { getBrowserWindow, getColor } from 'cbioportal-frontend-commons';
 import { getTrackLabel } from './TrackHeader';
 import {
     COLOR_ATTRIBUTE_KEY,
@@ -31,6 +32,7 @@ import {
     SHAPE_ATTRIBUTE_KEY,
 } from './renderHelpers';
 import ReactMarkdown from 'react-markdown';
+import { useLocalObservable, useLocalStore } from 'mobx-react-lite';
 
 export interface ITimelineTrackProps {
     trackData: TimelineTrackSpecification;
@@ -55,12 +57,12 @@ export function groupEventsByPosition(events: TimelineEvent[]) {
     });
 }
 
-export function renderSuperscript(number: number) {
+export function renderSuperscript(number: number, y: number = 0) {
     return (
-        <g transform={'translate(3 -8)'}>
+        <g transform={'translate(3 -18)'}>
             <text
                 x={1}
-                y={0}
+                y={y}
                 dy={'1em'}
                 className="noselect"
                 style={{
@@ -144,18 +146,10 @@ export function randomColorGetter(e: TimelineEvent) {
     return getColor(getTrackLabel(e.containingTrack));
 }
 
-function getSpecifiedColorIfExists(e: TimelineEvent) {
-    return getAttributeValue(COLOR_ATTRIBUTE_KEY, e);
-}
-
-const defaultColorGetter = function(e: TimelineEvent) {
-    return getSpecifiedColorIfExists(e) || POINT_COLOR;
-};
-
 export function renderPoint(
     events: TimelineEvent[],
     y: number,
-    eventColorGetter: (e: TimelineEvent) => string = defaultColorGetter
+    eventColorGetter?: TimeLineColorGetter
 ) {
     // When nested tracks are collapsed, we might see multiple events that are
     //  from different tracks. So let's check if all these events actually come
@@ -176,12 +170,19 @@ export function renderPoint(
         if (events.length > 1) {
             contents = (
                 <>
-                    {renderSuperscript(events.length)}
-                    {renderStack(events.map(eventColorGetter))}
+                    {renderSuperscript(events.length, y)}
+                    {renderStack(
+                        events.map(colorGetterFactory(eventColorGetter)),
+                        y
+                    )}
                 </>
             );
         } else {
-            contents = renderShape(events[0], y, eventColorGetter);
+            contents = renderShape(
+                events[0],
+                y,
+                colorGetterFactory(eventColorGetter)
+            );
         }
     }
 
@@ -191,7 +192,7 @@ export function renderPoint(
 function renderRange(
     pixelWidth: number,
     events: TimelineEvent[],
-    eventColorGetter: (e: TimelineEvent) => string = defaultColorGetter
+    eventColorGetter?: TimeLineColorGetter
 ) {
     const height = 5;
     return (
@@ -201,7 +202,7 @@ function renderRange(
             y={(TIMELINE_TRACK_HEIGHT - height) / 2}
             rx="2"
             ry="2"
-            fill={eventColorGetter(events[0])}
+            fill={colorGetterFactory(eventColorGetter)(events[0])}
         />
     );
 }
@@ -220,7 +221,12 @@ export const TimelineTrack: React.FunctionComponent<ITimelineTrackProps> = obser
         let eventsGroupedByPosition;
 
         if (trackData.items) {
+            // group events which occur on the same day offset
+            // so they can be "stacked"
             eventsGroupedByPosition = groupEventsByPosition(trackData.items);
+
+            // if this track has a custom sorting function
+            // configured for simultaneous events, employ it
             if (trackData.sortSimultaneousEvents) {
                 eventsGroupedByPosition = _.mapValues(
                     eventsGroupedByPosition,
@@ -246,6 +252,10 @@ export const TimelineTrack: React.FunctionComponent<ITimelineTrackProps> = obser
                 const isPoint = firstItem.start === firstItem.end;
 
                 if (isPoint) {
+                    // if this track has a getLineChartValue
+                    // configured for it, we use that function to obtain
+                    // a y value so that the point's can be represented and connected
+                    // as a line chart, with corresponding axis
                     const y = getPointY(
                         itemGroup,
                         trackData,
@@ -256,7 +266,9 @@ export const TimelineTrack: React.FunctionComponent<ITimelineTrackProps> = obser
                         content = renderPoint(
                             itemGroup,
                             y,
-                            getTrackEventColorGetter(trackData)
+                            getTrackEventCustomColorGetterFromConfiguration(
+                                trackData
+                            )
                         );
                         linePoints.push({
                             x: position ? position.pixelLeft : 0,
@@ -267,7 +279,9 @@ export const TimelineTrack: React.FunctionComponent<ITimelineTrackProps> = obser
                     content = renderRange(
                         position.pixelWidth,
                         itemGroup,
-                        getTrackEventColorGetter(trackData)
+                        getTrackEventCustomColorGetterFromConfiguration(
+                            trackData
+                        )
                     );
                 }
 
@@ -394,6 +408,45 @@ const TimelineItemWithTooltip: React.FunctionComponent<{
     );
 });
 
+export const OurPopup: React.FunctionComponent<any> = observer(function(
+    ...props
+) {
+    const store = useLocalObservable(() => ({
+        showModal: false,
+    }));
+
+    const showModal = useCallback(() => {
+        const $modal = $(`
+            <div class="myoverlay">
+                <div class="myclose"><button class="btn btn-xs">Open in New Window</button> <button class="btn btn-xs"><i class="fa fa-close"></i> Close</button> </div>
+                <iframe class="modal-iframe"></iframe>
+            </div>,
+        `)
+            .appendTo('body')
+            .on('keydown', function(event) {
+                if (event.key == 'Escape') {
+                    $modal.remove();
+                }
+            })
+            .on('click', function(e) {
+                if (/Open in New Window/.test(e.target.innerText)) {
+                    getBrowserWindow().open(props[0].href);
+                }
+                $modal.remove();
+            });
+
+        setTimeout(() => {
+            $modal.find('iframe').attr('src', props[0].href);
+        }, 500);
+    }, []);
+
+    return (
+        <>
+            <a onClick={showModal}>{props[0].children}</a>
+        </>
+    );
+});
+
 export const EventTooltipContent: React.FunctionComponent<{
     event: TimelineEvent;
 }> = function({ event }) {
@@ -418,6 +471,11 @@ export const EventTooltipContent: React.FunctionComponent<{
                                         <ReactMarkdown
                                             allowedElements={['p', 'a']}
                                             linkTarget={'_blank'}
+                                            components={{
+                                                a: ({ node, ...props }) => (
+                                                    <OurPopup {...props} />
+                                                ),
+                                            }}
                                         >
                                             {att.value}
                                         </ReactMarkdown>

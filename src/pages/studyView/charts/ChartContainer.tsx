@@ -28,6 +28,7 @@ import {
     ClinicalDataCountSummary,
     DataBin,
     getHeightByDimension,
+    getRangeFromDataBins,
     getTableHeightByDimension,
     getWidthByDimension,
     logScalePossible,
@@ -68,8 +69,8 @@ import {
     SURVIVAL_PLOT_X_LABEL_WITHOUT_EVENT_TOOLTIP,
     SURVIVAL_PLOT_Y_LABEL_TOOLTIP,
 } from 'pages/resultsView/survival/SurvivalUtil';
-import Timer = NodeJS.Timer;
 import StudyViewViolinPlotTable from 'pages/studyView/charts/violinPlotTable/StudyViewViolinPlotTable';
+import { PatientSurvival } from 'shared/model/PatientSurvival';
 
 export interface AbstractChart {
     toSVGDOMNode: () => Element;
@@ -90,8 +91,10 @@ const COMPARISON_CHART_TYPES: ChartType[] = [
     ChartTypeEnum.CNA_GENES_TABLE,
     ChartTypeEnum.SAMPLE_TREATMENTS_TABLE,
     ChartTypeEnum.SAMPLE_TREATMENT_GROUPS_TABLE,
+    ChartTypeEnum.SAMPLE_TREATMENT_TARGET_TABLE,
     ChartTypeEnum.PATIENT_TREATMENTS_TABLE,
     ChartTypeEnum.PATIENT_TREATMENT_GROUPS_TABLE,
+    ChartTypeEnum.PATIENT_TREATMENT_TARGET_TABLE,
     ChartTypeEnum.STRUCTURAL_VARIANT_GENES_TABLE,
 ];
 
@@ -159,6 +162,10 @@ export interface IChartContainerProps {
     genePanelCache: MobxPromiseCache<{ genePanelId: string }, GenePanel>;
     mutationFilterActive?: boolean;
     alterationFilterActive?: boolean;
+    isLeftTruncationAvailable?: boolean;
+    patientSurvivalsWithoutLeftTruncation?: PatientSurvival[];
+    onToggleSurvivalPlotLeftTruncation?: (chartMeta: ChartMeta) => void;
+    survivalPlotLeftTruncationChecked?: boolean;
 }
 
 @observer
@@ -217,6 +224,11 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
             }),
             onToggleNAValue: action(() => {
                 this.props.onToggleNAValue?.(this.props.chartMeta);
+            }),
+            onToggleSurvivalPlotLeftTruncation: action(() => {
+                this.props.onToggleSurvivalPlotLeftTruncation?.(
+                    this.props.chartMeta
+                );
             }),
             onSwapAxes: action(() => {
                 this.props.onSwapAxes?.(this.props.chartMeta);
@@ -315,6 +327,14 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                 controls = { showPieIcon: true };
                 break;
             }
+            case ChartTypeEnum.SURVIVAL: {
+                controls = {
+                    showSurvivalPlotLeftTruncationToggle: this.props
+                        .isLeftTruncationAvailable,
+                    survivalPlotLeftTruncationChecked: this.props
+                        .survivalPlotLeftTruncationChecked,
+                };
+            }
         }
         if (this.comparisonPagePossible) {
             controls.showComparisonPageIcon = true;
@@ -379,6 +399,7 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
         //   a rerender with delay
         if (
             this.props.promise.isComplete &&
+            this.props.store.survivalPlotDataById.isComplete &&
             this.props.patientToAnalysisGroup &&
             this.props.patientToAnalysisGroup.isComplete
         ) {
@@ -389,7 +410,9 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                 }
             );
             return makeSurvivalChartData(
-                survival.survivalData,
+                this.props.store.survivalPlotDataById.result[
+                    this.props.chartMeta.uniqueKey
+                ]?.survivalData,
                 this.props.analysisGroupsSettings.groups,
                 this.props.patientToAnalysisGroup!.result!
             );
@@ -834,6 +857,9 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                         <SurvivalChart
                             ref={this.handlers.ref}
                             sortedGroupedSurvivals={data.sortedGroupedSurvivals}
+                            patientSurvivalsWithoutLeftTruncation={
+                                this.props.patientSurvivalsWithoutLeftTruncation
+                            }
                             patientToAnalysisGroups={
                                 data.patientToAnalysisGroups
                             }
@@ -854,6 +880,20 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                             showDownloadButtons={false}
                             showSlider={false}
                             showTable={false}
+                            isLeftTruncationAvailable={
+                                this.props.isLeftTruncationAvailable
+                            }
+                            showLeftTruncationCheckbox={
+                                this.props.isLeftTruncationAvailable
+                            }
+                            isLeftTruncationChecked={
+                                this.props.survivalPlotLeftTruncationChecked
+                            }
+                            onToggleSurvivalPlotLeftTruncation={() =>
+                                this.props.onToggleSurvivalPlotLeftTruncation!(
+                                    this.props.chartMeta
+                                )
+                            }
                             styleOpts={{
                                 padding: {
                                     top: 15,
@@ -865,10 +905,14 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                                     this.props.dimension,
                                     this.borderWidth
                                 ),
-                                height: getHeightByDimension(
-                                    this.props.dimension,
-                                    this.chartHeaderHeight
-                                ),
+                                height:
+                                    getHeightByDimension(
+                                        this.props.dimension,
+                                        this.chartHeaderHeight
+                                    ) -
+                                    (this.props.isLeftTruncationAvailable
+                                        ? 35
+                                        : 0),
                                 tooltipXOffset: 10,
                                 tooltipYOffset: -58,
                                 pValue: {
@@ -898,6 +942,7 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                     return null;
                 }
             }
+            case ChartTypeEnum.SAMPLE_TREATMENT_TARGET_TABLE:
             case ChartTypeEnum.SAMPLE_TREATMENT_GROUPS_TABLE:
             case ChartTypeEnum.SAMPLE_TREATMENTS_TABLE: {
                 return () => (
@@ -936,6 +981,7 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                     />
                 );
             }
+            case ChartTypeEnum.PATIENT_TREATMENT_TARGET_TABLE:
             case ChartTypeEnum.PATIENT_TREATMENT_GROUPS_TABLE:
             case ChartTypeEnum.PATIENT_TREATMENTS_TABLE: {
                 return () => (
@@ -1034,14 +1080,22 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                 const chartInfo = this.props.store.getXvsYViolinChartInfo(
                     this.props.chartMeta!.uniqueKey
                 )!;
+                const violinFilter = (
+                    this.props.store.filters.clinicalDataFilters || []
+                ).find(
+                    x =>
+                        x.attributeId ===
+                        chartInfo.numericalAttr.clinicalAttributeId
+                );
                 return () => {
                     const isLoading =
-                        !this.props.store.clinicalDataBinPromises[
+                        (this.props.store.clinicalDataBinPromises[
                             chartInfo.numericalAttr.clinicalAttributeId
-                        ] ||
-                        this.props.store.clinicalDataBinPromises[
-                            chartInfo.numericalAttr.clinicalAttributeId
-                        ].isPending;
+                        ] &&
+                            this.props.store.clinicalDataBinPromises[
+                                chartInfo.numericalAttr.clinicalAttributeId
+                            ].isPending) ||
+                        this.props.promise.isPending;
                     return (
                         <StudyViewViolinPlotTable
                             dimension={this.props.dimension}
@@ -1056,13 +1110,17 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                             categoryColumnName={this.props.axisLabelX!}
                             violinColumnName={this.props.axisLabelY!}
                             violinBounds={{
-                                min: this.props.promise.result.axisStart,
-                                max: this.props.promise.result.axisEnd,
+                                min: this.props.promise.result.data.axisStart,
+                                max: this.props.promise.result.data.axisEnd,
                             }}
-                            rows={this.props.promise.result.rows || []}
+                            violinFilterRange={
+                                violinFilter &&
+                                getRangeFromDataBins(violinFilter.values)
+                            }
+                            rows={this.props.promise.result.data.rows || []}
                             showViolin={this.props.violinPlotChecked!}
                             showBox={this.props.boxPlotChecked!}
-                            logScale={chartSettings?.violinLogScale!}
+                            logScale={this.props.promise.result.violinLogScale}
                             setFilters={this.props.onValueSelection}
                             selectedCategories={this.props.selectedCategories!}
                             isLoading={isLoading}
@@ -1124,6 +1182,12 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                     toggleLogScaleY={this.handlers.onToggleLogScaleY}
                     toggleBoxPlot={this.handlers.onToggleBoxPlot}
                     toggleViolinPlot={this.handlers.onToggleViolinPlot}
+                    toggleSurvivalPlotLeftTruncation={
+                        this.handlers.onToggleSurvivalPlotLeftTruncation
+                    }
+                    isLeftTruncationAvailable={
+                        this.props.isLeftTruncationAvailable
+                    }
                     swapAxes={this.handlers.onSwapAxes}
                     toggleNAValue={this.handlers.onToggleNAValue}
                     chartControls={this.chartControls}

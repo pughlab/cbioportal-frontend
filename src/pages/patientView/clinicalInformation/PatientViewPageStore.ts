@@ -16,7 +16,6 @@ import {
     ResourceData,
     Sample,
     SampleMolecularIdentifier,
-    StructuralVariantFilter,
     GenericAssayData,
     GenericAssayMeta,
     GenericAssayDataMultipleStudyFilter,
@@ -25,13 +24,7 @@ import {
 import client from '../../../shared/api/cbioportalClientInstance';
 import internalClient from '../../../shared/api/cbioportalInternalClientInstance';
 import oncokbClient from '../../../shared/api/oncokbClientInstance';
-import {
-    computed,
-    observable,
-    action,
-    runInAction,
-    makeObservable,
-} from 'mobx';
+import { computed, observable, action, makeObservable } from 'mobx';
 import { remoteData, stringListToSet } from 'cbioportal-frontend-commons';
 import { IGisticData } from 'shared/model/Gistic';
 import { cached, labelMobxPromises } from 'mobxpromise';
@@ -129,7 +122,6 @@ import {
     IndicatorQueryResp,
 } from 'oncokb-ts-api-client';
 import { MutationTableDownloadDataFetcher } from 'shared/lib/MutationTableDownloadDataFetcher';
-import { getNavCaseIdsCache } from 'shared/lib/handleLongUrls';
 import {
     fetchTrialMatchesUsingPOST,
     fetchTrialsById,
@@ -144,7 +136,7 @@ import { groupTrialMatchesById } from '../trialMatch/TrialMatchTableUtils';
 import { GeneFilterOption } from '../mutation/GeneFilterMenu';
 import TumorColumnFormatter from '../mutation/column/TumorColumnFormatter';
 import { getVariantAlleleFrequency } from 'shared/lib/MutationUtils';
-import { AppStore, SiteError } from 'AppStore';
+import { AppStore } from '../../../AppStore';
 import { getGeneFilterDefault } from './PatientViewPageStoreUtil';
 import { checkNonProfiledGenesExist } from '../PatientViewPageUtils';
 import autobind from 'autobind-decorator';
@@ -165,9 +157,7 @@ import {
 import { makeGeneticTrackData } from 'shared/components/oncoprint/DataUtils';
 import { GeneticTrackDatum } from 'shared/components/oncoprint/Oncoprint';
 import {
-    AlterationTypeConstants,
     AnnotatedExtendedAlteration,
-    DataTypeConstants,
     CustomDriverNumericGeneMolecularData,
 } from 'pages/resultsView/ResultsViewPageStore';
 import {
@@ -181,27 +171,39 @@ import {
     GENOME_NEXUS_ARG_FIELD_ENUM,
     MSI_H_THRESHOLD,
     TMB_H_THRESHOLD,
+    AlterationTypeConstants,
+    DataTypeConstants,
 } from 'shared/constants';
 import {
     OTHER_BIOMARKER_HUGO_SYMBOL,
     OtherBiomarkersQueryType,
     OTHER_BIOMARKER_NAME,
-} from 'react-mutation-mapper';
+} from 'oncokb-frontend-commons';
 import {
     IMutationalSignature,
     IMutationalSignatureMeta,
 } from 'shared/model/MutationalSignature';
-import { GenericAssayTypeConstants } from 'shared/lib/GenericAssayUtils/GenericAssayCommonUtils';
+import { GenericAssayTypeConstants } from 'shared/lib/GenericAssayUtils/GenericAssayConfig';
+
 import {
     MutationalSignaturesVersion,
     MutationalSignatureStableIdKeyWord,
     validateMutationalSignatureRawData,
 } from 'shared/lib/GenericAssayUtils/MutationalSignaturesUtils';
 import { getServerConfig } from 'config/config';
-import { getOncoKbIconStyle } from 'shared/lib/AnnotationColumnUtils';
+import { StructuralVariantFilter } from 'cbioportal-ts-api-client';
+import { IGenePanelDataByProfileIdAndSample } from 'shared/lib/isSampleProfiled';
+import { NamespaceColumnConfig } from 'shared/components/namespaceColumns/NamespaceColumnConfig';
+import { buildNamespaceColumnConfig } from 'shared/components/namespaceColumns/namespaceColumnsUtils';
+import { SiteError } from 'shared/model/appMisc';
 
 type PageMode = 'patient' | 'sample';
 type ResourceId = string;
+
+type NamespaceColumnConfigMap = {
+    cna: NamespaceColumnConfig;
+    structVar: NamespaceColumnConfig;
+};
 
 export async function checkForTissueImage(patientId: string): Promise<boolean> {
     if (/TCGA/.test(patientId) === false) {
@@ -302,14 +304,30 @@ function transformClinicalInformationToStoreShape(
 }
 
 export class PatientViewPageStore {
-    constructor(private appStore: AppStore) {
+    constructor(
+        private appStore: AppStore,
+        studyId: string,
+        patientId: string,
+        sampleId: string = '',
+        cohortIds?: string[]
+    ) {
         makeObservable(this);
-        //labelMobxPromises(this);
+
+        if (cohortIds) {
+            this.patientIdsInCohort = cohortIds;
+        }
         this.internalClient = internalClient;
+
+        this._patientId = patientId;
+
+        this._sampleId = sampleId;
+
+        this.studyId = studyId;
     }
 
     public internalClient: CBioPortalAPIInternal;
 
+    @observable public activeLocus: string | undefined;
     @observable public activeTabId = '';
 
     @observable private _patientId = '';
@@ -376,9 +394,9 @@ export class PatientViewPageStore {
         return this._sampleId ? 'sample' : 'patient';
     }
 
-    @computed get caseId(): string {
-        return this.pageMode === 'sample' ? this.sampleId : this.patientId;
-    }
+    // @computed get caseId(): string {
+    //     return this.pageMode === 'sample' ? this.sampleId : this.patientId;
+    // }
 
     readonly mutationMolecularProfile = remoteData({
         await: () => [this.molecularProfilesInStudy],
@@ -433,20 +451,21 @@ export class PatientViewPageStore {
 
     // this is a string of concatenated ids
     @observable
-    private _patientIdsInCohort: string[] = [];
+    public patientIdsInCohort: string[] = [];
 
-    public set patientIdsInCohort(cohortIds: string[]) {
-        // cannot put action on setter
-        runInAction(() => (this._patientIdsInCohort = cohortIds));
-    }
+    // public set patientIdsInCohort(cohortIds: string[]) {
+    //     // cannot put action on setter
+    //     runInAction(() => (this._patientIdsInCohort = cohortIds || []));
+    // }
 
-    @computed
-    public get patientIdsInCohort(): string[] {
-        let concatenatedIds: string;
-        // check to see if we copied from url hash on app load
-        const memoryCachedIds = getNavCaseIdsCache();
-        return memoryCachedIds ? memoryCachedIds : this._patientIdsInCohort;
-    }
+    // @computed
+    // public get patientIdsInCohort(): string[]  {
+    //     let concatenatedIds: string;
+    //     // check to see if we copied from url hash on app load
+    //     // const memoryCachedIds = getNavCaseIdsCache();
+    //     // return memoryCachedIds ? memoryCachedIds :
+    //     return this._patientIdsInCohort;
+    // }
 
     readonly myCancerGenomeData: IMyCancerGenomeData = getMyCancerGenomeData();
 
@@ -612,7 +631,7 @@ export class PatientViewPageStore {
                 .value();
 
             if (mutationalSignatureContributionStableIds.length > 0) {
-                return client.fetchGenericAssayMetaDataUsingPOST({
+                return client.fetchGenericAssayMetaUsingPOST({
                     genericAssayMetaFilter: {
                         genericAssayStableIds: mutationalSignatureContributionStableIds,
                     } as GenericAssayMetaFilter,
@@ -743,11 +762,7 @@ export class PatientViewPageStore {
                     this.sampleId
                 ),
             onError: (err: Error) => {
-                this.appStore.siteErrors.push({
-                    errorObj: err,
-                    dismissed: false,
-                    title: 'Samples / Patients not valid',
-                } as SiteError);
+                this.appStore.siteErrors.push(new SiteError(err));
             },
         },
         []
@@ -1035,7 +1050,7 @@ export class PatientViewPageStore {
                             ? GENOME_NEXUS_ARG_FIELD_ENUM.SIGNAL
                             : '',
                     ].filter(f => f),
-                    getServerConfig().isoformOverrideSource,
+                    getServerConfig().genomenexus_isoform_override_source,
                     this.genomeNexusClient
                 ),
             onError: (err: Error) => {
@@ -1056,7 +1071,7 @@ export class PatientViewPageStore {
                     this.uncalledMutationData
                 ),
                 [GENOME_NEXUS_ARG_FIELD_ENUM.MY_VARIANT_INFO],
-                getServerConfig().isoformOverrideSource,
+                getServerConfig().genomenexus_isoform_override_source,
                 this.genomeNexusClient
             );
             return getMyVariantInfoAnnotationsFromIndexedVariantAnnotations(
@@ -1340,6 +1355,15 @@ export class PatientViewPageStore {
         []
     );
 
+    @computed get namespaceColumnConfig(): NamespaceColumnConfigMap {
+        return {
+            cna: buildNamespaceColumnConfig(this.discreteCNAData.result),
+            structVar: buildNamespaceColumnConfig(
+                this.structuralVariantData.result
+            ),
+        };
+    }
+
     readonly molecularData = remoteData<NumericGeneMolecularData[]>(
         {
             await: () => [this.discreteCNAData],
@@ -1566,9 +1590,9 @@ export class PatientViewPageStore {
         { samples: {}, patients: {} }
     );
 
-    readonly genePanelDataByMolecularProfileIdAndSampleId = remoteData<{
-        [profileId: string]: { [sampleId: string]: GenePanelData };
-    }>(
+    readonly genePanelDataByMolecularProfileIdAndSampleId = remoteData<
+        IGenePanelDataByProfileIdAndSample
+    >(
         {
             await: () => [this.genePanelData],
             invoke: async () => {
@@ -1614,7 +1638,7 @@ export class PatientViewPageStore {
                     }),
                 } as StructuralVariantFilter;
 
-                return client.fetchStructuralVariantsUsingPOST({
+                return internalClient.fetchStructuralVariantsUsingPOST({
                     structuralVariantFilter,
                 });
             }
@@ -1657,6 +1681,7 @@ export class PatientViewPageStore {
                     return Promise.resolve([]);
                 }
             },
+            onError: () => {},
         },
         []
     );
@@ -1680,10 +1705,6 @@ export class PatientViewPageStore {
             : USE_DEFAULT_PUBLIC_INSTANCE_FOR_ONCOKB;
     }
 
-    @computed get mergeOncoKbIcons() {
-        return getOncoKbIconStyle().mergeIcons;
-    }
-
     readonly oncoKbAnnotatedGenes = remoteData(
         {
             await: () => [this.oncoKbCancerGenes],
@@ -1696,7 +1717,7 @@ export class PatientViewPageStore {
                                 map: { [entrezGeneId: number]: boolean },
                                 next: CancerGene
                             ) => {
-                                if (next.oncokbAnnotated) {
+                                if (next?.oncokbAnnotated) {
                                     map[next.entrezGeneId] = true;
                                 }
                                 return map;
@@ -1708,6 +1729,7 @@ export class PatientViewPageStore {
                     return Promise.resolve({});
                 }
             },
+            onError: () => {},
         },
         {}
     );
@@ -2430,6 +2452,7 @@ export class PatientViewPageStore {
                     this.oncoKbAnnotatedGenes,
                     this.mutationData
                 ),
+            onError: () => {},
         },
         ONCOKB_DEFAULT
     );
@@ -2459,8 +2482,6 @@ export class PatientViewPageStore {
             return Promise.resolve((mutation: Mutation): {
                 oncoKb: string;
                 hotspots: boolean;
-                cbioportalCount: boolean;
-                cosmicCount: boolean;
                 customDriverBinary: boolean;
                 customDriverTier?: string;
             } => {
@@ -2480,8 +2501,6 @@ export class PatientViewPageStore {
                 const isHotspotDriver =
                     !(this.isHotspotForOncoprint.result instanceof Error) &&
                     this.isHotspotForOncoprint.result!(mutation);
-                const cbioportalCountExceeded = false;
-                const cosmicCountExceeded = false;
 
                 // Note:
                 // - custom driver annotations are part of the incoming datum
@@ -2492,10 +2511,6 @@ export class PatientViewPageStore {
                     oncoKbDatum,
                     true,
                     isHotspotDriver,
-                    false,
-                    cbioportalCountExceeded,
-                    false,
-                    cosmicCountExceeded,
                     false,
                     undefined
                 );
@@ -2691,5 +2706,6 @@ export class PatientViewPageStore {
                 .value();
         },
         default: {},
+        onError: () => {},
     });
 }

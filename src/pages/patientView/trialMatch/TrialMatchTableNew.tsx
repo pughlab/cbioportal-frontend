@@ -102,6 +102,7 @@ export default class TrialMatchTableNew extends React.Component<ITrialMatchNewPr
                     <div>{trialmatch.shortTitle}</div>
                 </div>
             ),
+            sortBy: (trialmatch: ITrialMatch) => trialmatch.shortTitle,
             width: this.columnWidths[ColumnKey.TITLE],
         },
         {
@@ -111,6 +112,7 @@ export default class TrialMatchTableNew extends React.Component<ITrialMatchNewPr
                     <div>{trialmatch.armDescription}</div>
                 </div>
             ),
+            sortBy: (trialmatch: ITrialMatch) => trialmatch.armDescription,
             width: this.columnWidths[ColumnKey.ARM],
         },
         {
@@ -120,6 +122,7 @@ export default class TrialMatchTableNew extends React.Component<ITrialMatchNewPr
                     <div>{trialmatch.trueHugoSymbol}</div>
                 </div>
             ),
+            sortBy: (trialmatch: ITrialMatch) => trialmatch.trueHugoSymbol,
             width: this.columnWidths[ColumnKey.GENE],
         },
         {
@@ -129,22 +132,28 @@ export default class TrialMatchTableNew extends React.Component<ITrialMatchNewPr
                     <div>{trialmatch.matchType}</div>
                 </div>
             ),
+            sortBy: (trialmatch: ITrialMatch) => trialmatch.matchType,
             width: this.columnWidths[ColumnKey.MATCHTYPE],
         },
         {
             name: ColumnKey.MATCHING_CRITERIA,
             render: (trialmatch: ITrialMatch) => (
                 <div>
-                    <div>{trialmatch.oncotreePrimaryDiagnosisName}</div>
+                    genomicAlteration:
+                    <div>&nbsp;{trialmatch.genomicAlteration}</div>
                     <br/>
-                    <div>{trialmatch.trialOncotreePrimaryDiagnosis}</div>
+                    oncotreePrimaryDiagnosisName:
+                    <div>&nbsp;{trialmatch.oncotreePrimaryDiagnosisName}</div>
                     <br/>
-                    <div>{trialmatch.trueProteinChange}</div>
+                    trialOncotreePrimaryDiagnosis:
+                    <div>&nbsp;{trialmatch.trialOncotreePrimaryDiagnosis}</div>
                     <br/>
-                    <div>{trialmatch.genomicAlteration}</div>
+                    trueProteinChange:
+                    <div>&nbsp;{trialmatch.trueProteinChange}</div>
                     <br/>
                 </div>
             ),
+            sortBy: (trialmatch: ITrialMatch) => trialmatch.genomicAlteration,
             width: this.columnWidths[ColumnKey.MATCHING_CRITERIA],
         },
         {
@@ -156,7 +165,7 @@ export default class TrialMatchTableNew extends React.Component<ITrialMatchNewPr
                         </span>                
                 </div>
             ),
-            sortBy: (trialmatch: ITrialMatch) => trialmatch.shortTitle,
+            sortBy: (trialmatch: ITrialMatch) => trialmatch.status,
             width: this.columnWidths[ColumnKey.STATUS],
         },
     ];

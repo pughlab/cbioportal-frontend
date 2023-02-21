@@ -1609,16 +1609,6 @@ export default class PatientViewPage extends React.Component<
                                                 WindowStore.size.width - 20
                                             }
                                         />
-                                        <TrialMatchTableNew
-                                            sampleManager={sampleManager}
-                                            trialMatches={
-                                                this.patientViewPageStore
-                                                    .trialMatches.result
-                                            }
-                                            containerWidth={
-                                                WindowStore.size.width - 20
-                                            }
-                                        />
                                     </MSKTab>
                                 )}
 

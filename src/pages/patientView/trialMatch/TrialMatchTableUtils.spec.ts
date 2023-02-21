@@ -182,6 +182,10 @@ describe('TrialMatchTableUtils', () => {
                 trialOncotreePrimaryDiagnosis: 'All Solid Tumors',
                 shortTitle: '',
                 status: '',
+                gender: '',
+                armType: '',
+                vitalStatus: '',
+
             },
             {
                 id: 'NCT01948297+13-131',
@@ -199,6 +203,9 @@ describe('TrialMatchTableUtils', () => {
                 trialOncotreePrimaryDiagnosis: 'All Solid Tumors',
                 shortTitle: '',
                 status: '',
+                gender: '',
+                armType: '',
+                vitalStatus: '',
             },
             {
                 id: 'NCT02924376+17-405',
@@ -208,13 +215,17 @@ describe('TrialMatchTableUtils', () => {
                 matchType: 'annotated_variant',
                 armDescription: 'Cohort C INCB054828',
                 armType: 'Control Arm',
+                trueHugoSymbol: '',
                 sampleId: 'P-0002675-T01-IM3',
                 mrn: 'P-0002675',
+                trueProteinChange: '',
                 genomicAlteration: 'FGF23 !Oncogenic Mutations',
                 trialAgeNumerical: '>=18',
                 trialOncotreePrimaryDiagnosis: 'Cholangiocarcinoma',
                 shortTitle: '',
                 status: '',
+                gender: '',
+                vitalStatus: '',
             },
             {
                 id: 'NCT02924376+17-405',
@@ -225,12 +236,16 @@ describe('TrialMatchTableUtils', () => {
                 armDescription: 'Cohort C INCB054828',
                 armType: 'Control Arm',
                 sampleId: 'P-0002675-T01-IM3',
+                trueHugoSymbol: '',
                 mrn: 'P-0002675',
                 genomicAlteration: 'FGFR1 !Oncogenic Mutations',
+                trueProteinChange: '',
                 trialAgeNumerical: '>=18',
                 trialOncotreePrimaryDiagnosis: 'Cholangiocarcinoma',
                 shortTitle: '',
                 status: '',
+                gender: '',
+                vitalStatus: '',
             },
         ];
         const expectedResult: ITrialMatch[] = [
@@ -250,6 +265,9 @@ describe('TrialMatchTableUtils', () => {
                 trialOncotreePrimaryDiagnosis: 'All Solid Tumors',
                 shortTitle: '',
                 status: '',
+                gender: '',
+                armType: '',
+                vitalStatus: '',
             },
             {
                 id: 'NCT01948297+13-131',
@@ -267,6 +285,9 @@ describe('TrialMatchTableUtils', () => {
                 trialOncotreePrimaryDiagnosis: 'All Solid Tumors',
                 shortTitle: '',
                 status: '',
+                gender: '',
+                armType: '',
+                vitalStatus: '',
             },
         ];
         assert.deepEqual(

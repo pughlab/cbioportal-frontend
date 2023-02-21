@@ -52,11 +52,11 @@ export async function fetchTrialMatches(
                     trialOncotreePrimaryDiagnosis: record.trial_oncotree_primary_diagnosis
                         ? record.trial_oncotree_primary_diagnosis
                         : '',
-                    shortTitle: record.shortTitle
-                        ? record.shortTitle
+                    shortTitle: record.short_title
+                        ? record.short_title
                         : '',
-                    status: record.status
-                        ? record.status
+                    status: record.trial_summary_status
+                        ? record.trial_summary_status
                         : '',
                 };
                 ret.push(curRecord);

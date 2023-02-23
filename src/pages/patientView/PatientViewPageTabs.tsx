@@ -49,6 +49,7 @@ export enum PatientViewPageTabs {
     TrialMatchTab = 'trialMatchTab',
     MutationalSignatures = 'mutationalSignatures',
     PathwayMapper = 'pathways',
+    PathologySlides = 'pathSlidesTab',
 }
 
 export const PatientViewResourceTabPrefix = 'openResource_';
@@ -573,6 +574,24 @@ export function tabs(
                     <IFrameLoader
                         height={WindowStore.size.height - 220}
                         url={pageComponent.wholeSlideViewerUrl.result!}
+                    />
+                </div>
+            </MSKTab>
+        );
+
+    pageComponent.showPathologySlideViewerTab &&
+        pageComponent.pathologySlideViewerUrl.result &&
+        tabs.push(
+            <MSKTab
+                key={9}
+                id={PatientViewPageTabs.PathologySlides}
+                linkText="Pathology Slides"
+                unmountOnHide={false}
+            >
+                <div>
+                    <IFrameLoader
+                        height={WindowStore.size.height - 220}
+                        url={pageComponent.pathologySlideViewerUrl.result!}
                     />
                 </div>
             </MSKTab>

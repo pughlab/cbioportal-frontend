@@ -27,6 +27,7 @@ import PatientViewCnaDataStore from './copyNumberAlterations/PatientViewCnaDataS
 import './patient.scss';
 
 import { getWholeSlideViewerUrl } from '../../shared/api/urls';
+import { getPathologySlideUrl } from '../../shared/api/urls';
 import { PageLayout } from '../../shared/components/PageLayout/PageLayout';
 import Helmet from 'react-helmet';
 import { getServerConfig } from '../../config/config';
@@ -253,6 +254,15 @@ export class PatientViewPageInner extends React.Component<
         );
     }
 
+    @computed get showPathologySlideViewerTab() {
+        return (
+            this.patientViewPageStore.clinicalDataPatient.isComplete &&
+            _.some(this.patientViewPageStore.clinicalDataPatient.result, s => {
+                return s.clinicalAttributeId === 'SLIDE_ID';
+            })
+        );
+    }
+
     @action.bound
     onCnaTableColumnVisibilityToggled(
         columnId: string,
@@ -346,6 +356,21 @@ export class PatientViewPageInner extends React.Component<
                     //but if request fails, we will return undefined.
                     return undefined;
                 }
+            }
+            return undefined;
+        },
+    });
+
+    pathologySlideViewerUrl = remoteData<string | undefined>({
+        await: () => [this.patientViewPageStore.clinicalDataPatient],
+        invoke: async () => {
+            if (
+                !_.isEmpty(this.patientViewPageStore.clinicalDataPatient.result)
+            ) {
+                const ids = this.patientViewPageStore.clinicalDataPatient.result.find(
+                    c => c.clinicalAttributeId === 'SLIDE_ID'
+                )?.value;
+                return ids ? getPathologySlideUrl(ids) : '';
             }
             return undefined;
         },

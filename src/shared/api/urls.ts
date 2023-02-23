@@ -345,3 +345,13 @@ export function getWholeSlideViewerUrl(
         throw 'error parsing mskWholeSlideViewerToken';
     }
 }
+
+export function getPathologySlideUrl(ids: string): string {
+    try {
+        if (ids.length >= 1)
+            return `https://slidesharing.ca/eSlideTray.php?ImageIds=` + ids;
+        else return ``;
+    } catch (ex) {
+        throw 'error generating pathology slide url ';
+    }
+}

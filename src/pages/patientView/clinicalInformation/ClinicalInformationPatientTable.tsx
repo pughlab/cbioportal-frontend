@@ -5,8 +5,10 @@ import LazyMobXTable from 'shared/components/lazyMobXTable/LazyMobXTable';
 import styles from './style/patientTable.module.scss';
 import { SHOW_ALL_PAGE_SIZE } from '../../../shared/components/paginationControls/PaginationControls';
 import { sortByClinicalAttributePriorityThenName } from '../../../shared/lib/SortUtils';
-import { isUrl } from 'cbioportal-frontend-commons';
+import { DownloadControlOption, isUrl } from 'cbioportal-frontend-commons';
 import autobind from 'autobind-decorator';
+import { formatPercentValue } from 'cbioportal-utils';
+import { getServerConfig } from 'config/config';
 
 export interface IClinicalInformationPatientTableProps {
     data: ClinicalData[];
@@ -32,16 +34,17 @@ export default class ClinicalInformationPatientTable extends React.Component<
         attribute: string;
         value: string;
     }): string {
-        let ret: string;
-        switch (data.attribute) {
-            case 'Overall Survival (Months)':
-                ret = parseInt(data.value, 10).toFixed(0);
-                break;
-            default:
-                ret = data.value;
-                break;
+        if (isNaN(data.value as any)) {
+            return data.value;
+        } else {
+            const parsedFloat = parseFloat(data.value);
+            if (parsedFloat !== parseInt(data.value)) {
+                // the values formatted are not percentages in this case however the function cleanly rounds any float to 1 decimal place
+                return formatPercentValue(parsedFloat);
+            } else {
+                return data.value;
+            }
         }
-        return ret;
     }
 
     @autobind handleClick(name: string) {
@@ -140,7 +143,8 @@ export default class ClinicalInformationPatientTable extends React.Component<
                 initialItemsPerPage={SHOW_ALL_PAGE_SIZE}
                 showFilter={this.props.showFilter === false ? false : true}
                 showCopyDownload={
-                    this.props.showCopyDownload === false ? false : true
+                    getServerConfig().skin_hide_download_controls ===
+                    DownloadControlOption.SHOW_ALL
                 }
             />
         );

@@ -70,28 +70,32 @@ export type MultiSelectionTableColumn = {
     columnTooltip?: JSX.Element;
 };
 
-export type MultiSelectionTableProps = {
+export type BaseMultiSelectionTableProps = {
     tableType: FreqColumnTypeEnum;
-    promise: MobxPromise<MultiSelectionTableRow[]>;
     width: number;
     height: number;
     filters: string[][];
     onSubmitSelection: (value: string[][]) => void;
     onChangeSelectedRows: (rowsKeys: string[]) => void;
-    extraButtons?: IFixedHeaderTableProps<
-        MultiSelectionTableRow
-    >['extraButtons'];
     selectedRowsKeys: string[];
-    onGeneSelect: (hugoGeneSymbol: string) => void;
-    selectedGenes: string[];
     cancerGeneFilterEnabled?: boolean;
     genePanelCache: MobxPromiseCache<{ genePanelId: string }, GenePanel>;
     filterByCancerGenes: boolean;
     onChangeCancerGeneFilter: (filtered: boolean) => void;
     alterationFilterEnabled?: boolean;
     filterAlterations?: boolean;
+    setOperationsButtonText: string;
+};
+
+export type MultiSelectionTableProps = BaseMultiSelectionTableProps & {
     defaultSortBy: MultiSelectionTableColumnKey;
+    extraButtons?: IFixedHeaderTableProps<
+        MultiSelectionTableRow
+    >['extraButtons'];
+    selectedGenes: string[];
+    onGeneSelect: (hugoGeneSymbol: string) => void;
     columns: MultiSelectionTableColumn[];
+    promise: MobxPromise<MultiSelectionTableRow[]>;
 };
 
 const DEFAULT_COLUMN_WIDTH_RATIO: {
@@ -268,7 +272,7 @@ export class MultiSelectionTable extends React.Component<
                         <TableHeaderCellFilterIcon
                             cellMargin={cellMargin}
                             dataTest="number-column-header"
-                            className={styles.displayFlex}
+                            className={`${styles.displayFlex} ${styles.pullRight}`}
                             showFilter={!!this.props.alterationFilterEnabled}
                             isFiltered={!!this.props.filterAlterations}
                         >
@@ -324,7 +328,10 @@ export class MultiSelectionTable extends React.Component<
                         data.numberOfAlteredCases,
                         data.matchingGenePanelIds || [],
                         this.toggleModal,
-                        { marginLeft: cellMargin }
+                        {
+                            marginLeft: cellMargin,
+                        },
+                        styles.pullRight
                     );
                 },
                 sortBy: (data: MultiSelectionTableRow) =>
@@ -357,9 +364,8 @@ export class MultiSelectionTable extends React.Component<
                 render: (data: MultiSelectionTableRow) => (
                     <span
                         data-test={'numberOfAlterations'}
+                        className={styles.pullRight}
                         style={{
-                            flexDirection: 'row-reverse',
-                            display: 'flex',
                             marginRight: cellMargin,
                         }}
                     >
@@ -392,10 +398,9 @@ export class MultiSelectionTable extends React.Component<
                     <span
                         data-test={'numberOfAlterations'}
                         style={{
-                            flexDirection: 'row-reverse',
-                            display: 'flex',
                             marginRight: cellMargin,
                         }}
+                        className={`${styles.pullRight}`}
                     >
                         {data.totalCount.toLocaleString()}
                     </span>
@@ -780,6 +785,9 @@ export class MultiSelectionTable extends React.Component<
             <div data-test={tableId} key={tableId}>
                 {this.props.promise.isComplete && (
                     <MultiSelectionTableComponent
+                        key={`multiSelect-${tableId}-${this.preSelectedRowsKeys.join(
+                            ''
+                        )}`}
                         width={this.props.width}
                         height={this.props.height}
                         data={this.selectableTableData}
@@ -795,6 +803,9 @@ export class MultiSelectionTable extends React.Component<
                         fixedTopRowsData={this.preSelectedRows}
                         highlightedRowClassName={this.selectedRowClassName}
                         showSetOperationsButton={true}
+                        setOperationsButtonText={
+                            this.props.setOperationsButtonText
+                        }
                         numberOfSelectedRows={
                             this.props.selectedRowsKeys.length
                         }

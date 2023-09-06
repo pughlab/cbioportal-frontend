@@ -23,7 +23,6 @@ import SurvivalChart, {
 import BarChart from './barChart/BarChart';
 import {
     ChartMeta,
-    ChartMetaDataTypeEnum,
     ChartType,
     ClinicalDataCountSummary,
     DataBin,
@@ -31,7 +30,6 @@ import {
     getRangeFromDataBins,
     getTableHeightByDimension,
     getWidthByDimension,
-    logScalePossible,
     MutationCountVsCnaYBinsMin,
     NumericalGroupComparisonType,
 } from '../StudyViewUtils';
@@ -65,12 +63,22 @@ import {
 import { getComparisonParamsForTable } from 'pages/studyView/StudyViewComparisonUtils';
 import ComparisonVsIcon from 'shared/components/ComparisonVsIcon';
 import {
+    SURVIVAL_COMPACT_MODE_THRESHOLD,
     SURVIVAL_PLOT_X_LABEL_WITH_EVENT_TOOLTIP,
     SURVIVAL_PLOT_X_LABEL_WITHOUT_EVENT_TOOLTIP,
     SURVIVAL_PLOT_Y_LABEL_TOOLTIP,
 } from 'pages/resultsView/survival/SurvivalUtil';
 import StudyViewViolinPlotTable from 'pages/studyView/charts/violinPlotTable/StudyViewViolinPlotTable';
 import { PatientSurvival } from 'shared/model/PatientSurvival';
+import ClinicalEventTypeCountTable, {
+    ClinicalEventTypeCountColumnKey,
+} from 'pages/studyView/table/ClinicalEventTypeCountTable';
+import {
+    StructuralVariantMultiSelectionTable,
+    StructVarMultiSelectionTableColumn,
+    StructVarMultiSelectionTableColumnKey,
+} from 'pages/studyView/table/StructuralVariantMultiSelectionTable';
+import { StructVarGenePair } from 'pages/studyView/StructVarUtils';
 
 export interface AbstractChart {
     toSVGDOMNode: () => Element;
@@ -96,9 +104,11 @@ const COMPARISON_CHART_TYPES: ChartType[] = [
     ChartTypeEnum.PATIENT_TREATMENT_GROUPS_TABLE,
     ChartTypeEnum.PATIENT_TREATMENT_TARGET_TABLE,
     ChartTypeEnum.STRUCTURAL_VARIANT_GENES_TABLE,
+    ChartTypeEnum.STRUCTURAL_VARIANTS_TABLE,
 ];
 
 export interface IChartContainerProps {
+    id?: string;
     chartMeta: ChartMeta;
     chartType: ChartType;
     store: StudyViewPageStore;
@@ -148,6 +158,8 @@ export interface IChartContainerProps {
     selectedGenes?: any;
     cancerGenes: number[];
     onGeneSelect?: any;
+    selectedStructuralVariants?: StructVarGenePair[];
+    onStructuralVariantSelect?: any;
     isNewlyAdded: (uniqueKey: string) => boolean;
     cancerGeneFilterEnabled: boolean;
     filterByCancerGenes?: boolean;
@@ -364,7 +376,7 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
     openComparisonPage(params?: {
         // for numerical clinical attributes
         categorizationType?: NumericalGroupComparisonType;
-        // for mutated genes table
+        // for mutated genes table and genomic data count chart
         hugoGeneSymbols?: string[];
         // for treatments tables
         treatmentUniqueKeys?: string[];
@@ -374,15 +386,10 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
             switch (this.props.chartType) {
                 case ChartTypeEnum.PIE_CHART:
                 case ChartTypeEnum.TABLE:
-                    const openComparison = () =>
-                        this.props.store.openComparisonPage(
-                            this.props.chartMeta,
-                            {
-                                clinicalAttributeValues: this.props.promise
-                                    .result! as ClinicalDataCountSummary[],
-                            }
-                        );
-                    openComparison();
+                    this.props.store.openComparisonPage(this.props.chartMeta, {
+                        clinicalAttributeValues: this.props.promise
+                            .result! as ClinicalDataCountSummary[],
+                    });
                     break;
                 default:
                     this.props.store.openComparisonPage(
@@ -414,7 +421,8 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                     this.props.chartMeta.uniqueKey
                 ]?.survivalData,
                 this.props.analysisGroupsSettings.groups,
-                this.props.patientToAnalysisGroup!.result!
+                this.props.patientToAnalysisGroup!.result!,
+                this.props.chartMeta.uniqueKey
             );
         } else {
             return undefined;
@@ -435,11 +443,29 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
         return this.highlightChart ? 2 : 1;
     }
 
+    @computed
+    get showCompactSurvivalChart() {
+        // returns true when selected survivals are larger than the threshold
+        if (
+            !_.isEmpty(this.survivalChartData) &&
+            !_.isEmpty(this.survivalChartData!.sortedGroupedSurvivals)
+        ) {
+            return _.some(
+                this.survivalChartData!.sortedGroupedSurvivals!,
+                survivals => survivals.length > SURVIVAL_COMPACT_MODE_THRESHOLD
+            );
+        }
+        return false;
+    }
+
     @computed get comparisonButtonForTables() {
         if (this.selectedRowsKeys!.length >= 2) {
             return {
                 content: (
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div
+                        data-tour="mutated-genes-table-compare-btn"
+                        style={{ display: 'flex', alignItems: 'center' }}
+                    >
                         <ComparisonVsIcon
                             className={classnames('fa fa-fw')}
                             style={{ marginRight: 4 }}
@@ -599,6 +625,11 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                                 },
                             ]}
                             defaultSortBy={MultiSelectionTableColumnKey.FREQ}
+                            setOperationsButtonText={
+                                this.props.store.hesitateUpdate
+                                    ? 'Add Filters '
+                                    : 'Select Samples '
+                            }
                         />
                     );
                 };
@@ -673,6 +704,106 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                                 },
                             ]}
                             defaultSortBy={MultiSelectionTableColumnKey.FREQ}
+                            setOperationsButtonText={
+                                this.props.store.hesitateUpdate
+                                    ? 'Add Filters '
+                                    : 'Select Samples '
+                            }
+                        />
+                    );
+                };
+            }
+            case ChartTypeEnum.STRUCTURAL_VARIANTS_TABLE: {
+                return () => {
+                    const numColumn: StructVarMultiSelectionTableColumn = {
+                        columnKey: StructVarMultiSelectionTableColumnKey.NUMBER,
+                    };
+                    if (this.props.store.isGlobalMutationFilterActive) {
+                        numColumn.columnTooltip = (
+                            <span data-test="hidden-fusion-alterations">
+                                Total number of fusions
+                                <br />
+                                This table is filtered based on selections in
+                                the <i>Alteration Filter</i> menu.
+                            </span>
+                        );
+                    }
+                    return (
+                        <StructuralVariantMultiSelectionTable
+                            tableType={
+                                FreqColumnTypeEnum.STRUCTURAL_VARIANT_PAIR
+                            }
+                            promise={this.props.promise}
+                            width={getWidthByDimension(
+                                this.props.dimension,
+                                this.borderWidth
+                            )}
+                            height={getTableHeightByDimension(
+                                this.props.dimension,
+                                this.chartHeaderHeight
+                            )}
+                            filters={this.props.filters}
+                            onSubmitSelection={this.handlers.onValueSelection}
+                            onChangeSelectedRows={
+                                this.handlers.onChangeSelectedRows
+                            }
+                            extraButtons={
+                                this.comparisonButtonForTables && [
+                                    this.comparisonButtonForTables,
+                                ]
+                            }
+                            selectedRowsKeys={this.selectedRowsKeys}
+                            onStructuralVariantSelect={
+                                this.props.onStructuralVariantSelect
+                            }
+                            selectedStructVars={
+                                this.props.selectedStructuralVariants || []
+                            }
+                            genePanelCache={this.props.genePanelCache}
+                            cancerGeneFilterEnabled={
+                                this.props.cancerGeneFilterEnabled
+                            }
+                            filterByCancerGenes={
+                                this.props.filterByCancerGenes!
+                            }
+                            onChangeCancerGeneFilter={
+                                this.props.onChangeCancerGeneFilter!
+                            }
+                            alterationFilterEnabled={
+                                this.props.alterationFilterEnabled
+                            }
+                            filterAlterations={this.props.filterAlterations}
+                            columns={[
+                                {
+                                    columnKey:
+                                        StructVarMultiSelectionTableColumnKey.STRUCTVAR_SELECT,
+                                },
+                                {
+                                    columnKey:
+                                        StructVarMultiSelectionTableColumnKey.GENE1,
+                                },
+                                {
+                                    columnKey:
+                                        StructVarMultiSelectionTableColumnKey.GENE2,
+                                },
+                                {
+                                    columnKey:
+                                        StructVarMultiSelectionTableColumnKey.NUMBER_STRUCTURAL_VARIANTS,
+                                },
+                                numColumn,
+                                {
+                                    columnKey:
+                                        StructVarMultiSelectionTableColumnKey.FREQ,
+                                },
+                            ]}
+                            defaultSortBy={
+                                StructVarMultiSelectionTableColumnKey.FREQ
+                            }
+                            setOperationsButtonText={
+                                this.props.store.hesitateUpdate
+                                    ? 'Add Filters '
+                                    : 'Select Samples '
+                            }
                         />
                     );
                 };
@@ -756,6 +887,11 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                                 },
                             ]}
                             defaultSortBy={MultiSelectionTableColumnKey.FREQ}
+                            setOperationsButtonText={
+                                this.props.store.hesitateUpdate
+                                    ? 'Add Filters '
+                                    : 'Select Samples '
+                            }
                         />
                     );
                 };
@@ -802,6 +938,11 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                             },
                         ]}
                         defaultSortBy={MultiSelectionTableColumnKey.FREQ}
+                        setOperationsButtonText={
+                            this.props.store.hesitateUpdate
+                                ? 'Add Filters '
+                                : 'Select Samples '
+                        }
                     />
                 );
             }
@@ -847,6 +988,11 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                             },
                         ]}
                         defaultSortBy={MultiSelectionTableColumnKey.FREQ}
+                        setOperationsButtonText={
+                            this.props.store.hesitateUpdate
+                                ? 'Add Filters '
+                                : 'Select Samples '
+                        }
                     />
                 );
             }
@@ -936,6 +1082,9 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                             // scatter the tick to avoid text overlaping on study view survival plots
                             yAxisTickCount={2}
                             xAxisTickCount={4}
+                            compactMode={this.showCompactSurvivalChart}
+                            attributeId={data.attributeId}
+                            onUserSelection={this.handlers.onDataBinSelection}
                         />
                     );
                 } else {
@@ -978,6 +1127,11 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                         ]}
                         defaultSortBy={SampleTreatmentsTableColumnKey.COUNT}
                         selectedTreatments={[]}
+                        setOperationsButtonText={
+                            this.props.store.hesitateUpdate
+                                ? 'Add Filters '
+                                : 'Select Samples '
+                        }
                     />
                 );
             }
@@ -1019,6 +1173,54 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                         ]}
                         defaultSortBy={PatientTreatmentsTableColumnKey.COUNT}
                         selectedTreatments={[]}
+                        setOperationsButtonText={
+                            this.props.store.hesitateUpdate
+                                ? 'Add Filters '
+                                : 'Select Samples '
+                        }
+                    />
+                );
+            }
+            case ChartTypeEnum.CLINICAL_EVENT_TYPE_COUNTS_TABLE: {
+                return () => (
+                    <ClinicalEventTypeCountTable
+                        promise={this.props.promise}
+                        width={getWidthByDimension(
+                            this.props.dimension,
+                            this.borderWidth
+                        )}
+                        height={getTableHeightByDimension(
+                            this.props.dimension,
+                            this.chartHeaderHeight
+                        )}
+                        filters={this.props.filters}
+                        onSubmitSelection={this.handlers.onValueSelection}
+                        onChangeSelectedRows={
+                            this.handlers.onChangeSelectedRows
+                        }
+                        selectedRowsKeys={this.selectedRowsKeys}
+                        columns={[
+                            {
+                                columnKey:
+                                    ClinicalEventTypeCountColumnKey.CLINICAL_EVENT_TYPE,
+                            },
+                            {
+                                columnKey:
+                                    ClinicalEventTypeCountColumnKey.COUNT,
+                            },
+                            {
+                                columnKey: ClinicalEventTypeCountColumnKey.FREQ,
+                            },
+                        ]}
+                        selectedPatientsKeyPromise={
+                            this.props.store.selectedPatientKeys
+                        }
+                        defaultSortBy={ClinicalEventTypeCountColumnKey.COUNT}
+                        setOperationsButtonText={
+                            this.props.store.hesitateUpdate
+                                ? 'Add Filters '
+                                : 'Select Samples '
+                        }
                     />
                 );
             }
@@ -1198,6 +1400,7 @@ export class ChartContainer extends React.Component<IChartContainerProps, {}> {
                     openComparisonPage={this.openComparisonPage}
                     placement={this.placement}
                     description={this.props.description}
+                    isCompactSurvivalChart={this.showCompactSurvivalChart}
                 />
                 <div className={styles.chartInnerWrapper}>
                     {this.props.promise.isPending && (

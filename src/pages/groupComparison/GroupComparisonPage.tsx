@@ -50,6 +50,8 @@ import { getSortedGenericAssayTabSpecs } from 'shared/lib/GenericAssayUtils/Gene
 import { HelpWidget } from 'shared/components/HelpWidget/HelpWidget';
 import GroupComparisonPathwayMapper from './pathwayMapper/GroupComparisonPathwayMapper';
 import GroupComparisonMutationsTab from './GroupComparisonMutationsTab';
+import GroupComparisonPathwayMapperUserSelectionStore from './pathwayMapper/GroupComparisonPathwayMapperUserSelectionStore';
+import { Tour } from 'tours';
 
 export interface IGroupComparisonPageProps {
     routing: any;
@@ -65,11 +67,12 @@ export default class GroupComparisonPage extends React.Component<
     @observable.ref private store: GroupComparisonStore;
     private queryReaction: IReactionDisposer;
     private urlWrapper: GroupComparisonURLWrapper;
-
+    private pathwayMapperUserSelectionStore: GroupComparisonPathwayMapperUserSelectionStore;
     constructor(props: IGroupComparisonPageProps) {
         super(props);
         makeObservable(this);
         this.urlWrapper = new GroupComparisonURLWrapper(props.routing);
+        this.pathwayMapperUserSelectionStore = new GroupComparisonPathwayMapperUserSelectionStore();
         this.queryReaction = reaction(
             () => this.urlWrapper.query.comparisonId,
             sessionId => {
@@ -135,6 +138,7 @@ export default class GroupComparisonPage extends React.Component<
             this.store.alterationsEnrichmentData,
             this.store.alterationsEnrichmentAnalysisGroups,
             this.store.genesSortedByMutationFrequency,
+            this.store.genesSortedByAlterationFrequency,
         ],
         render: () => {
             return (
@@ -258,9 +262,6 @@ export default class GroupComparisonPage extends React.Component<
                         <MSKTab
                             id={GroupComparisonTab.PATHWAYS}
                             linkText={'Pathways'}
-                            anchorClassName={classnames({
-                                greyedOut: this.store.alterationsTabUnavailable,
-                            })}
                         >
                             <GroupComparisonPathwayMapper
                                 genomicData={
@@ -268,7 +269,10 @@ export default class GroupComparisonPage extends React.Component<
                                         .result || []
                                 }
                                 activeGroups={this.store.activeGroups.result}
-                                store={this.store}
+                                groupComparisonStore={this.store}
+                                userSelectionStore={
+                                    this.pathwayMapperUserSelectionStore
+                                }
                             />
                         </MSKTab>
                     )}
@@ -360,7 +364,7 @@ export default class GroupComparisonPage extends React.Component<
                     break;
                 case 1:
                     studyHeader = (
-                        <h3>
+                        <h3 data-tour="single-study-group-comparison-header">
                             <StudyLink studyId={studies[0].studyId}>
                                 {studies[0].name}
                             </StudyLink>
@@ -389,6 +393,7 @@ export default class GroupComparisonPage extends React.Component<
                     <span>
                         {studyHeader}Groups from{' '}
                         <span
+                            data-tour="single-study-group-comparison-attribute"
                             style={{ fontWeight: 'bold', fontStyle: 'italic' }}
                         >
                             {this.store.sessionClinicalAttributeName}
@@ -503,6 +508,7 @@ export default class GroupComparisonPage extends React.Component<
                         </div>
                     </div>
                     <div>{this.tabs.component}</div>
+                    {this.tabs.isComplete && <Tour />}
                 </div>
             </PageLayout>
         );

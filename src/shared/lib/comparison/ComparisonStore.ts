@@ -276,7 +276,6 @@ export default abstract class ComparisonStore extends AnalysisStore
     abstract _originalGroups: MobxPromise<ComparisonGroup[]>;
     abstract get overlapStrategy(): OverlapStrategy;
     abstract get usePatientLevelEnrichments(): boolean;
-    abstract get samples(): MobxPromise<Sample[]>;
     // < / >
 
     public get isLoggedIn() {
@@ -916,7 +915,7 @@ export default abstract class ComparisonStore extends AnalysisStore
                                 : 'samples'
                         } in ${
                             group.name
-                        } that have an alteration in the listed gene.`,
+                        } that are profiled for, and altered in, listed gene.`,
                     };
                 })
             );
@@ -1076,9 +1075,9 @@ export default abstract class ComparisonStore extends AnalysisStore
         referenceGenesPromise: this.hugoGeneSymbolToReferenceGene,
         fetchData: () => {
             if (
-                (this.alterationsEnrichmentDataRequestGroups.result &&
-                    this.alterationsEnrichmentDataRequestGroups.result.length >
-                        1 &&
+                (!_.isEmpty(
+                    this.alterationsEnrichmentDataRequestGroups.result
+                ) &&
                     (_(this.selectedMutationEnrichmentEventTypes)
                         .values()
                         .some() ||
@@ -1219,7 +1218,9 @@ export default abstract class ComparisonStore extends AnalysisStore
         invoke: async () => {
             const alterationRowData: AlterationEnrichmentRow[] = this
                 .alterationEnrichmentRowData.result!;
-            alterationRowData.sort(compareByAlterationPercentage);
+            // get a copy of the list to keep the original order intact
+            // this is to keep the order of rows in the alteration table as is
+            alterationRowData.slice().sort(compareByAlterationPercentage);
             return alterationRowData.map(a => a.hugoGeneSymbol);
         },
     });

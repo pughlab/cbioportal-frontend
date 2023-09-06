@@ -102,6 +102,24 @@ export class ServerConfigHelpers {
         return matches ? matches.map((s: string) => s.trim()) : [];
     }
 
+    @memoize
+    static parseCustomSampleTypeColors(config: string | undefined): any {
+        const result = {
+            customSampleTypes: [] as string[],
+            customSampleTypeToColor: {} as any,
+            customSampleTypesLower: [] as string[],
+        };
+        if (!config) {
+            return result;
+        }
+        result.customSampleTypeToColor = JSON.parse(config);
+        result.customSampleTypes = _.keys(result.customSampleTypeToColor);
+        result.customSampleTypesLower = result.customSampleTypes.map(t =>
+            t.toLowerCase()
+        );
+        return result;
+    }
+
     @memoize static parseConfigFormat(
         str: string | null
     ): CategorizedConfigItems {
@@ -132,17 +150,10 @@ export class ServerConfigHelpers {
     }
 
     static getUserDisplayName(): string | undefined {
-        if (getServerConfig().user_email_address) {
-            return getServerConfig().user_email_address &&
-                getServerConfig().user_email_address !== 'anonymousUser'
-                ? getServerConfig().user_email_address
-                : undefined;
-        } else {
-            return getServerConfig().user_display_name &&
-                getServerConfig().user_display_name !== 'anonymousUser'
-                ? getServerConfig().user_display_name
-                : undefined;
-        }
+        return getServerConfig().user_display_name &&
+            getServerConfig().user_display_name !== 'anonymousUser'
+            ? getServerConfig().user_display_name
+            : undefined;
     }
 }
 
@@ -241,7 +252,7 @@ function registerRequestBodyCompression(apiClient: any, domain: string): void {
         resolve: any,
         errorHandlers: any[]
     ) => {
-        if (method === 'POST') {
+        if (method === 'POST' && body !== undefined) {
             var bodyString = JSON.stringify(body);
             if (bodyString.length > REQ_BODY_SIZE_CHAR_LIMIT) {
                 headers['Content-Encoding'] = 'gzip';
@@ -376,7 +387,5 @@ export function fetchServerConfig() {
 
 export function initializeAppStore(appStore: AppStore) {
     appStore.authMethod = getServerConfig().authenticationMethod;
-    appStore.userName = getServerConfig().user_display_name
-        ? getServerConfig().user_display_name
-        : getServerConfig().user_email_address;
+    appStore.userName = getServerConfig().user_display_name;
 }

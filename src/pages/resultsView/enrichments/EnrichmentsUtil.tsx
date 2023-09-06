@@ -23,7 +23,7 @@ import styles from './styles.module.scss';
 import classNames from 'classnames';
 import { IMultipleCategoryBarPlotData } from 'pages/groupComparison/MultipleCategoryBarPlot';
 import { getTextColor } from '../../groupComparison/OverlapUtils';
-import { TruncatedText } from 'cbioportal-frontend-commons';
+import { DefaultTooltip, TruncatedText } from 'cbioportal-frontend-commons';
 import {
     ExpressionEnrichmentTableColumn,
     ExpressionEnrichmentTableColumnType,
@@ -52,9 +52,15 @@ export type ContinousDataPvalueTooltipProps = {
 };
 
 export const CNA_AMP_VALUE = 2;
+export const CNA_GAIN_VALUE = 1;
+export const CNA_DIPLOID_VALUE = 0;
+export const CNA_HETLOSS_VALUE = -1;
 export const CNA_HOMDEL_VALUE = -2;
 export const CNA_TO_ALTERATION: { [cna: number]: string } = {
     [CNA_AMP_VALUE]: 'AMP',
+    [CNA_GAIN_VALUE]: 'GAIN',
+    [CNA_DIPLOID_VALUE]: 'DIPLOID',
+    [CNA_HETLOSS_VALUE]: 'HETLOSS',
     [CNA_HOMDEL_VALUE]: 'HOMDEL',
 };
 export const PVALUE_TEST_GROUP_SIZE_THRESHOLD = 3;
@@ -112,6 +118,13 @@ export function formatPercentage(
     return (
         datum.alteredCount + ' (' + datum.alteredPercentage.toFixed(2) + '%)'
     );
+}
+
+export function getProfiledCount(
+    group: string,
+    data: AlterationEnrichmentRow
+): number {
+    return data.groupsSet[group].profiledCount;
 }
 
 export function getAlteredCount(
@@ -651,11 +664,27 @@ export function getAlterationEnrichmentColumns(
         columns.push({
             name: group.name,
             headerRender: PERCENTAGE_IN_headerRender,
-            render: (d: AlterationEnrichmentRow) => (
-                <span data-test={`${group.name}-CountCell`}>
-                    {formatPercentage(group.name, d)}
-                </span>
-            ),
+            render: (d: AlterationEnrichmentRow) => {
+                let overlay = (
+                    <span>
+                        {getProfiledCount(group.name, d)} samples in{' '}
+                        {group.name} are profiled for {d.hugoGeneSymbol},&nbsp;
+                        {formatPercentage(group.name, d)} of which are altered
+                        in {d.hugoGeneSymbol}
+                    </span>
+                );
+                return (
+                    <DefaultTooltip
+                        destroyTooltipOnHide={true}
+                        trigger={['hover']}
+                        overlay={overlay}
+                    >
+                        <span data-test={`${group.name}-CountCell`}>
+                            {formatPercentage(group.name, d)}
+                        </span>
+                    </DefaultTooltip>
+                );
+            },
             tooltip: (
                 <span>
                     <strong>{group.name}:</strong> {group.description}

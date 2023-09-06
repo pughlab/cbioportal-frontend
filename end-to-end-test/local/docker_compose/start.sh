@@ -9,6 +9,7 @@ DIR=$PWD
 
 cd $E2E_WORKSPACE/cbioportal-docker-compose
 
+
 compose_extensions="-f docker-compose.yml -f $TEST_HOME/docker_compose/cbioportal.yml -f $TEST_HOME/docker_compose/keycloak.yml"
 if [ $CUSTOM_BACKEND -eq 1 ]; then
   compose_extensions="$compose_extensions -f $TEST_HOME/docker_compose/cbioportal-custombranch.yml"

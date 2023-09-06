@@ -42,6 +42,7 @@ export interface IServerConfig {
     oncoprint_custom_driver_annotation_binary_menu_label: string | null; // default:
     disabled_tabs: string | null;
     custom_tabs: any[];
+    custom_js_urls: string; // comma delimited string
     oncoprint_custom_driver_annotation_binary_default: boolean;
     oncoprint_custom_driver_annotation_tiers_default: boolean;
     oncoprint_oncokb_default: boolean;
@@ -67,6 +68,7 @@ export interface IServerConfig {
     show_hotspot: boolean | undefined;
     show_oncokb: boolean;
     show_civic: boolean;
+    show_revue: boolean;
     show_genomenexus: boolean;
     show_genomenexus_annotation_sources: string;
     show_pathway_mapper: boolean;
@@ -103,6 +105,7 @@ export interface IServerConfig {
     skin_right_nav_show_testimonials: boolean;
     skin_right_nav_show_whats_new: boolean;
     skin_right_nav_show_twitter: boolean;
+    skin_right_nav_show_web_tours: boolean;
     skin_right_nav_whats_new_blurb: string | null;
     skin_show_about_tab: boolean;
     skin_show_data_tab: boolean;
@@ -119,7 +122,7 @@ export interface IServerConfig {
     skin_title: string;
     skin_authorization_message: string | null;
     skin_patientview_filter_genes_profiled_all_samples: boolean;
-    skin_hide_download_controls: boolean;
+    skin_hide_download_controls: string;
     show_mdacc_heatmap: boolean;
     quick_search_enabled: boolean;
     default_cross_cancer_study_list: string; // this has a default
@@ -137,7 +140,6 @@ export interface IServerConfig {
     query_sets_of_genes: string | null;
     skin_quick_select_buttons: string | null;
     base_url: string | null;
-    user_email_address: string; //Property to be completely replaced by user_display_name when backend PR #9986 is merged
     user_display_name: string;
     sessionServiceEnabled: boolean;
     session_url_length_threshold: string;
@@ -158,12 +160,21 @@ export interface IServerConfig {
     enable_treatment_groups: boolean;
     referenceGenomeVersion: string;
     skin_home_page_show_unauthorized_studies: boolean;
+    skin_home_page_show_reference_genome: string;
     skin_home_page_unauthorized_studies_global_message: string;
     skin_mutation_table_namespace_column_show_by_default: boolean;
     skin_patient_view_mutation_table_columns_show_on_init: string;
     skin_results_view_mutation_table_columns_show_on_init: string;
+    skin_comparison_view_mutation_table_columns_show_on_init: string;
     skin_patient_view_copy_number_table_columns_show_on_init: string;
     skin_patient_view_structural_variant_table_columns_show_on_init: string;
+    skin_patient_view_custom_sample_type_colors_json: string;
     comparison_categorical_na_values: string;
     oncoprint_clinical_tracks_config_json: string;
+    oncoprint_clustered_default: boolean; // this has a default
+    enable_cross_study_expression: string;
+    studyview_max_samples_selected: number;
+    study_download_url: string;
+    vaf_sequential_mode_default: boolean; // this has a default
+    vaf_log_scale_default: boolean; // this has a default
 }

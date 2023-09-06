@@ -1,4 +1,6 @@
 declare const styles: {
+  readonly "addControl": string;
+  readonly "addGeneUI": string;
   readonly "amp": string;
   readonly "autoMarginCheckbox": string;
   readonly "cancerGene": string;
@@ -20,12 +22,15 @@ declare const styles: {
   readonly "highlightedEvenRow": string;
   readonly "highlightedOddRow": string;
   readonly "highlightedRow": string;
+  readonly "hover": string;
   readonly "intersection": string;
   readonly "labelContent": string;
   readonly "labelContentSVG": string;
   readonly "mutsig": string;
   readonly "oddRow": string;
+  readonly "pullRight": string;
   readonly "row": string;
+  readonly "selected": string;
   readonly "studyViewTablesTable": string;
   readonly "tableSearchInput": string;
   readonly "union": string;

@@ -26,12 +26,12 @@ services:
     - DB_DATABASE=keycloak
     - KEYCLOAK_USER=admin
     - KEYCLOAK_PASSWORD=admin
-    - JDBC_PARAMS=${KEYCLOAK_JDBC_PARAMS:-useSSL=false}
+    - JDBC_PARAMS=${KEYCLOAK_JDBC_PARAMS:-useSSL=false&serverTimezone=UTC}
 
   kcdb:
     networks:
     - cbio-net
-    image: mysql:5.7
+    image: ${DOCKER_IMAGE_MYSQL}
     container_name: kcdb
     restart: unless-stopped
     volumes:

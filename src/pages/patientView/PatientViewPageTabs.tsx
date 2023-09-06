@@ -94,7 +94,6 @@ export function tabs(
     sampleManager: SampleManager | null
 ) {
     const tabs: JSX.Element[] = [];
-
     tabs.push(
         <MSKTab key={0} id={PatientViewPageTabs.Summary} linkText="Summary">
             <LoadingIndicator
@@ -597,6 +596,8 @@ export function tabs(
         );
 
     pageComponent.patientViewPageStore.hasMutationalSignatureData.result &&
+        pageComponent.patientViewPageStore.initialMutationalSignatureVersion
+            .isComplete &&
         tabs.push(
             <MSKTab
                 key={8}
@@ -605,6 +606,8 @@ export function tabs(
                 hide={
                     pageComponent.patientViewPageStore
                         .mutationalSignatureMolecularProfiles.isPending ||
+                    pageComponent.patientViewPageStore
+                        .initialMutationalSignatureVersion.isPending ||
                     _.isEmpty(
                         pageComponent.patientViewPageStore
                             .mutationalSignatureDataGroupByVersion.result
@@ -627,6 +630,19 @@ export function tabs(
                         pageComponent.patientViewPageStore
                             .selectedMutationalSignatureVersion
                     }
+                    dataCount={
+                        pageComponent.patientViewPageStore
+                            .mutationalSignatureCountDataGroupedByVersion.result
+                    }
+                    sample={
+                        pageComponent.patientViewPageStore
+                            .selectedSampleMutationalSignatureData
+                    }
+                    samples={
+                        pageComponent.patientViewPageStore
+                            .samplesWithCountDataAvailable
+                    }
+                    onSampleChange={pageComponent.onSampleIdChange}
                 />
             </MSKTab>
         );

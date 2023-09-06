@@ -1,28 +1,32 @@
 import {
     filterCBioPortalWebServiceDataByUnflattenedOQLLine,
-    OQLLineFilterOutput,
     MergedTrackLineFilterOutput,
     filterCBioPortalWebServiceData,
     parseOQLQuery,
     unparseOQLQueryLine,
     doesQueryContainMutationOQL,
     doesQueryContainOQL,
+    convertToGene1Gene2String,
+    STUCTVARDownstreamFusionStr,
+    STUCTVARUpstreamFusionStr,
+    STRUCTVARAnyGeneStr,
+    STRUCTVARNullGeneStr,
+    queryContainsStructVarAlteration,
 } from './oqlfilter';
 import {
     NumericGeneMolecularData,
     MolecularProfile,
-    Mutation,
 } from 'cbioportal-ts-api-client';
 import AccessorsForOqlFilter from './AccessorsForOqlFilter';
-import _ from 'lodash';
 import { assert } from 'chai';
-import sinon from 'sinon';
-import { CustomDriverNumericGeneMolecularData } from '../../../pages/resultsView/ResultsViewPageStore';
 import { AlterationTypeConstants } from 'shared/constants';
 import {
     AnnotatedMutation,
     AnnotatedStructuralVariant,
 } from 'shared/model/AnnotatedMutation';
+import { CustomDriverNumericGeneMolecularData } from 'shared/model/CustomDriverNumericGeneMolecularData';
+import { SingleGeneQuery } from './oql-parser';
+import { assertEsLintSupport } from 'fork-ts-checker-webpack-plugin/lib/eslint-reporter/assertEsLintSupport';
 
 // This file uses type assertions to force functions that use overly specific
 // Swagger-generated types as parameters to accept mocked literals believed to
@@ -264,6 +268,12 @@ describe('doesQueryContainOQL', () => {
         assert.equal(doesQueryContainOQL('TP53 BRCA1 BRCA2:EXP>0'), true);
         assert.equal(doesQueryContainOQL('TP53 BRCA1 BRCA2:FUSION'), true);
         assert.equal(doesQueryContainOQL('TP53 BRCA1 BRCA2:DRIVER'), true);
+        assert.equal(doesQueryContainOQL('TP53 BRCA1 PTEN::'), true);
+        assert.equal(doesQueryContainOQL('TP53 BRCA1 ::IGF2'), true);
+        assert.equal(doesQueryContainOQL('TP53 BRCA1 PTEN::IGF2'), true);
+        assert.equal(doesQueryContainOQL('TP53 BRCA1 PTEN:FUSION::'), true);
+        assert.equal(doesQueryContainOQL('TP53 BRCA1 PTEN:FUSION::IGF2'), true);
+        assert.equal(doesQueryContainOQL('TP53 BRCA1 PTEN:IGF::FUSION'), true);
     });
 });
 
@@ -281,6 +291,15 @@ describe('doesQueryContainMutationOQL', () => {
             true
         );
         assert.equal(doesQueryContainMutationOQL('TP53: DRIVER'), true);
+
+        // Struct Vars
+        assert.equal(doesQueryContainMutationOQL('TP53: FUSION'), false);
+        assert.equal(doesQueryContainMutationOQL('TP53: FUSION::'), false);
+        assert.equal(doesQueryContainMutationOQL('TP53: ::FUSION'), false);
+        assert.equal(doesQueryContainMutationOQL('TP53: FUSION::-'), false);
+        assert.equal(doesQueryContainMutationOQL('TP53: -::FUSION'), false);
+        assert.equal(doesQueryContainMutationOQL('KIF5B: FUSION::RET'), false);
+        assert.equal(doesQueryContainMutationOQL('RET: KIF5B::FUSION'), false);
     });
 });
 
@@ -338,6 +357,29 @@ describe('unparseOQLQueryLine', () => {
         assert.equal(
             unparseOQLQueryLine(parsedLine),
             'TP53: MUT=INFRAME_DRIVER_GERMLINE_(1-100*) MUT_(-500) MUT_GERMLINE_(51-)_DRIVER;'
+        );
+    });
+    it('unparses queries with downstream fusion with RET', () => {
+        const parsedLine = parseOQLQuery(
+            'KIF5B: SOMATIC_FUSION::RET_DRIVER'
+        )[0];
+        assert.equal(
+            unparseOQLQueryLine(parsedLine),
+            'KIF5B: FUSION::RET_SOMATIC_DRIVER;'
+        );
+    });
+    it('unparses queries with downstream fusion with any gene', () => {
+        const parsedLine = parseOQLQuery('KIF5B: SOMATIC_FUSION::_DRIVER')[0];
+        assert.equal(
+            unparseOQLQueryLine(parsedLine),
+            'KIF5B: FUSION::_SOMATIC_DRIVER;'
+        );
+    });
+    it('unparses queries with downstream fusion with undefined gene', () => {
+        const parsedLine = parseOQLQuery('KIF5B: SOMATIC_FUSION::-_DRIVER')[0];
+        assert.equal(
+            unparseOQLQueryLine(parsedLine),
+            'KIF5B: FUSION::-_SOMATIC_DRIVER;'
         );
     });
 });
@@ -782,6 +824,183 @@ describe('filterCBioPortalWebServiceDataByUnflattenedOQLLine', () => {
         assert.lengthOf(
             (filteredData[1] as MergedTrackLineFilterOutput<object>).list,
             2
+        );
+    });
+});
+
+describe('convertToGene1Gene2String', () => {
+    it.each([
+        [{ gene: 'A', alterations: [] }, ['A']],
+        [
+            {
+                gene: 'A',
+                alterations: [
+                    {
+                        gene: undefined,
+                        alteration_type: STUCTVARDownstreamFusionStr,
+                        modifiers: [],
+                    },
+                ],
+            },
+            ['A'],
+        ],
+        [
+            {
+                gene: 'A',
+                alterations: [
+                    {
+                        gene: 'B',
+                        alteration_type: STUCTVARDownstreamFusionStr,
+                        modifiers: [],
+                    },
+                ],
+            },
+            ['A::B'],
+        ],
+        [
+            {
+                gene: 'A',
+                alterations: [
+                    {
+                        gene: STRUCTVARAnyGeneStr,
+                        alteration_type: STUCTVARDownstreamFusionStr,
+                        modifiers: [],
+                    },
+                ],
+            },
+            [`A::${STRUCTVARAnyGeneStr}`],
+        ],
+        [
+            {
+                gene: 'A',
+                alterations: [
+                    {
+                        gene: STRUCTVARNullGeneStr,
+                        alteration_type: STUCTVARDownstreamFusionStr,
+                        modifiers: [],
+                    },
+                ],
+            },
+            [`A::${STRUCTVARNullGeneStr}`],
+        ],
+        [
+            {
+                gene: 'A',
+                alterations: [
+                    {
+                        gene: 'B',
+                        alteration_type: STUCTVARUpstreamFusionStr,
+                        modifiers: [],
+                    },
+                ],
+            },
+            ['B::A'],
+        ],
+        [
+            {
+                gene: 'A',
+                alterations: [
+                    {
+                        gene: STRUCTVARAnyGeneStr,
+                        alteration_type: STUCTVARUpstreamFusionStr,
+                        modifiers: [],
+                    },
+                ],
+            },
+            [`${STRUCTVARAnyGeneStr}::A`],
+        ],
+        [
+            {
+                gene: 'A',
+                alterations: [
+                    {
+                        gene: STRUCTVARNullGeneStr,
+                        alteration_type: STUCTVARUpstreamFusionStr,
+                        modifiers: [],
+                    },
+                ],
+            },
+            [`${STRUCTVARNullGeneStr}::A`],
+        ],
+        [
+            {
+                gene: 'A',
+                alterations: [
+                    {
+                        gene: 'B',
+                        alteration_type: STUCTVARDownstreamFusionStr,
+                        modifiers: [],
+                    },
+                    {
+                        gene: 'C',
+                        alteration_type: STUCTVARDownstreamFusionStr,
+                        modifiers: [],
+                    },
+                ],
+            },
+            ['A::B', 'A::C'],
+        ],
+    ])('converts %p into %p', (singleGeneQuery, expected: string[]) => {
+        assert.deepEqual(
+            convertToGene1Gene2String(singleGeneQuery as SingleGeneQuery),
+            expected
+        );
+    });
+});
+
+describe('queryContainsStructVarAlteration', () => {
+    it.each([
+        [{ gene: 'A', alterations: false }, false],
+        [{ gene: 'A', alterations: [] }, false],
+        [
+            {
+                gene: 'A',
+                alterations: [
+                    {
+                        gene: undefined,
+                        alteration_type: STUCTVARDownstreamFusionStr,
+                        modifiers: [],
+                    },
+                ],
+            },
+            false,
+        ],
+        [
+            {
+                gene: 'A',
+                alterations: [
+                    {
+                        alteration_type: 'mut',
+                        modifiers: [],
+                    },
+                ],
+            },
+            false,
+        ],
+        [
+            {
+                gene: 'A',
+                alterations: [
+                    {
+                        gene: 'B',
+                        alteration_type: 'mut',
+                        modifiers: [],
+                    },
+                    {
+                        gene: 'C',
+                        alteration_type: STUCTVARDownstreamFusionStr,
+                        modifiers: [],
+                    },
+                ],
+            },
+            true,
+        ],
+    ])('converts %p into %p', (singleGeneQuery, expected: boolean) => {
+        assert.equal(
+            queryContainsStructVarAlteration(
+                singleGeneQuery as SingleGeneQuery
+            ),
+            expected
         );
     });
 });

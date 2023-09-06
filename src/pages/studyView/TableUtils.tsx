@@ -48,6 +48,11 @@ export function getGeneColumnCellOverlaySimple(
                     isTumorSuppressorGene
                 )}
             </span>
+            <strong>
+                {geneIsSelected
+                    ? `Click gene symbol to remove from query queue`
+                    : 'Click gene symbol to queue for query'}
+            </strong>
         </div>
     );
 }
@@ -91,6 +96,7 @@ export function getCancerGeneFilterToggleIcon(
 export enum FreqColumnTypeEnum {
     MUTATION = 'mutations',
     STRUCTURAL_VARIANT = 'structural variants',
+    STRUCTURAL_VARIANT_PAIR = 'structural variant pairs',
     CNA = 'copy number alterations',
     DATA = 'data',
 }
@@ -106,7 +112,8 @@ export function getFreqColumnRender(
     numberOfAlteredCases: number,
     matchingGenePanelIds: string[],
     toggleModal?: (panelName: string) => void,
-    style?: CSSProperties
+    style?: CSSProperties,
+    className?: string
 ) {
     let tooltipContent = '# of samples profiled';
     if (type !== 'data') {
@@ -131,7 +138,7 @@ export function getFreqColumnRender(
             overlay={addTotalProfiledOverlay}
             destroyTooltipOnHide={true}
         >
-            <span data-test="freq-cell" style={style}>
+            <span data-test="freq-cell" className={className} style={style}>
                 {getFrequencyStr(
                     (numberOfAlteredCases / numberOfProfiledCases) * 100
                 )}

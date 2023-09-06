@@ -43,6 +43,7 @@ export const ServerConfigDefaults: Partial<IServerConfig> = {
     show_hotspot: true,
     show_oncokb: true,
     show_civic: false,
+    show_revue: true,
     show_pathway_mapper: true,
     show_mutation_mapper_tool_grch38: true,
     show_transcript_dropdown: false,
@@ -74,6 +75,7 @@ export const ServerConfigDefaults: Partial<IServerConfig> = {
     skin_right_nav_show_examples: true,
     skin_right_nav_show_testimonials: true,
     skin_right_nav_show_whats_new: true,
+    skin_right_nav_show_web_tours: false,
     skin_right_nav_show_twitter: false,
     skin_citation_rule_text:
         'Please cite: <a href="http://cancerdiscovery.aacrjournals.org/content/2/5/401.abstract" target="_blank">Cerami et al., 2012</a> &amp; <a href="http://www.ncbi.nlm.nih.gov/pubmed/23550210" target="_blank">Gao et al., 2013</a>',
@@ -100,7 +102,7 @@ export const ServerConfigDefaults: Partial<IServerConfig> = {
     default_cross_cancer_study_list_name: 'TCGA PanCancer Atlas studies',
     skin_title: 'cBioPortal for Cancer Genomics',
 
-    skin_data_sets_header: `The portal currently contains data from the following 
+    skin_data_sets_header: `The portal currently contains data from the following
             cancer genomics studies.  The table below lists the number of available samples per data type and tumor.`,
 
     skin_example_study_queries: `tcga pancancer atlas\n
@@ -145,6 +147,7 @@ export const ServerConfigDefaults: Partial<IServerConfig> = {
             SAMPLE_TREATMENTS_TABLE: 75,
             SAMPLE_TREATMENT_GROUPS_TABLE: 75,
             SAMPLE_TREATMENT_TARGET_TABLE: 75,
+            CLINICAL_EVENT_TYPE_COUNTS_TABLE: 75,
             CANCER_STUDIES: 70,
             SEQUENCED: 60,
             HAS_CNA_DATA: 50,
@@ -175,6 +178,8 @@ export const ServerConfigDefaults: Partial<IServerConfig> = {
 
     query_product_limit: 1000000,
 
+    enable_cross_study_expression: undefined,
+
     clinical_attribute_product_limit: 6500000,
 
     skin_show_gsva: false,
@@ -198,7 +203,7 @@ export const ServerConfigDefaults: Partial<IServerConfig> = {
     skin_home_page_unauthorized_studies_global_message:
         'The study is unauthorized. You need to request access.',
     comparison_categorical_na_values: 'NA',
-    skin_hide_download_controls: false,
+    skin_hide_download_controls: 'show',
 
     oncoprint_clinical_tracks_config_json: '',
 
@@ -206,9 +211,23 @@ export const ServerConfigDefaults: Partial<IServerConfig> = {
 
     skin_results_view_mutation_table_columns_show_on_init: '',
 
+    skin_comparison_view_mutation_table_columns_show_on_init: '',
+
     skin_patient_view_copy_number_table_columns_show_on_init: '',
 
     skin_patient_view_structural_variant_table_columns_show_on_init: '',
+
+    skin_patient_view_custom_sample_type_colors_json: '',
+
+    studyview_max_samples_selected: 0,
+
+    study_download_url: '',
+
+    oncoprint_clustered_default: true,
+
+    vaf_sequential_mode_default: false,
+
+    vaf_log_scale_default: false,
 };
 
 export default ServerConfigDefaults;

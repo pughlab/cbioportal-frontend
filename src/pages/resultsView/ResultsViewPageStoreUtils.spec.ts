@@ -26,11 +26,6 @@ import {
     parseGenericAssayGroups,
 } from './ResultsViewPageStoreUtils';
 import {
-    AnnotatedExtendedAlteration,
-    CustomDriverNumericGeneMolecularData,
-    IQueriedMergedTrackCaseData,
-} from './ResultsViewPageStore';
-import {
     MergedTrackLineFilterOutput,
     OQLLineFilterOutput,
 } from '../../shared/lib/oql/oqlfilter';
@@ -55,6 +50,9 @@ import {
 } from 'shared/api/session-service/sessionServiceModels';
 import $ from 'jquery';
 import { AnnotatedMutation } from 'shared/model/AnnotatedMutation';
+import { AnnotatedExtendedAlteration } from 'shared/model/AnnotatedExtendedAlteration';
+import { CustomDriverNumericGeneMolecularData } from 'shared/model/CustomDriverNumericGeneMolecularData';
+import { IQueriedMergedTrackCaseData } from 'shared/model/IQueriedMergedTrackCaseData';
 
 describe('ResultsViewPageStoreUtils', () => {
     describe('computeCustomDriverAnnotationReport', () => {
@@ -1259,7 +1257,7 @@ const defaultOqlAlterations = (oql_parser.parse(
 )![0] as SingleGeneQuery).alterations;
 
 describe('getSampleAlteredMap', () => {
-    const filteredAlterationData = [
+    const filteredAlterationData = ([
         {
             cases: {
                 samples: {},
@@ -1449,6 +1447,7 @@ describe('getSampleAlteredMap', () => {
         {
             cases: {
                 samples: {},
+                patients: {},
             },
             oql: {
                 gene: 'KRAS',
@@ -1469,7 +1468,7 @@ describe('getSampleAlteredMap', () => {
                 ],
             },
         },
-    ] as IQueriedMergedTrackCaseData[];
+    ] as unknown) as IQueriedMergedTrackCaseData[];
 
     var samples = ([
         {

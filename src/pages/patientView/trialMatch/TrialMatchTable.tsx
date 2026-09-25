@@ -656,8 +656,8 @@ export default class TrialMatchTable extends React.Component<ITrialMatchProps> {
                 />
                 <div className={styles.powered}>
                     Powered by{' '}
-                    <a href="https://oncokb.org/" target="_blank">
-                        OncoKB
+                    <a href="https://ctims.ca/" target="_blank">
+                        CTIMS
                     </a>{' '}
                     &{' '}
                     <a href="https://matchminer.org/" target="_blank">
